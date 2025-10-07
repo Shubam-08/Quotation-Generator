@@ -1,103 +1,83 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React from 'react';
+import Link from 'next/link';
+
+export default function HomePage() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-gray-50">
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      {/* Hero Section */}
+      <section className="bg-gradient-to-r from-blue-900 to-blue-700 text-white py-28 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 leading-tight">
+            QLite Global <br /> Product Configurator
+          </h1>
+          <p className="text-lg md:text-xl text-gray-200 mb-10">
+            Explore, configure, and download tailored product selections for your next project.
+          </p>
+          <Link
+            href="/products"
+            className="inline-block bg-white text-blue-900 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-gray-100 transition"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            Explore Products
+          </Link>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      </section>
+
+      {/* Features / Why QLite Global */}
+      <section className="py-20 px-6 bg-gray-50">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+          
+          <div className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition">
+            <h2 className="text-2xl font-bold mb-3 text-blue-900">Easy Selection</h2>
+            <p className="text-gray-600">
+              Browse our wide range of products with detailed specifications and pick what suits your project.
+            </p>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition">
+            <h2 className="text-2xl font-bold mb-3 text-blue-900">Flexible Configuration</h2>
+            <p className="text-gray-600">
+              Customize quantities and specifications seamlessly before generating your project overview.
+            </p>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition">
+            <h2 className="text-2xl font-bold mb-3 text-blue-900">Export & Share</h2>
+            <p className="text-gray-600">
+              Download your selected products in PDF or Excel format, ready to share with your team or clients.
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Call-to-Action Section */}
+      <section className="bg-blue-50 py-20 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-4 text-blue-900">
+            Start Your Project Today
+          </h2>
+          <p className="text-gray-700 mb-8">
+            Quickly configure your products and get a comprehensive overview ready for planning and budgeting.
+          </p>
+          <Link
+            href="/products"
+            className="inline-block bg-blue-900 text-white font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-800 transition"
+          >
+            Start Configuring
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-gray-200 py-10 text-center">
+        <p className="text-sm">
+          © {new Date().getFullYear()} QLite Global. All rights reserved.
+        </p>
       </footer>
+
     </div>
   );
 }
