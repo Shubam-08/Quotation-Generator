@@ -5,9 +5,34 @@ import { useCart } from '@/context/CartContext';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet } from 'lucide-react';
 
-export default function CartSidebar() {
-  const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity } = useCart();
+// Define Product & CartItem types
+interface Product {
+  _id: string;
+  sku?: string;
+  category?: string;
+  application?: string;
+  inputVoltage?: string;
+  watt?: string;
+  lumen?: string;
+  beamAngle?: string;
+  dimension?: string;
+  cutOut?: string;
+  ipRating?: string;
+  price?: number;
+}
+type CartItem = Product & { quantity: number; name?: string; };
+
+export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => void }) {
+  const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity } = useCart() as {
+    cart: CartItem[];
+    removeFromCart: (id: string) => void;
+    clearCart: () => void;
+    increaseQuantity: (id: string) => void;
+    decreaseQuantity: (id: string) => void;
+  };
+
   const [userInfo, setUserInfo] = useState({ email: '', mobile: '', project: '' });
   const [showError, setShowError] = useState(false);
 
@@ -19,301 +44,202 @@ export default function CartSidebar() {
     setShowError(false);
   };
 
-  // Excel Export
+  // Export Excel
   const exportExcel = () => {
-    if (!canDownload) {
-      setShowError(true);
-      return;
-    }
+    if (!canDownload) { setShowError(true); return; }
 
-    const data = cart.map(item => ({
-      'Model Number': item.sku ?? 'N/A',
-      'Category': item.category ?? '-',
-      'Application': item.application ?? '-',
-      'Input Voltage': item.inputVoltage ?? '-',
-      'Watt': item.watt ?? '-',
-      'Lumen': item.lumen ?? '-',
-      'Beam Angle': item.beamAngle ?? '-',
-      'Price': item.price ?? 0,
-      'Quantity': item.quantity ?? 1,
-      'Total': (item.price ?? 0) * (item.quantity ?? 1)
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Cart');
-    XLSX.writeFile(workbook, 'cart.xlsx');
-  };
+    const headerData = [
+      ['QLITE CO. WLL'],
+      ['CR No.: 82699-01'],
+      ['P.O. Box: 1858'],
+      ['Manama - Kingdom of Bahrain'],
+      ['TEL: +973 17232503  FAX: +973 17242125'],
+      ['E-mail: sales@qliteglobal.com'],
+      [`Project Name - ${userInfo.project}`],
+      [`Email: ${userInfo.email}`],
+      [`Mobile: ${userInfo.mobile}`],
+      [],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(headerData);
+    ws['!merges'] = headerData.map((_, i) => ({ s: { r: i, c: 0 }, e: { r: i, c: 12 } }));
 
-  // PDF Export (Professional)
-  const exportPDF = () => {
-    if (!canDownload) {
-      setShowError(true);
-      return;
-    }
-
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    // Logo
-    const imgWidth = 80;
-    const imgHeight = 40;
-    doc.addImage('/logo.jpg', 'JPEG', 14, 14, imgWidth, imgHeight);
-
-    // Company Info (Top-Right)
-    doc.setFontSize(10);
-    doc.text('QLITE CO. WLL', pageWidth - 150, 20, { align: 'right' });
-    doc.text('CR No.: 82699-01', pageWidth - 150, 32, { align: 'right' });
-    doc.text('P.O. Box: 1858', pageWidth - 150, 44, { align: 'right' });
-    doc.text('Manama - Kingdom of Bahrain', pageWidth - 150, 56, { align: 'right' });
-    doc.text('TEL: +973 17232503  FAX: +973 17242125', pageWidth - 150, 68, { align: 'right' });
-    doc.text('E-mail: sales@qliteglobal.com', pageWidth - 150, 80, { align: 'right' });
-
-    // Project Info
-    doc.setFontSize(12);
-    doc.setTextColor(0, 70, 255);
-    doc.text(`Project Name - ${userInfo.project}`, 14, 100);
-    doc.setTextColor(0);
-    doc.setFontSize(10);
-    doc.text(`Email: ${userInfo.email}`, 14, 112);
-    doc.text(`Mobile: ${userInfo.mobile}`, 14, 124);
-
-    // Table
-    const columns = [
-      'Model Number', 'Category', 'Application', 'Input Voltage', 'Watt',
-      'Lumen', 'Beam Angle', 'Price', 'Quantity', 'Total'
+    const tableColumns = [
+      'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','Dimension','Cut Out','IP Rating','Price','Quantity','Total'
     ];
 
-    const rows = cart.map(item => [
-      item.sku ?? 'N/A',
-      item.category ?? '-',
-      item.application ?? '-',
-      item.inputVoltage ?? '-',
-      item.watt ?? '-',
-      item.lumen ?? '-',
-      item.beamAngle ?? '-',
-      item.price ?? 0,
-      item.quantity ?? 1,
-      (item.price ?? 0) * (item.quantity ?? 1)
+    const tableData = cart.map(item => [
+      item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
+      item.watt ?? '-', item.lumen ?? '-', item.beamAngle ?? '-', item.dimension ?? '-', item.cutOut ?? '-', 
+      item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', item.price ?? 0, item.quantity ?? 1, (item.price ?? 0) * (item.quantity ?? 1)
     ]);
 
-    autoTable(doc, {
-      head: [columns],
-      body: rows,
-      startY: 140,
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [0, 70, 255], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-      margin: { left: 14, right: 14 }
-    });
+    XLSX.utils.sheet_add_aoa(ws, [tableColumns], { origin: 10 });
+    XLSX.utils.sheet_add_aoa(ws, tableData, { origin: 11 });
 
-    // Total Amount
-    const finalY = (doc as any).lastAutoTable.finalY || 140;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total Amount: ₹${total.toLocaleString()}`, pageWidth - 14, finalY + 20, { align: 'right' });
+    const totalAmount = cart.reduce((sum, item) => sum + ((item.price ?? 0) * (item.quantity ?? 1)), 0);
+    const totalRowIndex = 11 + tableData.length;
+    XLSX.utils.sheet_add_aoa(ws, [['','','','','','','','','','', 'Total Amount:', totalAmount]], { origin: totalRowIndex });
 
-    doc.save(`${userInfo.project}_quotation.pdf`);
+    XLSX.utils.book_append_sheet(workbook, ws, 'Cart');
+    XLSX.writeFile(workbook, `${userInfo.project}_cart.xlsx`);
   };
+
+  // Export PDF
+const exportPDF = () => {
+  if (!canDownload) { setShowError(true); return; }
+
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginRight = 20;
+  const rightX = pageWidth - marginRight;
+
+  // Logo
+  doc.addImage('/logo.jpg', 'JPEG', 14, 1, 80, 90);
+
+  // Company Info - smaller & normal
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('QLITE CO. WLL', rightX, 20, { align: 'right' });
+  doc.text('CR No.: 82699-01', rightX, 32, { align: 'right' });
+  doc.text('P.O. Box: 1858', rightX, 44, { align: 'right' });
+  doc.text('Manama - Kingdom of Bahrain', rightX, 56, { align: 'right' });
+  doc.text('TEL: +973 17232503  FAX: +973 17242125', rightX, 68, { align: 'right' });
+  doc.text('E-mail: sales@qliteglobal.com', rightX, 80, { align: 'right' });
+
+  // Project Info
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(`Project Name - ${userInfo.project}`, 14, 100);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`Email: ${userInfo.email}`, 14, 112);
+  doc.text(`Mobile: ${userInfo.mobile}`, 14, 124);
+
+  // Table
+  const columns = [
+    'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating','Price','Quantity','Total'
+  ];
+  const rows = cart.map(item => [
+    item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
+    item.watt ?? '-', item.lumen ?? '-', item.beamAngle ?? '-', item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', 
+    item.price ?? 0, item.quantity ?? 1, (item.price ?? 0) * (item.quantity ?? 1)
+  ]);
+
+  autoTable(doc, {
+    head: [columns],
+    body: rows,
+    startY: 140,
+    styles: { fontSize: 7, cellPadding: 2, fontStyle: 'normal' }, // smaller, thin text
+    headStyles: { fillColor: [0, 70, 255], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+    margin: { left: 14, right: 14 },
+    columnStyles: { 7: { cellWidth: 50 } },
+  });
+
+  // Total Amount - slightly bold
+  const finalY = (doc as any).lastAutoTable.finalY || 140;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total Amount: Rs. ${total.toLocaleString('en-IN')}`, pageWidth - 10, finalY + 20, { align: 'right' });
+
+  doc.save(`${userInfo.project}_quotation.pdf`);
+};
+
 
   return (
     <div style={{
-      position: 'fixed',
-      right: 0,
-      top: 0,
-      height: '100%',
-      width: '384px',
-      backgroundColor: 'white',
-      boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
-      padding: '1.5rem',
-      overflowY: 'auto',
-      zIndex: 50
-    }}>
-      <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-        Cart ({cart.length})
-      </h2>
-      
-      {cart.length === 0 && <p style={{ color: '#6b7280' }}>Your cart is empty.</p>}
+  width: '100%',
+  maxWidth: '800px',        // optional, to keep content centered
+  margin: '2rem auto',      // top/bottom spacing and center horizontally
+  backgroundColor: 'white',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+  borderRadius: '0.75rem',
+  overflowY: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+  padding: '1.5rem',
+}}>
+      {/* Close Button */}
+      {closeSidebar && (
+        <button onClick={closeSidebar} style={{
+          position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.25rem'
+        }}>×</button>
+      )}
 
-      {cart.map(item => (
-        <div
-          key={item._id}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '0.75rem',
-            borderBottom: '1px solid #e5e7eb',
-            paddingBottom: '0.5rem'
-          }}
-        >
-          <div>
-            <p style={{ fontWeight: '500', fontSize: '0.875rem' }}>
-              {item.sku}
-            </p>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-              ₹{item.price} x {item.quantity} = ₹{((item.price ?? 0) * (item.quantity ?? 1)).toLocaleString()}
-            </p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              style={{
-                padding: '0.25rem 0.5rem',
-                backgroundColor: '#e5e7eb',
-                borderRadius: '0.25rem',
-                border: 'none',
-                cursor: 'pointer'
-              }}
-              onClick={() => decreaseQuantity(item._id)}
-            >-</button>
-            <span style={{ fontSize: '0.875rem' }}>{item.quantity}</span>
-            <button
-              style={{
-                padding: '0.25rem 0.5rem',
-                backgroundColor: '#e5e7eb',
-                borderRadius: '0.25rem',
-                border: 'none',
-                cursor: 'pointer'
-              }}
-              onClick={() => increaseQuantity(item._id)}
-            >+</button>
-            <button
-              style={{
-                marginLeft: '0.5rem',
-                color: '#ef4444',
-                fontSize: '0.75rem',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                textDecoration: 'underline'
-              }}
-              onClick={() => removeFromCart(item._id)}
-            >Remove</button>
+      {/* Header */}
+      <div style={{ padding: '1.5rem', borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <ShoppingCart size={24} color="#3b82f6" />
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>Cart</h2>
+            {cart.length > 0 && <span style={{ backgroundColor: '#3b82f6', color: 'white', borderRadius: '9999px', padding: '0.25rem 0.625rem', fontSize: '0.875rem', fontWeight: 700 }}>{cart.length}</span>}
           </div>
         </div>
-      ))}
+      </div>
 
-      {cart.length > 0 && (
-        <>
-          <div style={{ marginTop: '1rem' }}>
-          <p style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
-  Total: ₹{total.toLocaleString()}
-</p>
-<p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0' }}>
-  *Current price may vary. Final price on request.
-</p>
-
-            <input
-              type="email"
-              placeholder="Your Email"
-              name="email"
-              value={userInfo.email}
-              onChange={handleChange}
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                marginBottom: '0.5rem',
-                fontSize: '0.875rem',
-                boxSizing: 'border-box'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Mobile Number"
-              name="mobile"
-              value={userInfo.mobile}
-              onChange={handleChange}
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                marginBottom: '0.5rem',
-                fontSize: '0.875rem',
-                boxSizing: 'border-box'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Project Name"
-              name="project"
-              value={userInfo.project}
-              onChange={handleChange}
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                marginBottom: '0.5rem',
-                fontSize: '0.875rem',
-                boxSizing: 'border-box'
-              }}
-            />
-
-            {showError && (
-              <p style={{ color: '#ef4444', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                Please fill all details to download.
-              </p>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <button
-                onClick={clearCart}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#dc2626',
-                  color: 'white',
-                  padding: '0.5rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = '#b91c1c'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = '#dc2626'}
-              >
-                Clear Cart
-              </button>
-              <button
-                onClick={exportExcel}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#16a34a',
-                  color: 'white',
-                  padding: '0.5rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = '#15803d'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = '#16a34a'}
-              >
-                Export to Excel
-              </button>
-              <button
-                onClick={exportPDF}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#2563eb',
-                  color: 'white',
-                  padding: '0.5rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = '#1d4ed8'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = '#2563eb'}
-              >
-                Export to PDF
-              </button>
-            </div>
+      {/* Cart Items */}
+      <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+        {cart.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
+            <ShoppingCart size={48} color="#cbd5e1" style={{ margin: '0 auto 1rem' }} />
+            <p style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>Your cart is empty</p>
+            <p style={{ fontSize: '0.875rem' }}>Add products to get best quotations</p>
           </div>
-        </>
-      )}
+        ) : (
+          <>
+            {cart.map(item => (
+              <div key={item._id} style={{ backgroundColor: '#f8fafc', borderRadius: '0.75rem', padding: '1rem', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#1e293b', marginBottom: '0.25rem' }}>{item.sku}</p>
+                    <p style={{ fontSize: '0.8125rem', color: '#64748b' }}>{item.category}</p>
+                  </div>
+                  <button onClick={() => removeFromCart(item._id)} style={{ padding: '0.375rem', backgroundColor: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: 'white', padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                    <button onClick={() => decreaseQuantity(item._id)} style={{ width: '28px', height: '28px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}><Minus size={14} /></button>
+                    <span style={{ fontWeight: 600, fontSize: '0.9375rem', minWidth: '24px', textAlign: 'center' }}>{item.quantity}</span>
+                    <button onClick={() => increaseQuantity(item._id)} style={{ width: '28px', height: '28px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}><Plus size={14} /></button>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.125rem' }}>₹{item.price} × {item.quantity}</p>
+                    <p style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>₹{((item.price ?? 0) * (item.quantity ?? 1)).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Total, User Info, Actions */}
+            <div style={{ backgroundColor: '#eff6ff', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1.5rem', border: '2px solid #bfdbfe' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '1rem', fontWeight: 600, color: '#1e40af' }}>Total Amount:</span>
+                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e40af' }}>₹{total.toLocaleString()}</span>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>*Current price may vary. Final price on request.</p>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.025em', marginBottom: '1rem' }}>Contact Details</h3>
+              {['email','mobile','project'].map(field => (
+                <div key={field} style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#64748b', marginBottom: '0.375rem' }}>{field==='project'?'Project Name':field==='mobile'?'Mobile Number':'Email'}</label>
+                  <input type="text" name={field} value={(userInfo as any)[field]} onChange={handleChange} placeholder={field==='project'?'Enter project name':field==='mobile'?'Enter mobile number':'Enter email address'} style={{ width: '100%', padding: '0.75rem', border: '2px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem' }} />
+                </div>
+              ))}
+              {showError && <div style={{ color:'#dc2626', backgroundColor:'#fef2f2', padding:'0.75rem', borderRadius:'0.5rem', fontSize:'0.8125rem', border:'1px solid #fecaca', marginTop:'0.75rem' }}>Please fill all details to download.</div>}
+            </div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem' }}>
+              <button onClick={exportPDF} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', padding:'0.875rem', backgroundColor:'#3b82f6', color:'white', borderRadius:'0.5rem' }}><FileText size={18}/> Export to PDF</button>
+              <button onClick={exportExcel} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', padding:'0.875rem', backgroundColor:'#10b981', color:'white', borderRadius:'0.5rem' }}><FileSpreadsheet size={18}/> Export to Excel</button>
+              <button onClick={clearCart} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', padding:'0.875rem', backgroundColor:'#ef4444', color:'white', borderRadius:'0.5rem' }}><Trash2 size={18}/> Clear Cart</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -14,6 +14,9 @@ type Product = {
   lumen?: string;
   beamAngle?: string;
   application?: string;
+  dimension?: string;
+  cutOut?: string;
+  ipRating?: string;
 };
 
 type CartContextType = {
@@ -59,6 +62,9 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       beamAngle: product.beamAngle || '-',
       category: product.category || '-',
       application: product.application || '-',
+      dimension: product.dimension || '-',
+      cutOut: product.cutOut || '-',
+      ipRating: product.ipRating || 'N/A',
       quantity: 1
     };
 

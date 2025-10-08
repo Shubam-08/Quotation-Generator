@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import CartSidebar from '@/components/CartSidebar';
 
 export default function HomePage() {
   return (
@@ -20,7 +21,7 @@ export default function HomePage() {
             href="/products"
             className="inline-block bg-white text-blue-900 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-gray-100 transition"
           >
-            Explore Products
+            Let,s make the Quotation
           </Link>
         </div>
       </section>
@@ -53,7 +54,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Call-to-Action Section */}
+      {/* Call-to-Action Section 
       <section className="bg-blue-50 py-20 px-6">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4 text-blue-900">
@@ -70,7 +71,7 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
-
+     */}
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-200 py-10 text-center">
         <p className="text-sm">
