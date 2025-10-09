@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useCart } from '@/context/CartContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import CartSidebar from '@/components/CartSidebar';
+import CurrencySelector from '@/components/CurrencySelector';
+import CurrencyInfo from '@/components/CurrencyInfo';
 import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Menu, ArrowUpDown } from 'lucide-react';
 import CartButton from '@/components/CartButton';
 
@@ -282,10 +285,12 @@ const lumenRanges = [
 
 export default function ProductsPage() {
   const { addToCart, cart } = useCart();
+  const { formatPrice } = useCurrency();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -420,11 +425,15 @@ export default function ProductsPage() {
               {/*<Package size={32} color="#3b82f6" strokeWidth={2.5} />*/}
               <h1 style={{ fontSize: 'clamp(1.5rem, 4vw, 2.5rem)', fontWeight: '700', color: '#0f172a', margin: 0, letterSpacing: '-0.025em' }}>Get Your Quotation</h1>
             </div>
-            {!loading && products.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#eff6ff', padding: '0.625rem 1.25rem', borderRadius: '9999px', border: '2px solid #bfdbfe' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af' }}>{products.length} Products</span>
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <CurrencySelector />
+              <CurrencyInfo />
+              {!loading && products.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#eff6ff', padding: '0.625rem 1.25rem', borderRadius: '9999px', border: '2px solid #bfdbfe' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af' }}>{products.length} Products</span>
+                </div>
+              )}
+            </div>
           </div>
           <p style={{ fontSize: '0.9375rem', color: '#64748b', margin: 0 }}>Browse and select products for your quotation</p>
            <div>
@@ -686,6 +695,7 @@ export default function ProductsPage() {
                         { label: 'Lumen', key: 'lumen' },
                         { label: 'Beam Angle', key: 'beamAngle' },
                         { label: 'IP Rating', key: 'ipRating' },
+                        { label: 'Price', key: 'price' },
                         { label: 'Action', key: 'action' }
                       ].map(col => (
                         <th 
@@ -767,6 +777,9 @@ export default function ProductsPage() {
                             {p.ipRating || 'N/A'}
                           </span>
                         </td>
+                        <td style={{ padding: '1rem 1.25rem', fontSize: '0.9375rem', color: '#1e293b', fontWeight: '600' }}>
+                          {formatPrice(p.price)}
+                        </td>
                         <td style={{ padding: '0.25rem 0.5rem', width: '1px', whiteSpace: 'nowrap' }}>
   <button 
     style={{ 
@@ -775,30 +788,43 @@ export default function ProductsPage() {
       gap: '0.25rem',
       padding: '0.25rem 0.5rem', 
       borderRadius: '0.125rem', 
-      backgroundColor: '#10b981', 
+      backgroundColor: cart.some(item => item._id === p._id) ? '#6b7280' : '#10b981', 
       color: 'white', 
       border: 'none', 
-      cursor: 'pointer',
+      cursor: cart.some(item => item._id === p._id) ? 'not-allowed' : 'pointer',
       fontWeight: '500',
       fontSize: '0.70rem',
       transition: 'all 0.2s',
       boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
+      opacity: addingProductId === p._id ? 0.7 : 1,
+      transform: addingProductId === p._id ? 'scale(0.95)' : 'scale(1)',
     }} 
-    onClick={() => addToCart(p)}
+    onClick={() => {
+      if (!cart.some(item => item._id === p._id)) {
+        setAddingProductId(p._id);
+        addToCart(p);
+        setTimeout(() => setAddingProductId(null), 300);
+      }
+    }}
     onMouseEnter={(e) => {
-      e.currentTarget.style.backgroundColor = '#059669';
-      e.currentTarget.style.transform = 'translateY(-1px)';
-      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.08)';
+      if (!cart.some(item => item._id === p._id)) {
+        e.currentTarget.style.backgroundColor = '#059669';
+        e.currentTarget.style.transform = 'translateY(-1px)';
+        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.08)';
+      }
     }}
     onMouseLeave={(e) => {
-      e.currentTarget.style.backgroundColor = '#10b981';
-      e.currentTarget.style.transform = 'translateY(0)';
-      e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+      if (!cart.some(item => item._id === p._id)) {
+        e.currentTarget.style.backgroundColor = '#10b981';
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+      }
     }}
+    disabled={cart.some(item => item._id === p._id)}
   >
     <ShoppingCart size={12} />
-    Add to List
+    {cart.some(item => item._id === p._id) ? 'Added' : 'Add to List'}
   </button>
 </td>
 

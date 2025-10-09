@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useToast } from './ToastContext';
 
 type Product = {
   _id: string;
@@ -32,6 +33,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [cart, setCart] = useState<(Product & { quantity: number; name: string })[]>([]);
+  const { showToast } = useToast();
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -48,7 +50,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   const addToCart = (product: Product) => {
     const exists = cart.find(item => item._id === product._id);
-    if (exists) return; // Prevent duplicate
+    if (exists) {
+      showToast(`${product.sku} is already in your list`, 'info');
+      return; // Prevent duplicate
+    }
 
     const cartItem = {
       _id: product._id,
@@ -69,6 +74,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     setCart(prev => [...prev, cartItem]);
+    showToast(`${product.sku} added to your list`, 'success');
   };
 
   const removeFromCart = (_id: string) => {

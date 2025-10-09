@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useCart } from '@/context/CartContext';
+import { useCurrency } from '@/context/CurrencyContext';
+import CurrencySelector from './CurrencySelector';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -32,6 +34,7 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
     increaseQuantity: (id: string) => void;
     decreaseQuantity: (id: string) => void;
   };
+  const { formatPrice, convertPrice, currencyInfo } = useCurrency();
 
   const [userInfo, setUserInfo] = useState({ email: '', mobile: '', project: '' });
   const [showError, setShowError] = useState(false);
@@ -59,6 +62,7 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
       [`Project Name - ${userInfo.project}`],
       [`Email: ${userInfo.email}`],
       [`Mobile: ${userInfo.mobile}`],
+      [`Currency: ${currencyInfo.code} - ${currencyInfo.name}`],
       [],
     ];
     const ws = XLSX.utils.aoa_to_sheet(headerData);
@@ -71,15 +75,17 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
     const tableData = cart.map(item => [
       item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
       item.watt ?? '-', item.lumen ?? '-', item.beamAngle ?? '-', item.dimension ?? '-', item.cutOut ?? '-', 
-      item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', item.price ?? 0, item.quantity ?? 1, (item.price ?? 0) * (item.quantity ?? 1)
+      item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', 
+      convertPrice(item.price ?? 0).toFixed(2), item.quantity ?? 1, 
+      (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2)
     ]);
 
-    XLSX.utils.sheet_add_aoa(ws, [tableColumns], { origin: 10 });
-    XLSX.utils.sheet_add_aoa(ws, tableData, { origin: 11 });
+    XLSX.utils.sheet_add_aoa(ws, [tableColumns], { origin: 11 });
+    XLSX.utils.sheet_add_aoa(ws, tableData, { origin: 12 });
 
-    const totalAmount = cart.reduce((sum, item) => sum + ((item.price ?? 0) * (item.quantity ?? 1)), 0);
-    const totalRowIndex = 11 + tableData.length;
-    XLSX.utils.sheet_add_aoa(ws, [['','','','','','','','','','', 'Total Amount:', totalAmount]], { origin: totalRowIndex });
+    const totalAmount = cart.reduce((sum, item) => sum + (convertPrice(item.price ?? 0) * (item.quantity ?? 1)), 0);
+    const totalRowIndex = 12 + tableData.length;
+    XLSX.utils.sheet_add_aoa(ws, [['','','','','','','','','','', 'Total Amount:', totalAmount.toFixed(2)]], { origin: totalRowIndex });
 
     XLSX.utils.book_append_sheet(workbook, ws, 'Cart');
     XLSX.writeFile(workbook, `${userInfo.project}_cart.xlsx`);
@@ -115,6 +121,7 @@ const exportPDF = () => {
   doc.setFontSize(8);
   doc.text(`Email: ${userInfo.email}`, 14, 112);
   doc.text(`Mobile: ${userInfo.mobile}`, 14, 124);
+  doc.text(`Currency: ${currencyInfo.code} - ${currencyInfo.name}`, 14, 136);
 
   // Table
   const columns = [
@@ -123,13 +130,14 @@ const exportPDF = () => {
   const rows = cart.map(item => [
     item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
     item.watt ?? '-', item.lumen ?? '-', item.beamAngle ?? '-', item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', 
-    item.price ?? 0, item.quantity ?? 1, (item.price ?? 0) * (item.quantity ?? 1)
+    convertPrice(item.price ?? 0).toFixed(2), item.quantity ?? 1, 
+    (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2)
   ]);
 
   autoTable(doc, {
     head: [columns],
     body: rows,
-    startY: 140,
+    startY: 150,
     styles: { fontSize: 7, cellPadding: 2, fontStyle: 'normal' }, // smaller, thin text
     headStyles: { fillColor: [0, 70, 255], textColor: 255, fontStyle: 'bold', fontSize: 8 },
     alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -141,7 +149,8 @@ const exportPDF = () => {
   const finalY = (doc as any).lastAutoTable.finalY || 140;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Total Amount: Rs. ${total.toLocaleString('en-IN')}`, pageWidth - 10, finalY + 20, { align: 'right' });
+  const convertedTotal = convertPrice(total);
+  doc.text(`Total Amount: ${currencyInfo.symbol} ${convertedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 10, finalY + 20, { align: 'right' });
 
   doc.save(`${userInfo.project}_quotation.pdf`);
 };
@@ -169,12 +178,13 @@ const exportPDF = () => {
 
       {/* Header */}
       <div style={{ padding: '1.5rem', borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <ShoppingCart size={24} color="#3b82f6" />
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>Cart</h2>
             {cart.length > 0 && <span style={{ backgroundColor: '#3b82f6', color: 'white', borderRadius: '9999px', padding: '0.25rem 0.625rem', fontSize: '0.875rem', fontWeight: 700 }}>{cart.length}</span>}
           </div>
+          <CurrencySelector />
         </div>
       </div>
 
@@ -205,8 +215,8 @@ const exportPDF = () => {
                     <button onClick={() => increaseQuantity(item._id)} style={{ width: '28px', height: '28px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}><Plus size={14} /></button>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.125rem' }}>₹{item.price} × {item.quantity}</p>
-                    <p style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>₹{((item.price ?? 0) * (item.quantity ?? 1)).toLocaleString()}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.125rem' }}>{formatPrice(item.price ?? 0)} × {item.quantity}</p>
+                    <p style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>{formatPrice((item.price ?? 0) * (item.quantity ?? 1))}</p>
                   </div>
                 </div>
               </div>
@@ -216,7 +226,7 @@ const exportPDF = () => {
             <div style={{ backgroundColor: '#eff6ff', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1.5rem', border: '2px solid #bfdbfe' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '1rem', fontWeight: 600, color: '#1e40af' }}>Total Amount:</span>
-                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e40af' }}>₹{total.toLocaleString()}</span>
+                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e40af' }}>{formatPrice(total)}</span>
               </div>
               <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>*Current price may vary. Final price on request.</p>
             </div>
