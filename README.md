@@ -1,8 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# QLite Global - Product Quotation System
 
-## Getting Started
+A modern product quotation and management system built with Next.js, MongoDB, and NextAuth.js.
 
-First, run the development server:
+## Features
+
+- 🔐 **Secure Authentication** - Login/logout with NextAuth.js
+- 👥 **Role-Based Access Control** - Admin and User roles
+- 📦 **Product Management** - Full CRUD operations for admins
+- 💰 **Dynamic Pricing** - USD to INR conversion
+- 📄 **Quotation Generation** - PDF and Excel export
+- 🎨 **Modern UI** - Built with TailwindCSS and Lucide icons
+
+## Quick Start
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Environment Variables
+
+Copy `.env.example` to `.env.local` and configure:
+
+```bash
+MONGODB_URI=your-mongodb-connection-string
+NEXTAUTH_SECRET=your-secret-key
+NEXTAUTH_URL=http://localhost:3000
+```
+
+See [AUTH_SETUP.md](./AUTH_SETUP.md) for detailed authentication setup.
+
+### 3. Create Admin User
+
+```bash
+node scripts/create-admin.js
+```
+
+### 4. Run Development Server
 
 ```bash
 npm run dev
@@ -16,21 +51,69 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## User Roles
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Admin
+- Access admin dashboard at `/admin`
+- Add, edit, and delete products
+- Full product management capabilities
+
+### User
+- Browse products at `/products`
+- Generate quotations (PDF/Excel)
+- View product details
+
+## Default Admin Credentials
+
+After running the create-admin script:
+- **Email:** admin@qlite.com
+- **Password:** admin123
+
+⚠️ **Change this password immediately after first login!**
+
+## Project Structure
+
+```
+app/
+  ├── admin/              # Admin dashboard (protected)
+  ├── login/              # Login page
+  ├── register/           # User registration
+  ├── products/           # Product listing
+  └── api/
+      ├── auth/           # Authentication endpoints
+      ├── products/       # Product CRUD APIs (protected)
+      └── quotations/     # Quotation generation
+
+lib/
+  ├── auth.ts             # NextAuth configuration
+  ├── auth-helpers.ts     # Auth utility functions
+  └── models/             # MongoDB models
+
+components/
+  ├── Navbar.tsx          # Navigation with auth
+  └── Providers.tsx       # Context providers
+
+middleware.ts             # Route protection
+```
+
+## Documentation
+
+- [Authentication Setup Guide](./AUTH_SETUP.md) - Detailed auth configuration
+- [MongoDB Setup Guide](./MONGODB_SETUP.md) - Database configuration
+
+## Technologies
+
+- **Framework:** Next.js 15 (App Router)
+- **Database:** MongoDB with Mongoose
+- **Authentication:** NextAuth.js
+- **Styling:** TailwindCSS
+- **Icons:** Lucide React
+- **PDF Generation:** jsPDF
+- **Excel Export:** XLSX
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js Documentation](https://nextjs.org/docs)
+- [NextAuth.js Documentation](https://next-auth.js.org/)
+- [MongoDB Documentation](https://www.mongodb.com/docs/)
+- [TailwindCSS Documentation](https://tailwindcss.com/docs)
