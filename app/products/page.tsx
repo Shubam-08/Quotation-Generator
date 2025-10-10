@@ -237,6 +237,11 @@ const styles = {
   },
 };
 
+type IpRatingPrice = {
+  rating: string;
+  price: number;
+};
+
 type Product = {
   _id: string;
   sku: string;
@@ -249,8 +254,9 @@ type Product = {
   beamAngle?: string;
   dimension?: string;
   cutOut?: string;
-  price: number;
-  ipRating?: string[]; // Changed to array to support multiple IP ratings
+  price: number; // Legacy field
+  ipRating?: string[]; // Legacy field
+  ipRatings?: IpRatingPrice[]; // New structure with individual prices
   images?: string[];
 };
 
@@ -437,11 +443,6 @@ export default function ProductsPage() {
             </div>
           </div>
           <p style={{ fontSize: '0.9375rem', color: '#9ca3af', margin: 0 }}>Browse and select products for your quotation</p>
-           <div>
-      {/* Your product catalog */}
-    
-      <CartButton/> {/* Button to open cart */}
-    </div>
         </div>
 
         {/* Filter Section */}
@@ -774,7 +775,33 @@ export default function ProductsPage() {
                         <td style={{ padding: '1rem 1.25rem', fontSize: '0.9375rem', color: '#374151' }}>{p.lumen || '-'}</td>
                         <td style={{ padding: '1rem 1.25rem', fontSize: '0.9375rem', color: '#374151' }}>{p.beamAngle || '-'}</td>
                         <td style={{ padding: '1rem 1.25rem', fontSize: '0.9375rem', color: '#374151' }}>
-                          {p.ipRating && p.ipRating.length > 0 ? (
+                          {p.ipRatings && p.ipRatings.length > 0 ? (
+                            p.ipRatings.length === 1 ? (
+                              <span style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: '#fbbf24', padding: '0.25rem 0.75rem', borderRadius: '0.375rem', fontSize: '0.8125rem', fontWeight: '600', border: '1px solid rgba(251,191,36,0.2)' }}>
+                                {p.ipRatings[0].rating}
+                              </span>
+                            ) : (
+                              <select
+                                value={selectedIpRatings[p._id] || p.ipRatings[0].rating}
+                                onChange={(e) => setSelectedIpRatings(prev => ({ ...prev, [p._id]: e.target.value }))}
+                                style={{ 
+                                  backgroundColor: 'rgba(251,191,36,0.1)', 
+                                  color: '#fbbf24', 
+                                  padding: '0.25rem 0.5rem', 
+                                  borderRadius: '0.375rem', 
+                                  fontSize: '0.8125rem', 
+                                  fontWeight: '600', 
+                                  border: '1px solid rgba(251,191,36,0.2)',
+                                  cursor: 'pointer',
+                                  outline: 'none'
+                                }}
+                              >
+                                {p.ipRatings.map((ip) => (
+                                  <option key={ip.rating} value={ip.rating}>{ip.rating}</option>
+                                ))}
+                              </select>
+                            )
+                          ) : p.ipRating && p.ipRating.length > 0 ? (
                             p.ipRating.length === 1 ? (
                               <span style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: '#fbbf24', padding: '0.25rem 0.75rem', borderRadius: '0.375rem', fontSize: '0.8125rem', fontWeight: '600', border: '1px solid rgba(251,191,36,0.2)' }}>
                                 {p.ipRating[0]}
@@ -805,14 +832,37 @@ export default function ProductsPage() {
                           )}
                         </td>
                         <td style={{ padding: '1rem 1.25rem', fontSize: '0.9375rem', color: '#fbbf24', fontWeight: '700' }}>
-                          {formatPrice(p.price)}
+                          {(() => {
+                            // Get the price based on selected IP rating
+                            if (p.ipRatings && p.ipRatings.length > 0) {
+                              const selectedRating = selectedIpRatings[p._id] || p.ipRatings[0].rating;
+                              const ipData = p.ipRatings.find(ip => ip.rating === selectedRating);
+                              return formatPrice(ipData?.price || 0);
+                            }
+                            return formatPrice(p.price);
+                          })()}
                         </td>
                         <td style={{ padding: '0.25rem 0.5rem', width: '1px', whiteSpace: 'nowrap' }}>
   {(() => {
-    // Get the current selected IP rating for this product
-    const currentIpRating = p.ipRating && p.ipRating.length > 0
-      ? (p.ipRating.length > 1 ? (selectedIpRatings[p._id] || p.ipRating[0]) : p.ipRating[0])
-      : undefined;
+    // Get the current selected IP rating and price for this product
+    let currentIpRating: string | undefined;
+    let currentPrice: number;
+    
+    if (p.ipRatings && p.ipRatings.length > 0) {
+      // New format with individual prices
+      const selectedRating = selectedIpRatings[p._id] || p.ipRatings[0].rating;
+      const ipData = p.ipRatings.find(ip => ip.rating === selectedRating);
+      currentIpRating = selectedRating;
+      currentPrice = ipData?.price || 0;
+    } else if (p.ipRating && p.ipRating.length > 0) {
+      // Legacy format
+      currentIpRating = p.ipRating.length > 1 ? (selectedIpRatings[p._id] || p.ipRating[0]) : p.ipRating[0];
+      currentPrice = p.price;
+    } else {
+      // No IP rating
+      currentIpRating = undefined;
+      currentPrice = p.price;
+    }
     
     // Create the cart item ID for this combination
     const cartItemId = `${p._id}_${currentIpRating || 'default'}`;
@@ -843,10 +893,11 @@ export default function ProductsPage() {
         onClick={() => {
           if (!isInCart) {
             setAddingProductId(p._id);
-            // Create product with selected IP rating as string
+            // Create product with selected IP rating and correct price
             const productToAdd = {
               ...p,
-              ipRating: currentIpRating
+              ipRating: currentIpRating,
+              price: currentPrice
             };
             addToCart(productToAdd);
             setTimeout(() => setAddingProductId(null), 300);

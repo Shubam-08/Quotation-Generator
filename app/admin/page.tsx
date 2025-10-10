@@ -5,6 +5,11 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Plus, X } from "lucide-react";
 
+interface IpRatingPrice {
+  rating: string;
+  price: number;
+}
+
 interface Product {
   _id: string;
   sku: string;
@@ -16,8 +21,9 @@ interface Product {
   beamAngle?: string;
   dimension?: string;
   cutOut?: string;
-  ipRating?: string[]; // Changed to array
-  price: number;
+  ipRatings?: IpRatingPrice[]; // New structure with individual prices
+  ipRating?: string[]; // Legacy field for backward compatibility
+  price: number; // Legacy field
   images?: string[];
 }
 
@@ -32,8 +38,9 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState<string>("");
-  const [ipRatings, setIpRatings] = useState<string[]>([]);
+  const [ipRatings, setIpRatings] = useState<IpRatingPrice[]>([]);
   const [newIpRating, setNewIpRating] = useState<string>("");
+  const [newIpPrice, setNewIpPrice] = useState<string>("");
 
   useEffect(() => {
     if (status === "loading") {
@@ -142,9 +149,19 @@ export default function AdminDashboard() {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleAddIpRating = () => {
+  const handleAddIpRating = async () => {
     const trimmed = newIpRating.trim().toUpperCase();
-    if (!trimmed) return;
+    const priceValue = parseFloat(newIpPrice);
+    
+    if (!trimmed) {
+      setError("Please enter an IP rating");
+      return;
+    }
+    
+    if (!newIpPrice || isNaN(priceValue) || priceValue <= 0) {
+      setError("Please enter a valid price for this IP rating");
+      return;
+    }
     
     // Validate IP rating format (e.g., IP20, IP30, IP40, IP65, etc.)
     if (!/^IP\d{2}$/.test(trimmed)) {
@@ -152,13 +169,34 @@ export default function AdminDashboard() {
       return;
     }
     
-    if (ipRatings.includes(trimmed)) {
+    if (ipRatings.some(ip => ip.rating === trimmed)) {
       setError("This IP rating is already added");
       return;
     }
     
-    setIpRatings((prev) => [...prev, trimmed]);
+    // Convert USD to INR only when adding new product (not editing)
+    let finalPrice = priceValue;
+    if (!editingProduct) {
+      try {
+        const response = await fetch('/api/convert-usd-to-inr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usdAmount: priceValue })
+        });
+        const data = await response.json();
+        if (response.ok && data.inrAmount) {
+          finalPrice = Math.round(data.inrAmount * 10) / 10;
+        }
+      } catch (err) {
+        console.error('Error converting USD to INR:', err);
+        setError('Failed to convert currency. Please try again.');
+        return;
+      }
+    }
+    
+    setIpRatings((prev) => [...prev, { rating: trimmed, price: finalPrice }]);
     setNewIpRating("");
+    setNewIpPrice("");
     setError("");
   };
 
@@ -171,7 +209,15 @@ export default function AdminDashboard() {
       setEditingProduct(product);
       setFormData(product);
       setImages(product.images || []);
-      setIpRatings(product.ipRating || []);
+      // Migrate old format to new format if needed
+      if (product.ipRatings && product.ipRatings.length > 0) {
+        setIpRatings(product.ipRatings);
+      } else if (product.ipRating && product.ipRating.length > 0) {
+        // Convert old format to new format
+        setIpRatings(product.ipRating.map(rating => ({ rating, price: product.price || 0 })));
+      } else {
+        setIpRatings([]);
+      }
     } else {
       setEditingProduct(null);
       setFormData({});
@@ -191,6 +237,7 @@ export default function AdminDashboard() {
     setNewImageUrl("");
     setIpRatings([]);
     setNewIpRating("");
+    setNewIpPrice("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -209,7 +256,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           ...formData,
           images: images,
-          ipRating: ipRatings,
+          ipRatings: ipRatings,
         }),
       });
 
@@ -346,11 +393,19 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       <div className="flex flex-wrap gap-1">
-                        {product.ipRating && product.ipRating.length > 0 ? (
+                        {product.ipRatings && product.ipRatings.length > 0 ? (
+                          product.ipRatings.map((ip, idx) => (
+                            <div key={idx} className="flex flex-col bg-blue-50 border border-blue-200 rounded px-2 py-1">
+                              <span className="text-xs font-semibold text-blue-800">{ip.rating}</span>
+                              <span className="text-xs text-blue-600">₹{ip.price.toFixed(2)}</span>
+                            </div>
+                          ))
+                        ) : product.ipRating && product.ipRating.length > 0 ? (
                           product.ipRating.map((rating, idx) => (
                             <span
                               key={idx}
-                              className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded"
+                              className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded"
+                              title="Old format - please edit to add prices"
                             >
                               {rating}
                             </span>
@@ -361,7 +416,11 @@ export default function AdminDashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ₹{product.price.toFixed(2)}
+                      {product.ipRatings && product.ipRatings.length > 0 ? (
+                        <span className="text-gray-400" title="Price varies by IP rating">Varies</span>
+                      ) : (
+                        <span>₹{product.price.toFixed(2)}</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
@@ -574,7 +633,7 @@ export default function AdminDashboard() {
 
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      IP Ratings
+                      IP Ratings with Prices {editingProduct ? '(INR)' : '(USD)'}
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -590,6 +649,20 @@ export default function AdminDashboard() {
                         }}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                       />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder={editingProduct ? "Price (INR)" : "Price (USD)"}
+                        value={newIpPrice}
+                        onChange={(e) => setNewIpPrice(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddIpRating();
+                          }
+                        }}
+                        className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      />
                       <button
                         type="button"
                         onClick={handleAddIpRating}
@@ -599,17 +672,22 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Add multiple IP ratings for this product (e.g., IP20, IP30, IP40)
+                      {editingProduct 
+                        ? 'Add multiple IP ratings with their specific prices in INR (e.g., IP20 at ₹100, IP30 at ₹120)'
+                        : 'Add multiple IP ratings with their specific prices in USD (will be converted to INR automatically)'}
                     </p>
 
                     {ipRatings.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {ipRatings.map((rating, idx) => (
+                        {ipRatings.map((ip, idx) => (
                           <div
-                            key={`${rating}-${idx}`}
+                            key={`${ip.rating}-${idx}`}
                             className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5"
                           >
-                            <span className="text-sm font-medium text-blue-900">{rating}</span>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-blue-900">{ip.rating}</span>
+                              <span className="text-xs text-blue-700">₹{ip.price.toFixed(2)}</span>
+                            </div>
                             <button
                               type="button"
                               onClick={() => handleRemoveIpRating(idx)}
@@ -625,18 +703,22 @@ export default function AdminDashboard() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {editingProduct ? "Price (INR) *" : "Price (USD) *"}
+                      Base Price {editingProduct ? '(INR)' : '(USD)'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
-                      required
                       value={formData.price || ""}
                       onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      disabled={ipRatings.length > 0}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      {editingProduct ? "Edit price in INR" : "Will be converted to INR"}
+                      {ipRatings.length > 0 
+                        ? "Price is set per IP rating above" 
+                        : editingProduct 
+                          ? "Base price in INR (optional if using IP ratings)" 
+                          : "Base price in USD - will be converted to INR (optional if using IP ratings)"}
                     </p>
                   </div>
                 </div>

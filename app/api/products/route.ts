@@ -25,6 +25,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // Handle legacy price field (for backward compatibility)
     let inrPrice = data.price ? await convertUsdToInr(Number(data.price)) : 0;
     inrPrice = Math.round(inrPrice * 10) / 10;
 
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
       ...data,
       price: inrPrice,
       images: data.images || [],
+      ipRatings: data.ipRatings || [], // New field with individual prices
     });
 
     await newProduct.save();
@@ -114,7 +116,8 @@ export async function GET(req: Request) {
         { inputVoltage: rx },
         { lumen: rx },
         { beamAngle: rx },
-        { ipRating: { $elemMatch: { $regex: search, $options: "i" } } }, // Search in array
+        { ipRating: { $elemMatch: { $regex: search, $options: "i" } } }, // Legacy field
+        { "ipRatings.rating": { $regex: search, $options: "i" } }, // New field
       ];
     }
 
@@ -133,10 +136,14 @@ export async function GET(req: Request) {
       }
     }
     
-    // Special handling for ipRating (array field)
+    // Special handling for ipRating (array field) - support both old and new formats
     const ipRatingFilter = searchParams.get("ipRating");
     if (ipRatingFilter) {
-      query.ipRating = { $elemMatch: { $regex: ipRatingFilter, $options: "i" } };
+      query.$or = query.$or || [];
+      query.$or.push(
+        { ipRating: { $elemMatch: { $regex: ipRatingFilter, $options: "i" } } }, // Legacy
+        { "ipRatings.rating": { $regex: ipRatingFilter, $options: "i" } } // New
+      );
     }
 
     // Wattage range filter

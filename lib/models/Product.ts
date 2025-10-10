@@ -12,8 +12,17 @@ const ProductSchema = new mongoose.Schema(
     beamAngle: { type: String },
     dimension: { type: String },
     cutOut: { type: String },
-    ipRating: { type: [String], default: [] }, // Changed to array to support multiple IP ratings
-    price: { type: Number, required: true },
+    // IP ratings with individual prices: [{ rating: "IP20", price: 100 }, { rating: "IP30", price: 120 }]
+    ipRatings: { 
+      type: [{ 
+        rating: { type: String, required: true }, 
+        price: { type: Number, required: true } 
+      }], 
+      default: [] 
+    },
+    // Keep legacy fields for backward compatibility during migration
+    ipRating: { type: [String], default: [] },
+    price: { type: Number, default: 0 },
     images: { type: [String], default: [] },
   },
   { timestamps: true }
