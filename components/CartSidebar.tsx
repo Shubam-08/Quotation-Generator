@@ -24,7 +24,7 @@ interface Product {
   ipRating?: string;
   price?: number;
 }
-type CartItem = Product & { quantity: number; name?: string; };
+type CartItem = Product & { quantity: number; name?: string; cartItemId: string; };
 
 export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => void }) {
   const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity } = useCart() as {
@@ -62,14 +62,15 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
       [`Project Name - ${userInfo.project}`],
       [`Email: ${userInfo.email}`],
       [`Mobile: ${userInfo.mobile}`],
-      [`Currency: ${currencyInfo.code} - ${currencyInfo.name}`],
       [],
     ];
     const ws = XLSX.utils.aoa_to_sheet(headerData);
     ws['!merges'] = headerData.map((_, i) => ({ s: { r: i, c: 0 }, e: { r: i, c: 12 } }));
 
+    // Use currency code instead of symbol for Excel to avoid encoding issues with ₹
+    const excelCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
     const tableColumns = [
-      'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','Dimension','Cut Out','IP Rating','Price','Quantity','Total'
+      'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','Dimension','Cut Out','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
     ];
 
     const tableData = cart.map(item => [
@@ -80,12 +81,12 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
       (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2)
     ]);
 
-    XLSX.utils.sheet_add_aoa(ws, [tableColumns], { origin: 11 });
-    XLSX.utils.sheet_add_aoa(ws, tableData, { origin: 12 });
+    XLSX.utils.sheet_add_aoa(ws, [tableColumns], { origin: 10 });
+    XLSX.utils.sheet_add_aoa(ws, tableData, { origin: 11 });
 
     const totalAmount = cart.reduce((sum, item) => sum + (convertPrice(item.price ?? 0) * (item.quantity ?? 1)), 0);
-    const totalRowIndex = 12 + tableData.length;
-    XLSX.utils.sheet_add_aoa(ws, [['','','','','','','','','','', 'Total Amount:', totalAmount.toFixed(2)]], { origin: totalRowIndex });
+    const totalRowIndex = 11 + tableData.length;
+    XLSX.utils.sheet_add_aoa(ws, [['','','','','','','','','','', `Total Amount (${excelCurrency}):`, totalAmount.toFixed(2)]], { origin: totalRowIndex });
 
     XLSX.utils.book_append_sheet(workbook, ws, 'Cart');
     XLSX.writeFile(workbook, `${userInfo.project}_cart.xlsx`);
@@ -121,11 +122,12 @@ const exportPDF = () => {
   doc.setFontSize(8);
   doc.text(`Email: ${userInfo.email}`, 14, 112);
   doc.text(`Mobile: ${userInfo.mobile}`, 14, 124);
-  doc.text(`Currency: ${currencyInfo.code} - ${currencyInfo.name}`, 14, 136);
 
-  // Table
+  // Table - with currency symbol in column headers
+  // Use currency code instead of symbol for PDF to avoid encoding issues with ₹
+  const pdfCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
   const columns = [
-    'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating','Price','Quantity','Total'
+    'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${pdfCurrency})`,'Quantity',`Total (${pdfCurrency})`
   ];
   const rows = cart.map(item => [
     item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
@@ -137,7 +139,7 @@ const exportPDF = () => {
   autoTable(doc, {
     head: [columns],
     body: rows,
-    startY: 150,
+    startY: 136,
     styles: { fontSize: 7, cellPadding: 2, fontStyle: 'normal' }, // smaller, thin text
     headStyles: { fillColor: [0, 70, 255], textColor: 255, fontStyle: 'bold', fontSize: 8 },
     alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -150,7 +152,10 @@ const exportPDF = () => {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   const convertedTotal = convertPrice(total);
-  doc.text(`Total Amount: ${currencyInfo.symbol} ${convertedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 10, finalY + 20, { align: 'right' });
+  const formattedTotal = convertedTotal.toFixed(2);
+  // Use currency code instead of symbol for PDF to avoid encoding issues
+  const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
+  doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
 
   doc.save(`${userInfo.project}_quotation.pdf`);
 };
@@ -199,20 +204,27 @@ const exportPDF = () => {
         ) : (
           <>
             {cart.map(item => (
-              <div key={item._id} style={{ backgroundColor: '#f8fafc', borderRadius: '0.75rem', padding: '1rem', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
+              <div key={item.cartItemId} style={{ backgroundColor: '#f8fafc', borderRadius: '0.75rem', padding: '1rem', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#1e293b', marginBottom: '0.25rem' }}>{item.sku}</p>
-                    <p style={{ fontSize: '0.8125rem', color: '#64748b' }}>{item.category}</p>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <p style={{ fontSize: '0.8125rem', color: '#64748b' }}>{item.category}</p>
+                      {item.ipRating && item.ipRating !== 'N/A' && (
+                        <span style={{ fontSize: '0.75rem', backgroundColor: '#fef3c7', color: '#92400e', padding: '0.125rem 0.5rem', borderRadius: '0.25rem', fontWeight: 600 }}>
+                          {item.ipRating}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <button onClick={() => removeFromCart(item._id)} style={{ padding: '0.375rem', backgroundColor: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                  <button onClick={() => removeFromCart(item.cartItemId)} style={{ padding: '0.375rem', backgroundColor: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}><Trash2 size={16} /></button>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: 'white', padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                    <button onClick={() => decreaseQuantity(item._id)} style={{ width: '28px', height: '28px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}><Minus size={14} /></button>
-                    <span style={{ fontWeight: 600, fontSize: '0.9375rem', minWidth: '24px', textAlign: 'center' }}>{item.quantity}</span>
-                    <button onClick={() => increaseQuantity(item._id)} style={{ width: '28px', height: '28px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '0.375rem', cursor: 'pointer' }}><Plus size={14} /></button>
+                    <button onClick={() => decreaseQuantity(item.cartItemId)} style={{ width: '28px', height: '28px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', color: '#1e293b' }}><Minus size={14} /></button>
+                    <span style={{ fontWeight: 600, fontSize: '0.9375rem', minWidth: '24px', textAlign: 'center', color: '#1e293b' }}>{item.quantity}</span>
+                    <button onClick={() => increaseQuantity(item.cartItemId)} style={{ width: '28px', height: '28px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', color: '#1e293b' }}><Plus size={14} /></button>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.125rem' }}>{formatPrice(item.price ?? 0)} × {item.quantity}</p>
@@ -236,7 +248,7 @@ const exportPDF = () => {
               {['email','mobile','project'].map(field => (
                 <div key={field} style={{ marginBottom: '0.75rem' }}>
                   <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#64748b', marginBottom: '0.375rem' }}>{field==='project'?'Project Name':field==='mobile'?'Mobile Number':'Email'}</label>
-                  <input type="text" name={field} value={(userInfo as any)[field]} onChange={handleChange} placeholder={field==='project'?'Enter project name':field==='mobile'?'Enter mobile number':'Enter email address'} style={{ width: '100%', padding: '0.75rem', border: '2px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem' }} />
+                  <input type="text" name={field} value={(userInfo as any)[field]} onChange={handleChange} placeholder={field==='project'?'Enter project name':field==='mobile'?'Enter mobile number':'Enter email address'} style={{ width: '100%', padding: '0.75rem', border: '2px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', color: '#1e293b', backgroundColor: '#ffffff' }} />
                 </div>
               ))}
               {showError && <div style={{ color:'#dc2626', backgroundColor:'#fef2f2', padding:'0.75rem', borderRadius:'0.5rem', fontSize:'0.8125rem', border:'1px solid #fecaca', marginTop:'0.75rem' }}>Please fill all details to download.</div>}

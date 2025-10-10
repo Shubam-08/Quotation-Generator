@@ -109,11 +109,14 @@ export async function GET() {
 // POST endpoint to manually refresh rates (admin only)
 export async function POST(request: Request) {
   try {
-    // TODO: Add authentication check here
-    // const session = await getServerSession();
-    // if (!session || session.user.role !== 'admin') {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // }
+    // Authentication check - admin only
+    const { requireAdmin, unauthorizedResponse, forbiddenResponse } = await import('@/lib/auth-helpers');
+    const authCheck = await requireAdmin(request);
+    if ('error' in authCheck) {
+      return authCheck.status === 401
+        ? unauthorizedResponse(authCheck.error)
+        : forbiddenResponse(authCheck.error);
+    }
 
     const rates = await fetchLiveRates();
     const now = Date.now();

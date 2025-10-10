@@ -7,9 +7,12 @@ A modern product quotation and management system built with Next.js, MongoDB, an
 - 🔐 **Secure Authentication** - Login/logout with NextAuth.js
 - 👥 **Role-Based Access Control** - Admin and User roles
 - 📦 **Product Management** - Full CRUD operations for admins
-- 💰 **Dynamic Pricing** - USD to INR conversion
-- 📄 **Quotation Generation** - PDF and Excel export
+- 🏷️ **Multiple IP Ratings** - Support for products with multiple IP rating variants
+- 💰 **Multi-Currency Support** - Real-time currency conversion (USD, EUR, GBP, QAR, AED, SAR, BHD, OMR, INR)
+- 📄 **Quotation Generation** - Professional PDF and Excel export with IP ratings
+- 🛒 **Smart Cart System** - Separate entries for different IP rating selections
 - 🎨 **Modern UI** - Built with TailwindCSS and Lucide icons
+- 🖼️ **Flexible Image Hosting** - Support for direct URLs, ImgBB, and Google Drive
 
 ## Quick Start
 
@@ -100,6 +103,8 @@ middleware.ts             # Route protection
 
 - [Authentication Setup Guide](./AUTH_SETUP.md) - Detailed auth configuration
 - [MongoDB Setup Guide](./MONGODB_SETUP.md) - Database configuration
+- [IP Rating Implementation](./IP_RATING_IMPLEMENTATION.md) - Multiple IP ratings feature
+- [Production Readiness](./PRODUCTION_READINESS.md) - Pre-deployment checklist
 
 ## Technologies
 

@@ -17,22 +17,22 @@ type Product = {
   application?: string;
   dimension?: string;
   cutOut?: string;
-  ipRating?: string;
+  ipRating?: string | string[]; // Support both single string and array for backward compatibility
 };
 
 type CartContextType = {
-  cart: (Product & { quantity: number; name: string })[];
+  cart: (Product & { quantity: number; name: string; cartItemId: string })[];
   addToCart: (product: Product) => void;
-  removeFromCart: (_id: string) => void;
-  increaseQuantity: (_id: string) => void;
-  decreaseQuantity: (_id: string) => void;
+  removeFromCart: (cartItemId: string) => void;
+  increaseQuantity: (cartItemId: string) => void;
+  decreaseQuantity: (cartItemId: string) => void;
   clearCart: () => void;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
-  const [cart, setCart] = useState<(Product & { quantity: number; name: string })[]>([]);
+  const [cart, setCart] = useState<(Product & { quantity: number; name: string; cartItemId: string })[]>([]);
   const { showToast } = useToast();
 
   // Load cart from localStorage on mount
@@ -49,9 +49,20 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   }, [cart]);
 
   const addToCart = (product: Product) => {
-    const exists = cart.find(item => item._id === product._id);
+    // Get IP rating as string for comparison
+    const productIpRating = Array.isArray(product.ipRating) 
+      ? product.ipRating[0] 
+      : product.ipRating;
+    
+    // Create unique cart item ID based on product ID + IP rating
+    const cartItemId = `${product._id}_${productIpRating || 'default'}`;
+    
+    // Check if this specific product + IP rating combination already exists
+    const exists = cart.find(item => item.cartItemId === cartItemId);
+    
     if (exists) {
-      showToast(`${product.sku} is already in your list`, 'info');
+      const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
+      showToast(`${product.sku}${ipRatingText} is already in your list`, 'info');
       return; // Prevent duplicate
     }
 
@@ -69,28 +80,30 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       application: product.application || '-',
       dimension: product.dimension || '-',
       cutOut: product.cutOut || '-',
-      ipRating: product.ipRating || 'N/A',
-      quantity: 1
+      ipRating: productIpRating || 'N/A',
+      quantity: 1,
+      cartItemId: cartItemId
     };
 
     setCart(prev => [...prev, cartItem]);
-    showToast(`${product.sku} added to your list`, 'success');
+    const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
+    showToast(`${product.sku}${ipRatingText} added to your list`, 'success');
   };
 
-  const removeFromCart = (_id: string) => {
-    setCart(prev => prev.filter(item => item._id !== _id));
+  const removeFromCart = (cartItemId: string) => {
+    setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
   };
 
-  const increaseQuantity = (_id: string) => {
+  const increaseQuantity = (cartItemId: string) => {
     setCart(prev =>
-      prev.map(item => (item._id === _id ? { ...item, quantity: item.quantity + 1 } : item))
+      prev.map(item => (item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item))
     );
   };
 
-  const decreaseQuantity = (_id: string) => {
+  const decreaseQuantity = (cartItemId: string) => {
     setCart(prev =>
       prev.map(item =>
-        item._id === _id ? { ...item, quantity: Math.max(1, item.quantity - 1) } : item
+        item.cartItemId === cartItemId ? { ...item, quantity: Math.max(1, item.quantity - 1) } : item
       )
     );
   };

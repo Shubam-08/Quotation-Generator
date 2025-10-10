@@ -12,7 +12,7 @@ const ProductSchema = new mongoose.Schema(
     beamAngle: { type: String },
     dimension: { type: String },
     cutOut: { type: String },
-    ipRating: { type: String },
+    ipRating: { type: [String], default: [] }, // Changed to array to support multiple IP ratings
     price: { type: Number, required: true },
     images: { type: [String], default: [] },
   },

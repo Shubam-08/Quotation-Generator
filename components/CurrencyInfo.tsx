@@ -7,6 +7,7 @@ import { RefreshCw, Clock } from 'lucide-react';
 export default function CurrencyInfo() {
   const { lastUpdated, refreshRates } = useCurrency();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [relativeUpdated, setRelativeUpdated] = React.useState<string>(lastUpdated ? '...' : 'Never');
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -17,23 +18,29 @@ export default function CurrencyInfo() {
     }
   };
 
-  const formatLastUpdated = (timestamp: number | null) => {
-    if (!timestamp) return 'Never';
-    
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffDays > 0) {
-      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    } else if (diffHours > 0) {
-      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    } else {
-      return 'Just now';
+  React.useEffect(() => {
+    if (!lastUpdated) {
+      setRelativeUpdated('Never');
+      return;
     }
-  };
+    const date = new Date(lastUpdated);
+    const update = () => {
+      const now = Date.now();
+      const diffMs = now - date.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays > 0) {
+        setRelativeUpdated(`${diffDays} day${diffDays > 1 ? 's' : ''} ago`);
+      } else if (diffHours > 0) {
+        setRelativeUpdated(`${diffHours} hour${diffHours > 1 ? 's' : ''} ago`);
+      } else {
+        setRelativeUpdated('Just now');
+      }
+    };
+    update();
+    const id = setInterval(update, 60000);
+    return () => clearInterval(id);
+  }, [lastUpdated]);
 
   return (
     <div
@@ -51,7 +58,7 @@ export default function CurrencyInfo() {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
         <Clock size={14} />
-        <span>Rates updated: {formatLastUpdated(lastUpdated)}</span>
+        <span>Rates updated: {relativeUpdated}</span>
       </div>
       <button
         onClick={handleRefresh}

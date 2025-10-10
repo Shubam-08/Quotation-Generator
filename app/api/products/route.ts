@@ -57,9 +57,10 @@ export async function PUT(req: Request) {
     if (!id) return NextResponse.json({ error: "Product ID required" }, { status: 400 });
 
     const data = await req.json();
+    // Price is already in INR when updating, so don't convert it again
+    // Only round it to one decimal place for consistency
     if (data.price) {
-      let inrPrice = await convertUsdToInr(Number(data.price));
-      data.price = Math.round(inrPrice * 10) / 10;
+      data.price = Math.round(Number(data.price) * 10) / 10;
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(id, data, { new: true, runValidators: true });
@@ -113,7 +114,7 @@ export async function GET(req: Request) {
         { inputVoltage: rx },
         { lumen: rx },
         { beamAngle: rx },
-        { ipRating: rx },
+        { ipRating: { $elemMatch: { $regex: search, $options: "i" } } }, // Search in array
       ];
     }
 
@@ -124,13 +125,18 @@ export async function GET(req: Request) {
       "application",
       "beamAngle",
       "inputVoltage",
-      "ipRating",
     ];
     for (const field of fieldFilters) {
       const val = searchParams.get(field);
       if (val) {
         query[field] = { $regex: val, $options: "i" };
       }
+    }
+    
+    // Special handling for ipRating (array field)
+    const ipRatingFilter = searchParams.get("ipRating");
+    if (ipRatingFilter) {
+      query.ipRating = { $elemMatch: { $regex: ipRatingFilter, $options: "i" } };
     }
 
     // Wattage range filter

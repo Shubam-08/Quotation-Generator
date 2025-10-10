@@ -16,7 +16,7 @@ interface Product {
   beamAngle?: string;
   dimension?: string;
   cutOut?: string;
-  ipRating?: string;
+  ipRating?: string[]; // Changed to array
   price: number;
   images?: string[];
 }
@@ -32,6 +32,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState<string>("");
+  const [ipRatings, setIpRatings] = useState<string[]>([]);
+  const [newIpRating, setNewIpRating] = useState<string>("");
 
   useEffect(() => {
     if (status === "loading") {
@@ -78,7 +80,24 @@ export default function AdminDashboard() {
     try {
       const u = new URL(value);
       const pathname = u.pathname.toLowerCase();
-      return /(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg)$/.test(pathname);
+      const hostname = u.hostname.toLowerCase();
+      
+      // Check for direct image extensions
+      if (/(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.svg)$/.test(pathname)) {
+        return true;
+      }
+      
+      // Google Drive thumbnail URLs are valid direct image URLs
+      if (hostname === "drive.google.com" && pathname.includes("/thumbnail")) {
+        return true;
+      }
+      
+      // Google User Content CDN
+      if (hostname.includes("googleusercontent.com")) {
+        return true;
+      }
+      
+      return false;
     } catch {
       return false;
     }
@@ -123,15 +142,41 @@ export default function AdminDashboard() {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleAddIpRating = () => {
+    const trimmed = newIpRating.trim().toUpperCase();
+    if (!trimmed) return;
+    
+    // Validate IP rating format (e.g., IP20, IP30, IP40, IP65, etc.)
+    if (!/^IP\d{2}$/.test(trimmed)) {
+      setError("Please enter a valid IP rating (e.g., IP20, IP65)");
+      return;
+    }
+    
+    if (ipRatings.includes(trimmed)) {
+      setError("This IP rating is already added");
+      return;
+    }
+    
+    setIpRatings((prev) => [...prev, trimmed]);
+    setNewIpRating("");
+    setError("");
+  };
+
+  const handleRemoveIpRating = (index: number) => {
+    setIpRatings((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleOpenModal = (product?: Product) => {
     if (product) {
       setEditingProduct(product);
       setFormData(product);
       setImages(product.images || []);
+      setIpRatings(product.ipRating || []);
     } else {
       setEditingProduct(null);
       setFormData({});
       setImages([]);
+      setIpRatings([]);
     }
     setShowModal(true);
     setError("");
@@ -144,6 +189,8 @@ export default function AdminDashboard() {
     setError("");
     setImages([]);
     setNewImageUrl("");
+    setIpRatings([]);
+    setNewIpRating("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -162,6 +209,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           ...formData,
           images: images,
+          ipRating: ipRatings,
         }),
       });
 
@@ -274,6 +322,9 @@ export default function AdminDashboard() {
                     Watt
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    IP Ratings
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Price (INR)
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -292,6 +343,22 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {product.watt}W
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      <div className="flex flex-wrap gap-1">
+                        {product.ipRating && product.ipRating.length > 0 ? (
+                          product.ipRating.map((rating, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded"
+                            >
+                              {rating}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       ₹{product.price.toFixed(2)}
@@ -349,7 +416,7 @@ export default function AdminDashboard() {
                       required
                       value={formData.sku || ""}
                       onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>
 
@@ -362,7 +429,7 @@ export default function AdminDashboard() {
                       required
                       value={formData.category || ""}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>
 
@@ -374,7 +441,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={formData.application || ""}
                       onChange={(e) => setFormData({ ...formData, application: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>
 
@@ -386,7 +453,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={formData.inputVoltage || ""}
                       onChange={(e) => setFormData({ ...formData, inputVoltage: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>
 
@@ -398,7 +465,7 @@ export default function AdminDashboard() {
                       type="number"
                       value={formData.watt || ""}
                       onChange={(e) => setFormData({ ...formData, watt: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>
 
@@ -410,7 +477,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={formData.lumen || ""}
                       onChange={(e) => setFormData({ ...formData, lumen: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>
 
@@ -422,7 +489,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={formData.beamAngle || ""}
                       onChange={(e) => setFormData({ ...formData, beamAngle: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>
 
@@ -433,10 +500,10 @@ export default function AdminDashboard() {
                     <div className="flex gap-2">
                       <input
                         type="url"
-                        placeholder="https://example.com/image.jpg"
+                        placeholder="https://example.com/image.jpg or Google Drive link"
                         value={newImageUrl}
                         onChange={(e) => setNewImageUrl(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                       />
                       <button
                         type="button"
@@ -447,7 +514,9 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Paste one URL at a time. You can add multiple images.
+                      Supports direct image URLs, ImgBB (i.ibb.co), and Google Drive links (must be publicly shared). 
+                      <br />
+                      <span className="text-blue-600">Tip: For best results, use ImgBB.com - upload your image and copy the "Direct link".</span>
                     </p>
 
                     {images.length > 0 && (
@@ -503,21 +572,60 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
-                  <div>
+                  <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      IP Rating
+                      IP Ratings
                     </label>
-                    <input
-                      type="text"
-                      value={formData.ipRating || ""}
-                      onChange={(e) => setFormData({ ...formData, ipRating: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g., IP20, IP65"
+                        value={newIpRating}
+                        onChange={(e) => setNewIpRating(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddIpRating();
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddIpRating}
+                        className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Add multiple IP ratings for this product (e.g., IP20, IP30, IP40)
+                    </p>
+
+                    {ipRatings.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {ipRatings.map((rating, idx) => (
+                          <div
+                            key={`${rating}-${idx}`}
+                            className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5"
+                          >
+                            <span className="text-sm font-medium text-blue-900">{rating}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveIpRating(idx)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price (USD) *
+                      {editingProduct ? "Price (INR) *" : "Price (USD) *"}
                     </label>
                     <input
                       type="number"
@@ -525,9 +633,11 @@ export default function AdminDashboard() {
                       required
                       value={formData.price || ""}
                       onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Will be converted to INR</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {editingProduct ? "Edit price in INR" : "Will be converted to INR"}
+                    </p>
                   </div>
                 </div>
 
