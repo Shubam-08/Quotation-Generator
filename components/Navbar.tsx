@@ -10,9 +10,9 @@ export default function Navbar() {
 
   return (
     <nav className="bg-black border-b border-white/10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center">
               <Image 
                 src="/logoqliteweb.png" 
@@ -23,6 +23,9 @@ export default function Navbar() {
                 priority
               />
             </Link>
+            <span className="bg-yellow-400/10 text-yellow-400 text-xs px-2.5 py-1 rounded-full border border-yellow-400/30 font-semibold tracking-wide">
+              BETA
+            </span>
           </div>
 
           <div className="flex items-center gap-4">
