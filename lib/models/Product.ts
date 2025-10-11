@@ -5,6 +5,7 @@ const ProductSchema = new mongoose.Schema(
   {
     sku: { type: String, required: true },
     category: { type: String, required: true },
+    categoryFilter: { type: String }, // Main category for filtering
     application: { type: String },
     inputVoltage: { type: String },
     watt: { type: Number },

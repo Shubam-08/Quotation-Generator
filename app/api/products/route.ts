@@ -124,7 +124,6 @@ export async function GET(req: Request) {
     // Field-specific filters (combine with global search if provided)
     const fieldFilters = [
       "sku",
-      "category",
       "application",
       "beamAngle",
       "inputVoltage",
@@ -134,6 +133,16 @@ export async function GET(req: Request) {
       if (val) {
         query[field] = { $regex: val, $options: "i" };
       }
+    }
+    
+    // Special handling for category - search in both category and categoryFilter
+    const categoryVal = searchParams.get("category");
+    if (categoryVal) {
+      query.$or = query.$or || [];
+      query.$or.push(
+        { category: { $regex: categoryVal, $options: "i" } },
+        { categoryFilter: { $regex: categoryVal, $options: "i" } }
+      );
     }
     
     // Special handling for ipRating (array field) - support both old and new formats

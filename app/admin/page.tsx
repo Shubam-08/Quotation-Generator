@@ -14,6 +14,7 @@ interface Product {
   _id: string;
   sku: string;
   category: string;
+  categoryFilter?: string; // Main category for filtering
   application?: string;
   inputVoltage?: string;
   watt?: number;
@@ -385,8 +386,13 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {product.sku}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.category}
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      <div className="flex flex-col">
+                        <span className="text-gray-900 font-medium">{product.category}</span>
+                        <span className="text-xs text-blue-600 mt-0.5">
+                          🔍 Filter: {product.categoryFilter || 'Not Set'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {product.watt}W
@@ -481,7 +487,7 @@ export default function AdminDashboard() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Category *
+                      Category (Full Name) *
                     </label>
                     <input
                       type="text"
@@ -489,7 +495,28 @@ export default function AdminDashboard() {
                       value={formData.category || ""}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      placeholder="e.g., Surface Mounted Projector Light"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      📝 Full product category name (shown in product details)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Category Filter *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.categoryFilter || ""}
+                      onChange={(e) => setFormData({ ...formData, categoryFilter: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      placeholder="e.g., Projector Light"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      🔍 Main category shown in filter dropdown (e.g., "Projector Light", "LED Strip")
+                    </p>
                   </div>
 
                   <div>

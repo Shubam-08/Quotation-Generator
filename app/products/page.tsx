@@ -18,6 +18,7 @@ type Product = {
   sku: string;
   name: string;
   category: string;
+  categoryFilter?: string;
   application?: string;
   inputVoltage?: string;
   watt?: number;
@@ -133,9 +134,20 @@ export default function ProductsPage() {
 
       if (!data.error) {
         const products = data as Product[];
+        
+        // Use categoryFilter if available, otherwise fallback to extracting from category
+        const categoryFilters = products
+          .map(p => {
+            if (p.categoryFilter) return p.categoryFilter;
+            // Fallback: extract last two words from category
+            const words = p.category.trim().split(/\s+/);
+            return words.length === 1 ? words[0] : words.slice(-2).join(' ');
+          })
+          .filter((v): v is string => Boolean(v));
+        
         setFilterOptions({
           skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
-          categories: [...new Set(products.map(p => p.category).filter((v): v is string => Boolean(v)))].sort() as string[],
+          categories: [...new Set(categoryFilters)].sort() as string[],
           applications: [...new Set(products.map(p => p.application).filter((v): v is string => Boolean(v)))].sort() as string[],
           inputVoltages: [...new Set(products.map(p => p.inputVoltage).filter((v): v is string => Boolean(v)))].sort() as string[],
           beamAngles: [...new Set(products.map(p => p.beamAngle).filter((v): v is string => Boolean(v)))].sort() as string[],
@@ -293,25 +305,6 @@ export default function ProductsPage() {
                   />
                 </div>
 
-                {/* Model Number */}
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Model Number</label>
-                  <select 
-                    value={filters.sku} 
-                    onChange={e => handleFilterChange('sku', e.target.value)} 
-                    className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                      isDarkMode 
-                        ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                    }`}
-                  >
-                    <option value="">All Models</option>
-                    {filterOptions.skus.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-
                 {/* Category */}
                 <div>
                   <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
@@ -350,22 +343,22 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
-                {/* Input Voltage */}
+                {/* Model Number */}
                 <div>
                   <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Input Voltage</label>
+                  }`}>Model Number</label>
                   <select 
-                    value={filters.inputVoltage} 
-                    onChange={e => handleFilterChange('inputVoltage', e.target.value)} 
+                    value={filters.sku} 
+                    onChange={e => handleFilterChange('sku', e.target.value)} 
                     className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
                       isDarkMode 
                         ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
                         : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
                     }`}
                   >
-                    <option value="">All Voltages</option>
-                    {filterOptions.inputVoltages.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    <option value="">All Models</option>
+                    {filterOptions.skus.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
 
@@ -404,6 +397,25 @@ export default function ProductsPage() {
                   >
                     <option value="">All Lumens</option>
                     {lumenRanges.map(r => <option key={r.label} value={`${r.min}-${r.max}`}>{r.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Input Voltage */}
+                <div>
+                  <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>Input Voltage</label>
+                  <select 
+                    value={filters.inputVoltage} 
+                    onChange={e => handleFilterChange('inputVoltage', e.target.value)} 
+                    className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                      isDarkMode 
+                        ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                        : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                    }`}
+                  >
+                    <option value="">All Voltages</option>
+                    {filterOptions.inputVoltages.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
 
