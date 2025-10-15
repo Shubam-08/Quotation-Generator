@@ -25,6 +25,11 @@ const ProductSchema = new mongoose.Schema(
     ipRating: { type: [String], default: [] },
     price: { type: Number, default: 0 },
     images: { type: [String], default: [] },
+    // File attachments stored in AWS S3
+    datasheets: { type: [String], default: [] }, // URLs to datasheet PDFs
+    iesFiles: { type: [String], default: [] }, // URLs to IES files
+    certifications: { type: [String], default: [] }, // URLs to certification documents
+    productImages: { type: [String], default: [] }, // Additional product images (separate from legacy images field)
   },
   { timestamps: true }
 );

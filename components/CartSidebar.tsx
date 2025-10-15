@@ -27,19 +27,24 @@ interface Product {
 type CartItem = Product & { quantity: number; name?: string; cartItemId: string; };
 
 export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => void }) {
-  const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity } = useCart() as {
+  const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity, updateQuantity } = useCart() as {
     cart: CartItem[];
     removeFromCart: (id: string) => void;
     clearCart: () => void;
     increaseQuantity: (id: string) => void;
     decreaseQuantity: (id: string) => void;
+    updateQuantity: (id: string, quantity: number) => void;
   };
   const { formatPrice, convertPrice, currencyInfo } = useCurrency();
 
   const [userInfo, setUserInfo] = useState({ email: '', mobile: '', project: '' });
   const [showError, setShowError] = useState(false);
 
-  const total = cart.reduce((sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 1), 0);
+  // Calculate total in selected currency (not base INR price)
+  const total = cart.reduce((sum, item) => {
+    const convertedPrice = convertPrice(item.price ?? 0);
+    return sum + (convertedPrice * (item.quantity ?? 1));
+  }, 0);
   const canDownload = userInfo.email && userInfo.mobile && userInfo.project;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,8 +156,8 @@ const exportPDF = () => {
   const finalY = (doc as any).lastAutoTable.finalY || 140;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  const convertedTotal = convertPrice(total);
-  const formattedTotal = convertedTotal.toFixed(2);
+  // Total is already in converted currency, no need to convert again
+  const formattedTotal = total.toFixed(2);
   // Use currency code instead of symbol for PDF to avoid encoding issues
   const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
   doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
@@ -221,10 +226,16 @@ const exportPDF = () => {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: 'white', padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                    <button onClick={() => decreaseQuantity(item.cartItemId)} style={{ width: '28px', height: '28px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', color: '#1e293b' }}><Minus size={14} /></button>
-                    <span style={{ fontWeight: 600, fontSize: '0.9375rem', minWidth: '24px', textAlign: 'center', color: '#1e293b' }}>{item.quantity}</span>
-                    <button onClick={() => increaseQuantity(item.cartItemId)} style={{ width: '28px', height: '28px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', color: '#1e293b' }}><Plus size={14} /></button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'white', padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                    <button onClick={() => decreaseQuantity(item.cartItemId)} style={{ width: '32px', height: '32px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', color: '#1e293b' }}><Minus size={16} /></button>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      value={item.quantity} 
+                      onChange={(e) => updateQuantity(item.cartItemId, parseInt(e.target.value) || 1)}
+                      style={{ width: '60px', textAlign: 'center', fontWeight: 600, fontSize: '0.9375rem', color: '#1e293b', border: 'none', outline: 'none', backgroundColor: 'transparent' }}
+                    />
+                    <button onClick={() => increaseQuantity(item.cartItemId)} style={{ width: '32px', height: '32px', backgroundColor: '#eff6ff', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', color: '#1e293b' }}><Plus size={16} /></button>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.125rem' }}>{formatPrice(item.price ?? 0)} × {item.quantity}</p>
@@ -238,7 +249,7 @@ const exportPDF = () => {
             <div style={{ backgroundColor: '#eff6ff', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1.5rem', border: '2px solid #bfdbfe' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '1rem', fontWeight: 600, color: '#1e40af' }}>Total Amount:</span>
-                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e40af' }}>{formatPrice(total)}</span>
+                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e40af' }}>{currencyInfo.symbol} {total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>*Current price may vary. Final price on request.</p>
             </div>

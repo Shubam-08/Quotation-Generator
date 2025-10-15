@@ -30,7 +30,7 @@ const CURRENCY_METADATA: Record<Currency, { symbol: string; name: string }> = {
   USD: { symbol: '$', name: 'US Dollar' },
   GBP: { symbol: '£', name: 'British Pound' },
   EUR: { symbol: '€', name: 'Euro' },
-  QAR: { symbol: 'QR', name: 'Qatari Riyal' },
+  QAR: { symbol: 'QAR', name: 'Qatari Riyal' },
   AED: { symbol: 'AED', name: 'UAE Dirham' },
   SAR: { symbol: 'SAR', name: 'Saudi Riyal' },
   BHD: { symbol: 'BD', name: 'Bahraini Dinar' },

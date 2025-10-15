@@ -5,8 +5,9 @@ import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import CurrencySelector from '@/components/CurrencySelector';
 import CurrencyInfo from '@/components/CurrencyInfo';
-import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Sparkles, Sun, Moon } from 'lucide-react';
+import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Sparkles, Sun, Moon, FileText, Download, File, Award, ChevronLeft, ChevronRight } from 'lucide-react';
 import CartButton from '@/components/CartButton';
+import { getApplicationFromIpRating } from '@/lib/ipRatingUtils';
 
 type IpRatingPrice = {
   rating: string;
@@ -30,6 +31,10 @@ type Product = {
   ipRating?: string[];
   ipRatings?: IpRatingPrice[];
   images?: string[];
+  productImages?: string[];
+  datasheets?: string[];
+  iesFiles?: string[];
+  certifications?: string[];
 };
 
 type Filters = {
@@ -71,6 +76,10 @@ export default function ProductsPage() {
   const [selectedIpRatings, setSelectedIpRatings] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(20);
 
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -186,9 +195,21 @@ export default function ProductsPage() {
       sortBy: 'sku',
       order: 'asc',
     });
+    setCurrentPage(1); // Reset to first page when filters are cleared
   };
 
   const activeFilterCount = Object.values(filters).filter(v => v && v !== 'sku' && v !== 'asc').length;
+
+  // Pagination calculations
+  const totalPages = Math.ceil(products.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedProducts = products.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-gray-50'}`}>
@@ -343,25 +364,6 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
-                {/* Model Number */}
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Model Number</label>
-                  <select 
-                    value={filters.sku} 
-                    onChange={e => handleFilterChange('sku', e.target.value)} 
-                    className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                      isDarkMode 
-                        ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                    }`}
-                  >
-                    <option value="">All Models</option>
-                    {filterOptions.skus.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-
                 {/* Wattage */}
                 <div>
                   <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
@@ -497,14 +499,15 @@ export default function ProductsPage() {
                         { label: 'Beam Angle', key: 'beamAngle' },
                         { label: 'IP Rating', key: 'ipRating' },
                         { label: 'Price', key: 'price' },
+                        { label: 'Files', key: 'files' },
                         { label: 'Action', key: 'action' }
                       ].map(col => (
                         <th 
                           key={col.key} 
                           className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-wider ${
                             isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          } ${col.key !== 'action' ? `cursor-pointer ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-100'}` : ''}`}
-                          onClick={() => col.key !== 'action' && handleSortChange(col.key)}
+                          } ${col.key !== 'action' && col.key !== 'files' ? `cursor-pointer ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-100'}` : ''}`}
+                          onClick={() => col.key !== 'action' && col.key !== 'files' && handleSortChange(col.key)}
                         >
                           {col.label}
                         </th>
@@ -512,7 +515,7 @@ export default function ProductsPage() {
                     </tr>
                   </thead>
                   <tbody className={isDarkMode ? 'divide-y divide-white/10' : 'divide-y divide-gray-200'}>
-                    {products.map((p) => {
+                    {paginatedProducts.map((p) => {
                       let currentIpRating: string | undefined;
                       let currentPrice: number;
                       
@@ -537,9 +540,10 @@ export default function ProductsPage() {
                           isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'
                         }`}>
                           <td className="px-4 py-4 text-center">
-                            {p.images?.length ? (
+                            {/* Prioritize S3 productImages, then fall back to legacy images */}
+                            {(p.productImages?.length || p.images?.length) ? (
                               <img 
-                                src={p.images[0]} 
+                                src={p.productImages?.[0] || p.images?.[0]} 
                                 alt={p.sku} 
                                 className={`w-16 h-16 object-cover rounded-lg border-2 mx-auto ${
                                   isDarkMode ? 'border-white/10' : 'border-gray-200'
@@ -559,10 +563,26 @@ export default function ProductsPage() {
                               {p.category}
                             </span>
                           </td>
-                          <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{p.application || '-'}</td>
+                          <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {(() => {
+                              // Get currently selected IP rating for this product
+                              const currentIpRating = selectedIpRatings[p._id] || 
+                                (p.ipRatings && p.ipRatings.length > 0 ? p.ipRatings[0].rating : 
+                                (p.ipRating && p.ipRating.length > 0 ? p.ipRating[0] : null));
+                              
+                              // Calculate application based on selected IP rating
+                              const dynamicApplication = currentIpRating 
+                                ? getApplicationFromIpRating(currentIpRating)
+                                : (p.application || 'Indoor');
+                              
+                              return dynamicApplication;
+                            })()}
+                          </td>
                           <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{p.inputVoltage || '-'}</td>
                           <td className={`px-4 py-4 text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{p.watt ? `${p.watt}W` : '-'}</td>
-                          <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{p.lumen || '-'}</td>
+                          <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {p.lumen ? (p.lumen.toLowerCase().includes('lm') ? p.lumen : `${p.lumen} lm`) : '-'}
+                          </td>
                           <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{p.beamAngle || '-'}</td>
                           <td className="px-4 py-4">
                             {p.ipRatings && p.ipRatings.length > 0 ? (
@@ -605,6 +625,90 @@ export default function ProductsPage() {
                             {formatPrice(currentPrice)}
                           </td>
                           <td className="px-4 py-4">
+                            {(p.datasheets?.length || p.iesFiles?.length || p.certifications?.length) ? (
+                              <div className="relative group">
+                                <button className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                  isDarkMode 
+                                    ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30' 
+                                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300'
+                                }`}>
+                                  <File size={14} />
+                                  <span>View Files</span>
+                                  <ChevronDown size={12} className="group-hover:translate-y-0.5 transition-transform" />
+                                </button>
+                                
+                                {/* Dropdown Menu */}
+                                <div className={`absolute left-0 top-full mt-1 w-48 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 ${
+                                  isDarkMode 
+                                    ? 'bg-gray-800 border border-white/20' 
+                                    : 'bg-white border border-gray-200'
+                                }`}>
+                                  <div className="py-2">
+                                    {p.datasheets?.map((url, idx) => (
+                                      <a
+                                        key={`ds-${idx}`}
+                                        href={url}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                          isDarkMode 
+                                            ? 'text-gray-300 hover:bg-blue-500/20 hover:text-blue-400' 
+                                            : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                        }`}
+                                        title="Click to download datasheet"
+                                      >
+                                        <FileText size={16} className="text-blue-500" />
+                                        <span className="font-medium">Datasheet</span>
+                                        <Download size={12} className="ml-auto opacity-50" />
+                                      </a>
+                                    ))}
+                                    {p.iesFiles?.map((url, idx) => (
+                                      <a
+                                        key={`ies-${idx}`}
+                                        href={url}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                          isDarkMode 
+                                            ? 'text-gray-300 hover:bg-purple-500/20 hover:text-purple-400' 
+                                            : 'text-gray-700 hover:bg-purple-50 hover:text-purple-700'
+                                        }`}
+                                        title="Click to download IES file"
+                                      >
+                                        <Download size={16} className="text-purple-500" />
+                                        <span className="font-medium">IES File</span>
+                                        <Download size={12} className="ml-auto opacity-50" />
+                                      </a>
+                                    ))}
+                                    {p.certifications?.map((url, idx) => (
+                                      <a
+                                        key={`cert-${idx}`}
+                                        href={url}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                          isDarkMode 
+                                            ? 'text-gray-300 hover:bg-green-500/20 hover:text-green-400' 
+                                            : 'text-gray-700 hover:bg-green-50 hover:text-green-700'
+                                        }`}
+                                        title="Click to download certificate"
+                                      >
+                                        <Award size={16} className="text-green-500" />
+                                        <span className="font-medium">Certificate</span>
+                                        <Download size={12} className="ml-auto opacity-50" />
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className={`text-xs italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>No files</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
                             <button 
                               onClick={() => {
                                 if (!isInCart) {
@@ -634,6 +738,86 @@ export default function ProductsPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {!loading && !error && products.length > 0 && totalPages > 1 && (
+              <div className={`px-6 py-4 border-t flex items-center justify-between ${
+                isDarkMode ? 'bg-gray-900/50 border-white/10' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-700'}`}>
+                  Showing {startIndex + 1} to {Math.min(endIndex, products.length)} of {products.length} products
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-1 rounded-lg flex items-center gap-1 transition-colors ${
+                      currentPage === 1
+                        ? isDarkMode 
+                          ? 'bg-gray-800 text-gray-600 cursor-not-allowed' 
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : isDarkMode
+                          ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-white/10'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <ChevronLeft size={16} />
+                    Previous
+                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      // Show first 2, current page with neighbors, and last 2
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-3 py-1 rounded-lg transition-colors ${
+                            currentPage === pageNum
+                              ? isDarkMode
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-600 text-white'
+                              : isDarkMode
+                                ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-white/10'
+                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`px-3 py-1 rounded-lg flex items-center gap-1 transition-colors ${
+                      currentPage === totalPages
+                        ? isDarkMode 
+                          ? 'bg-gray-800 text-gray-600 cursor-not-allowed' 
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : isDarkMode
+                          ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-white/10'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Next
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
             )}
           </div>

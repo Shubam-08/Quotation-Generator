@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Plus, X } from "lucide-react";
+import { Pencil, Trash2, Plus, X, Upload, FileText, Image as ImageIcon, Award, Zap, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { getApplicationFromIpRatings, getApplicationFromIpRating } from "@/lib/ipRatingUtils";
 
 interface IpRatingPrice {
   rating: string;
@@ -26,6 +27,10 @@ interface Product {
   ipRating?: string[]; // Legacy field for backward compatibility
   price: number; // Legacy field
   images?: string[];
+  productImages?: string[]; // S3 uploaded images
+  datasheets?: string[]; // S3 uploaded datasheets
+  iesFiles?: string[]; // S3 uploaded IES files
+  certifications?: string[]; // S3 uploaded certifications
 }
 
 export default function AdminDashboard() {
@@ -42,6 +47,28 @@ export default function AdminDashboard() {
   const [ipRatings, setIpRatings] = useState<IpRatingPrice[]>([]);
   const [newIpRating, setNewIpRating] = useState<string>("");
   const [newIpPrice, setNewIpPrice] = useState<string>("");
+  
+  // Auto-update application when IP ratings change
+  useEffect(() => {
+    if (showModal && ipRatings.length > 0) {
+      const autoApplication = getApplicationFromIpRatings(ipRatings);
+      setFormData(prev => ({ ...prev, application: autoApplication }));
+    }
+  }, [ipRatings, showModal]);
+  
+  // File upload states
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [datasheets, setDatasheets] = useState<string[]>([]);
+  const [iesFiles, setIesFiles] = useState<string[]>([]);
+  const [certifications, setCertifications] = useState<string[]>([]);
+  const [uploadingFile, setUploadingFile] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  
+  // Pagination and search states
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(20);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
     if (status === "loading") {
@@ -73,6 +100,88 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
+
+  // Memoized unique categories from existing products
+  const uniqueCategories = useMemo(() => {
+    const categories = products
+      .map(p => p.categoryFilter)
+      .filter((cat): cat is string => !!cat && cat.trim() !== '');
+    return Array.from(new Set(categories)).sort();
+  }, [products]);
+
+  // Memoized unique input voltages from existing products
+  const uniqueInputVoltages = useMemo(() => {
+    const voltages = products
+      .map(p => p.inputVoltage)
+      .filter((v): v is string => !!v && v.trim() !== '');
+    return Array.from(new Set(voltages)).sort();
+  }, [products]);
+
+  // Memoized unique beam angles from existing products
+  const uniqueBeamAngles = useMemo(() => {
+    const angles = products
+      .map(p => p.beamAngle)
+      .filter((a): a is string => !!a && a.trim() !== '');
+    return Array.from(new Set(angles)).sort();
+  }, [products]);
+
+  // Memoized unique applications from existing products
+  const uniqueApplications = useMemo(() => {
+    const applications = products
+      .map(p => p.application)
+      .filter((app): app is string => !!app && app.trim() !== '');
+    return Array.from(new Set(applications)).sort();
+  }, [products]);
+
+  // Memoized unique full category names from existing products
+  const uniqueFullCategories = useMemo(() => {
+    const fullCategories = products
+      .map(p => p.category)
+      .filter((cat): cat is string => !!cat && cat.trim() !== '');
+    return Array.from(new Set(fullCategories)).sort();
+  }, [products]);
+
+  // Filtered and paginated products - search across all specifications
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) return products;
+    
+    const term = searchTerm.toLowerCase();
+    return products.filter(p => {
+      // Search in basic fields
+      if (p.sku?.toLowerCase().includes(term)) return true;
+      if (p.category?.toLowerCase().includes(term)) return true;
+      if (p.categoryFilter?.toLowerCase().includes(term)) return true;
+      if (p.application?.toLowerCase().includes(term)) return true;
+      
+      // Search in specifications
+      if (p.inputVoltage?.toLowerCase().includes(term)) return true;
+      if (p.watt?.toString().includes(term)) return true;
+      if (p.lumen?.toLowerCase().includes(term)) return true;
+      if (p.beamAngle?.toLowerCase().includes(term)) return true;
+      if (p.dimension?.toLowerCase().includes(term)) return true;
+      if (p.cutOut?.toLowerCase().includes(term)) return true;
+      
+      // Search in IP ratings (both old and new format)
+      if (p.ipRating?.some(ip => ip.toLowerCase().includes(term))) return true;
+      if (p.ipRatings?.some(ip => ip.rating.toLowerCase().includes(term))) return true;
+      
+      // Search in price
+      if (p.price?.toString().includes(term)) return true;
+      if (p.ipRatings?.some(ip => ip.price.toString().includes(term))) return true;
+      
+      return false;
+    });
+  }, [products, searchTerm]);
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, currentPage, itemsPerPage]);
+
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredProducts.length / itemsPerPage);
+  }, [filteredProducts.length, itemsPerPage]);
 
   const isValidUrl = (value: string) => {
     try {
@@ -151,12 +260,17 @@ export default function AdminDashboard() {
   };
 
   const handleAddIpRating = async () => {
-    const trimmed = newIpRating.trim().toUpperCase();
+    let trimmed = newIpRating.trim().toUpperCase();
     const priceValue = parseFloat(newIpPrice);
     
     if (!trimmed) {
       setError("Please enter an IP rating");
       return;
+    }
+    
+    // Auto-prefix with "IP" if user enters just numbers (e.g., "40" becomes "IP40")
+    if (/^\d{2}$/.test(trimmed)) {
+      trimmed = `IP${trimmed}`;
     }
     
     if (!newIpPrice || isNaN(priceValue) || priceValue <= 0) {
@@ -166,12 +280,22 @@ export default function AdminDashboard() {
     
     // Validate IP rating format (e.g., IP20, IP30, IP40, IP65, etc.)
     if (!/^IP\d{2}$/.test(trimmed)) {
-      setError("Please enter a valid IP rating (e.g., IP20, IP65)");
+      setError("Please enter a valid IP rating (e.g., IP20, IP65, or just 20, 65)");
       return;
     }
     
-    if (ipRatings.some(ip => ip.rating === trimmed)) {
-      setError("This IP rating is already added");
+    // Check if IP rating already exists
+    const existingIndex = ipRatings.findIndex(ip => ip.rating === trimmed);
+    if (existingIndex !== -1) {
+      // Update existing IP rating price instead of blocking
+      if (confirm(`IP rating ${trimmed} already exists with price ${ipRatings[existingIndex].price}. Do you want to update the price to ${priceValue}?`)) {
+        const updatedRatings = [...ipRatings];
+        updatedRatings[existingIndex].price = priceValue;
+        setIpRatings(updatedRatings);
+        setNewIpRating("");
+        setNewIpPrice("");
+        setError("");
+      }
       return;
     }
     
@@ -210,6 +334,10 @@ export default function AdminDashboard() {
       setEditingProduct(product);
       setFormData(product);
       setImages(product.images || []);
+      setProductImages(product.productImages || []);
+      setDatasheets(product.datasheets || []);
+      setIesFiles(product.iesFiles || []);
+      setCertifications(product.certifications || []);
       // Migrate old format to new format if needed
       if (product.ipRatings && product.ipRatings.length > 0) {
         setIpRatings(product.ipRatings);
@@ -223,6 +351,10 @@ export default function AdminDashboard() {
       setEditingProduct(null);
       setFormData({});
       setImages([]);
+      setProductImages([]);
+      setDatasheets([]);
+      setIesFiles([]);
+      setCertifications([]);
       setIpRatings([]);
     }
     setShowModal(true);
@@ -239,11 +371,36 @@ export default function AdminDashboard() {
     setIpRatings([]);
     setNewIpRating("");
     setNewIpPrice("");
+    setProductImages([]);
+    setDatasheets([]);
+    setIesFiles([]);
+    setCertifications([]);
+    setUploadingFile(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSubmitting(true);
+
+    // Form validation
+    if (!formData.sku?.trim()) {
+      setError("SKU/Model Number is required");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!formData.categoryFilter?.trim()) {
+      setError("Category Filter is required");
+      setSubmitting(false);
+      return;
+    }
+
+    if (ipRatings.length === 0) {
+      setError("Please add at least one IP rating with price");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const url = editingProduct
@@ -258,6 +415,10 @@ export default function AdminDashboard() {
           ...formData,
           images: images,
           ipRatings: ipRatings,
+          productImages: productImages,
+          datasheets: datasheets,
+          iesFiles: iesFiles,
+          certifications: certifications,
         }),
       });
 
@@ -265,32 +426,113 @@ export default function AdminDashboard() {
 
       if (!response.ok) {
         setError(data.error || "Operation failed");
+        setSubmitting(false);
         return;
       }
 
+      // Optimistic UI update
+      if (editingProduct) {
+        setProducts(prev => prev.map(p => p._id === editingProduct._id ? data : p));
+      } else {
+        setProducts(prev => [...prev, data]);
+      }
+
       handleCloseModal();
-      fetchProducts();
     } catch (err) {
       setError("An error occurred");
+    } finally {
+      setSubmitting(false);
     }
-  };
+  }, [formData, images, ipRatings, productImages, datasheets, iesFiles, certifications, editingProduct]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
 
     try {
+      // Optimistic UI update
+      setProducts(prev => prev.filter(p => p._id !== id));
+
       const response = await fetch(`/api/products?id=${id}`, {
         method: "DELETE",
       });
 
-      if (response.ok) {
+      if (!response.ok) {
+        // Revert on error
         fetchProducts();
-      } else {
         const data = await response.json();
         alert(data.error || "Failed to delete product");
       }
     } catch (err) {
+      // Revert on error
+      fetchProducts();
       alert("An error occurred while deleting");
+    }
+  }, []);
+
+  // File upload handlers
+  const handleFileUpload = async (
+    file: File,
+    fileType: "image" | "datasheet" | "ies" | "certification"
+  ) => {
+    setUploadingFile(true);
+    setError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("fileType", fileType);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Failed to upload file");
+        return;
+      }
+
+      // Add the uploaded file URL to the appropriate state
+      switch (fileType) {
+        case "image":
+          setProductImages((prev) => [...prev, data.url]);
+          break;
+        case "datasheet":
+          setDatasheets((prev) => [...prev, data.url]);
+          break;
+        case "ies":
+          setIesFiles((prev) => [...prev, data.url]);
+          break;
+        case "certification":
+          setCertifications((prev) => [...prev, data.url]);
+          break;
+      }
+    } catch (err) {
+      setError("An error occurred while uploading the file");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleRemoveFile = (
+    fileUrl: string,
+    fileType: "image" | "datasheet" | "ies" | "certification"
+  ) => {
+    switch (fileType) {
+      case "image":
+        setProductImages((prev) => prev.filter((url) => url !== fileUrl));
+        break;
+      case "datasheet":
+        setDatasheets((prev) => prev.filter((url) => url !== fileUrl));
+        break;
+      case "ies":
+        setIesFiles((prev) => prev.filter((url) => url !== fileUrl));
+        break;
+      case "certification":
+        setCertifications((prev) => prev.filter((url) => url !== fileUrl));
+        break;
     }
   };
 
@@ -341,18 +583,64 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-gray-600 mt-1">Manage products</p>
+            <p className="text-gray-600 mt-1">Manage products ({filteredProducts.length} total)</p>
           </div>
-          <button
-            onClick={() => handleOpenModal()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Plus size={20} />
-            Add Product
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                if (confirm('Update all products\' applications based on their IP ratings? This will overwrite existing application values.')) {
+                  try {
+                    const response = await fetch('/api/products/update-applications', { method: 'POST' });
+                    const data = await response.json();
+                    if (data.success) {
+                      alert(`Success! Updated ${data.updatedCount} products, skipped ${data.skippedCount} products.`);
+                      fetchProducts(); // Refresh the list
+                    } else {
+                      alert('Failed to update applications');
+                    }
+                  } catch (error) {
+                    alert('Error updating applications');
+                  }
+                }
+              }}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
+            >
+              <Zap size={20} />
+              Auto-Update Applications
+            </button>
+            <button
+              onClick={() => handleOpenModal()}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Add Product
+            </button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6 bg-white rounded-lg shadow p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by SKU, category, wattage, lumen, IP rating, price, or any specification..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1); // Reset to first page on search
+              }}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+            />
+          </div>
+          {searchTerm && (
+            <p className="mt-2 text-sm text-gray-600">
+              Found {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -381,7 +669,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {products.map((product) => (
+                {paginatedProducts.map((product) => (
                   <tr key={product._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {product.sku}
@@ -447,6 +735,58 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
+                    currentPage === 1
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <ChevronLeft size={16} />
+                  Previous
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 rounded-lg ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
+                    currentPage === totalPages
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Next
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -492,13 +832,19 @@ export default function AdminDashboard() {
                     <input
                       type="text"
                       required
+                      list="full-category-suggestions"
                       value={formData.category || ""}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-                      placeholder="e.g., Surface Mounted Projector Light"
+                      placeholder="Select existing or type new (e.g., Surface Mounted Projector Light)"
                     />
+                    <datalist id="full-category-suggestions">
+                      {uniqueFullCategories.map((category) => (
+                        <option key={category} value={category} />
+                      ))}
+                    </datalist>
                     <p className="mt-1 text-xs text-gray-500">
-                      📝 Full product category name (shown in product details)
+                      💡 Select from existing full category names or type a new one. Existing: {uniqueFullCategories.length > 0 ? uniqueFullCategories.slice(0, 3).join(', ') + (uniqueFullCategories.length > 3 ? '...' : '') : 'None yet'}
                     </p>
                   </div>
 
@@ -509,26 +855,36 @@ export default function AdminDashboard() {
                     <input
                       type="text"
                       required
+                      list="category-suggestions"
                       value={formData.categoryFilter || ""}
                       onChange={(e) => setFormData({ ...formData, categoryFilter: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-                      placeholder="e.g., Projector Light"
+                      placeholder="Select existing or type new category"
                     />
+                    <datalist id="category-suggestions">
+                      {uniqueCategories.map((category) => (
+                        <option key={category} value={category} />
+                      ))}
+                    </datalist>
                     <p className="mt-1 text-xs text-gray-500">
-                      🔍 Main category shown in filter dropdown (e.g., "Projector Light", "LED Strip")
+                      💡 Select from existing categories or type a new one. Existing: {uniqueCategories.length > 0 ? uniqueCategories.join(', ') : 'None yet'}
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Application
+                      Application (Auto-determined from IP Rating)
                     </label>
                     <input
                       type="text"
-                      value={formData.application || ""}
-                      onChange={(e) => setFormData({ ...formData, application: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      value={formData.application || "Indoor"}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                      placeholder="Automatically set based on IP rating"
                     />
+                    <p className="mt-1 text-xs text-blue-600">
+                      🤖 Auto-set: IP20-44=Indoor | IP45-54=Indoor/Outdoor | IP55-69=Outdoor
+                    </p>
                   </div>
 
                   <div>
@@ -537,10 +893,20 @@ export default function AdminDashboard() {
                     </label>
                     <input
                       type="text"
+                      list="voltage-suggestions"
                       value={formData.inputVoltage || ""}
                       onChange={(e) => setFormData({ ...formData, inputVoltage: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      placeholder="Select existing or type new (e.g., 220-240V AC)"
                     />
+                    <datalist id="voltage-suggestions">
+                      {uniqueInputVoltages.map((voltage) => (
+                        <option key={voltage} value={voltage} />
+                      ))}
+                    </datalist>
+                    <p className="mt-1 text-xs text-gray-500">
+                      💡 Select from existing voltages or type a new one. Existing: {uniqueInputVoltages.length > 0 ? uniqueInputVoltages.join(', ') : 'None yet'}
+                    </p>
                   </div>
 
                   <div>
@@ -573,10 +939,20 @@ export default function AdminDashboard() {
                     </label>
                     <input
                       type="text"
+                      list="beamangle-suggestions"
                       value={formData.beamAngle || ""}
                       onChange={(e) => setFormData({ ...formData, beamAngle: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      placeholder="Select existing or type new (e.g., 120°, 60°)"
                     />
+                    <datalist id="beamangle-suggestions">
+                      {uniqueBeamAngles.map((angle) => (
+                        <option key={angle} value={angle} />
+                      ))}
+                    </datalist>
+                    <p className="mt-1 text-xs text-gray-500">
+                      💡 Select from existing beam angles or type a new one. Existing: {uniqueBeamAngles.length > 0 ? uniqueBeamAngles.join(', ') : 'None yet'}
+                    </p>
                   </div>
 
                   <div className="col-span-2">
@@ -665,7 +1041,7 @@ export default function AdminDashboard() {
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder="e.g., IP20, IP65"
+                        placeholder="e.g., IP20, IP65 or just 20, 65"
                         value={newIpRating}
                         onChange={(e) => setNewIpRating(e.target.value)}
                         onKeyPress={(e) => {
@@ -700,8 +1076,8 @@ export default function AdminDashboard() {
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                       {editingProduct 
-                        ? 'Add multiple IP ratings with their specific prices in INR (e.g., IP20 at ₹100, IP30 at ₹120)'
-                        : 'Add multiple IP ratings with their specific prices in USD (will be converted to INR automatically)'}
+                        ? 'Enter IP rating (e.g., IP20 or just 20) with price in INR. "IP" prefix is added automatically if you enter just numbers.'
+                        : 'Enter IP rating (e.g., IP20 or just 20) with price in USD. "IP" prefix is added automatically if you enter just numbers.'}
                     </p>
 
                     {ipRatings.length > 0 && (
@@ -748,6 +1124,179 @@ export default function AdminDashboard() {
                           : "Base price in USD - will be converted to INR (optional if using IP ratings)"}
                     </p>
                   </div>
+
+                  {/* File Upload Sections */}
+                  <div className="col-span-2 border-t pt-4 mt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">File Attachments (AWS S3)</h3>
+                    
+                    {/* Product Images Upload */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <ImageIcon size={16} />
+                        Product Images
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "image");
+                          e.target.value = "";
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        disabled={uploadingFile}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload product images (JPG, PNG, WebP, GIF - Max 10MB)
+                      </p>
+                      {productImages.length > 0 && (
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          {productImages.map((url, idx) => (
+                            <div key={idx} className="relative group border rounded-lg p-2 bg-gray-50">
+                              <img src={url} alt={`Product ${idx + 1}`} className="w-full h-24 object-cover rounded" />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(url, "image")}
+                                className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X size={14} />
+                              </button>
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate block mt-1">
+                                View
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Datasheets Upload */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <FileText size={16} />
+                        Datasheets
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "datasheet");
+                          e.target.value = "";
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        disabled={uploadingFile}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload product datasheets (PDF - Max 10MB)
+                      </p>
+                      {datasheets.length > 0 && (
+                        <ul className="mt-3 space-y-2">
+                          {datasheets.map((url, idx) => (
+                            <li key={idx} className="flex items-center justify-between bg-gray-50 border rounded-lg p-2">
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">
+                                Datasheet {idx + 1}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(url, "datasheet")}
+                                className="text-red-600 hover:text-red-700 ml-2"
+                              >
+                                <X size={16} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* IES Files Upload */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Zap size={16} />
+                        IES Files
+                      </label>
+                      <input
+                        type="file"
+                        accept=".ies,.txt"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "ies");
+                          e.target.value = "";
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        disabled={uploadingFile}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload IES lighting files (.ies, .txt - Max 10MB)
+                      </p>
+                      {iesFiles.length > 0 && (
+                        <ul className="mt-3 space-y-2">
+                          {iesFiles.map((url, idx) => (
+                            <li key={idx} className="flex items-center justify-between bg-gray-50 border rounded-lg p-2">
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">
+                                IES File {idx + 1}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(url, "ies")}
+                                className="text-red-600 hover:text-red-700 ml-2"
+                              >
+                                <X size={16} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* Certifications Upload */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Award size={16} />
+                        Certifications
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "certification");
+                          e.target.value = "";
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        disabled={uploadingFile}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload certifications (PDF, JPG, PNG - Max 10MB)
+                      </p>
+                      {certifications.length > 0 && (
+                        <ul className="mt-3 space-y-2">
+                          {certifications.map((url, idx) => (
+                            <li key={idx} className="flex items-center justify-between bg-gray-50 border rounded-lg p-2">
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">
+                                Certification {idx + 1}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(url, "certification")}
+                                className="text-red-600 hover:text-red-700 ml-2"
+                              >
+                                <X size={16} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {uploadingFile && (
+                      <div className="text-center py-4">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <p className="text-sm text-gray-600 mt-2">Uploading file...</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 mt-6">
@@ -760,9 +1309,26 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    disabled={submitting || uploadingFile}
+                    className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                      submitting || uploadingFile
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    } text-white`}
                   >
-                    {editingProduct ? "Update" : "Create"}
+                    {submitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        {editingProduct ? "Updating..." : "Creating..."}
+                      </>
+                    ) : uploadingFile ? (
+                      <>
+                        <Upload size={16} className="animate-pulse" />
+                        Uploading files...
+                      </>
+                    ) : (
+                      <>{editingProduct ? "Update Product" : "Create Product"}</>
+                    )}
                   </button>
                 </div>
               </form>

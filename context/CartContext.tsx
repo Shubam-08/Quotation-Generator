@@ -22,10 +22,11 @@ type Product = {
 
 type CartContextType = {
   cart: (Product & { quantity: number; name: string; cartItemId: string })[];
-  addToCart: (product: Product) => void;
+  addToCart: (product: Product, quantity?: number) => void;
   removeFromCart: (cartItemId: string) => void;
   increaseQuantity: (cartItemId: string) => void;
   decreaseQuantity: (cartItemId: string) => void;
+  updateQuantity: (cartItemId: string, quantity: number) => void;
   clearCart: () => void;
 };
 
@@ -48,7 +49,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem('cart', JSON.stringify(cart));
   }, [cart]);
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, quantity: number = 1) => {
     // Get IP rating as string for comparison
     const productIpRating = Array.isArray(product.ipRating) 
       ? product.ipRating[0] 
@@ -66,6 +67,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       return; // Prevent duplicate
     }
 
+    const validQuantity = Math.max(1, Math.floor(quantity)); // Ensure positive integer
+
     const cartItem = {
       _id: product._id,
       sku: product.sku,
@@ -81,7 +84,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       dimension: product.dimension || '-',
       cutOut: product.cutOut || '-',
       ipRating: productIpRating || 'N/A',
-      quantity: 1,
+      quantity: validQuantity,
       cartItemId: cartItemId
     };
 
@@ -108,11 +111,20 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     );
   };
 
+  const updateQuantity = (cartItemId: string, quantity: number) => {
+    const validQuantity = Math.max(1, Math.floor(quantity)); // Ensure positive integer
+    setCart(prev =>
+      prev.map(item =>
+        item.cartItemId === cartItemId ? { ...item, quantity: validQuantity } : item
+      )
+    );
+  };
+
   const clearCart = () => setCart([]);
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, removeFromCart, increaseQuantity, decreaseQuantity, clearCart }}
+      value={{ cart, addToCart, removeFromCart, increaseQuantity, decreaseQuantity, updateQuantity, clearCart }}
     >
       {children}
     </CartContext.Provider>

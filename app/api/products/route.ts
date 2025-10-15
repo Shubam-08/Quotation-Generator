@@ -161,14 +161,24 @@ export async function GET(req: Request) {
     if (wattMin || wattMax) {
       query.watt = {};
       if (wattMin) query.watt.$gte = Number(wattMin);
-      if (wattMax && wattMax !== "Infinity") query.watt.$lte = Number(wattMax);
+      // Use $lt (less than) instead of $lte (less than or equal) to avoid duplicates
+      if (wattMax && wattMax !== "Infinity") query.watt.$lt = Number(wattMax);
     }
 
     // Lumen range filter - extract numeric value from string like "1000 Lm"
     const lumenMin = searchParams.get("lumenMin");
     const lumenMax = searchParams.get("lumenMax");
     
-    let products = await Product.find(query).sort({ createdAt: -1 });
+    // Determine sort order based on filters applied
+    let sortCriteria: any = { sku: 1 }; // Default sort by SKU
+    
+    // If watt filter is applied, sort by watt in ascending order
+    if (wattMin || wattMax) {
+      sortCriteria = { watt: 1 };
+    }
+    // If lumen filter is applied, we'll sort after filtering (since lumen is string)
+    
+    let products = await Product.find(query).sort(sortCriteria);
 
     // Client-side lumen filtering since lumen is stored as string
     if (lumenMin || lumenMax) {
@@ -181,9 +191,17 @@ export async function GET(req: Request) {
         if (isNaN(lumenValue)) return false;
         
         if (lumenMin && lumenValue < Number(lumenMin)) return false;
-        if (lumenMax && lumenMax !== "Infinity" && lumenValue > Number(lumenMax)) return false;
+        // Use < (less than) instead of <= (less than or equal) to avoid duplicates
+        if (lumenMax && lumenMax !== "Infinity" && lumenValue >= Number(lumenMax)) return false;
         
         return true;
+      });
+      
+      // Sort by lumen value in ascending order after filtering
+      products.sort((a: any, b: any) => {
+        const lumenA = parseFloat(a.lumen?.toString().replace(/[^\d.]/g, '') || '0');
+        const lumenB = parseFloat(b.lumen?.toString().replace(/[^\d.]/g, '') || '0');
+        return lumenA - lumenB;
       });
     }
 
