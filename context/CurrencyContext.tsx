@@ -12,9 +12,11 @@ export interface CurrencyInfo {
 }
 
 // Fallback exchange rates (used if API fails or during initial load)
+// Rate calculation: 1 INR = (1 / exchange_rate_to_INR)
+// Example: If 1 USD = 88.65 INR, then 1 INR = 0.01128 USD (1 / 88.65)
 const FALLBACK_RATES: Record<Currency, number> = {
   INR: 1,
-  USD: 0.01126,
+  USD: 0.01128, // Updated to match 88.65 INR per USD
   GBP: 0.00893,
   EUR: 0.01032,
   QAR: 0.04101,

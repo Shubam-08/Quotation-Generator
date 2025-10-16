@@ -11,8 +11,10 @@ let cachedRates: {
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
 // Fallback rates (used if API fails)
+// These rates represent: 1 INR = X foreign currency
+// Example: If 1 USD = 88.65 INR, then 1 INR = 0.01128 USD (1 / 88.65)
 const FALLBACK_RATES = {
-  USD: 0.01126,
+  USD: 0.01128, // Updated to match 88.65 INR per USD
   GBP: 0.00893,
   EUR: 0.01032,
   QAR: 0.04101,
@@ -66,8 +68,12 @@ export async function GET() {
   try {
     const now = Date.now();
 
+    // TEMPORARY: Force cache refresh to apply new fallback rates
+    // Remove this block after rates are updated
+    const forceRefresh = true;
+    
     // Check if we have cached rates and they're still valid
-    if (cachedRates && now < cachedRates.nextUpdate) {
+    if (cachedRates && now < cachedRates.nextUpdate && !forceRefresh) {
       return NextResponse.json({
         rates: cachedRates.rates,
         lastUpdated: cachedRates.lastUpdated,

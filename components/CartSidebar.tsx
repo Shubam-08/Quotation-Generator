@@ -23,6 +23,8 @@ interface Product {
   cutOut?: string;
   ipRating?: string;
   price?: number;
+  images?: string[];
+  productImages?: string[];
 }
 type CartItem = Product & { quantity: number; name?: string; cartItemId: string; };
 
@@ -98,7 +100,7 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
   };
 
   // Export PDF
-const exportPDF = () => {
+const exportPDF = async () => {
   if (!canDownload) { setShowError(true); return; }
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -132,24 +134,122 @@ const exportPDF = () => {
   // Use currency code instead of symbol for PDF to avoid encoding issues with ₹
   const pdfCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
   const columns = [
-    'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${pdfCurrency})`,'Quantity',`Total (${pdfCurrency})`
+    'Image','Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${pdfCurrency})`,'Quantity',`Total (${pdfCurrency})`
   ];
+
+  const getPrimaryImageUrl = (item: CartItem): string | null => {
+    const url = item.productImages?.[0] || item.images?.[0] || null;
+    return url || null;
+  };
+
+  const resolveImageUrl = async (url: string): Promise<string> => {
+    try {
+      if (url.includes('drive.google.com')) {
+        const res = await fetch('/api/resolve-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.url) return data.url as string;
+        }
+      }
+    } catch {}
+    return url;
+  };
+
+  const toDataUrl = async (url: string): Promise<string> => {
+    const u = await resolveImageUrl(url);
+    const res = await fetch(u, { mode: 'cors' });
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const imageDataUrls = await Promise.all(
+    cart.map(async (item) => {
+      const url = getPrimaryImageUrl(item);
+      if (!url) return null;
+      try { return await toDataUrl(url); } catch { return null; }
+    })
+  );
+
+  const getScaledImgHeight = (dataUrl: string, targetWidth: number): Promise<number> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const ratio = img.height / img.width;
+        resolve(targetWidth * ratio);
+      };
+      img.onerror = () => resolve(46);
+      img.src = dataUrl;
+    });
+  };
+
+  const targetImgWidth = 46;
+  const rowHeights = await Promise.all(
+    imageDataUrls.map(async (du) => {
+      if (!du) return 0;
+      const h = await getScaledImgHeight(du, targetImgWidth);
+      return Math.ceil(h + 4);
+    })
+  );
+
   const rows = cart.map(item => [
+    '',
     item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
     item.watt ?? '-', item.lumen ?? '-', item.beamAngle ?? '-', item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', 
     convertPrice(item.price ?? 0).toFixed(2), item.quantity ?? 1, 
     (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2)
   ]);
 
+  const cellPadding = { top: 6, right: 2, bottom: 6, left: 2 } as const;
   autoTable(doc, {
     head: [columns],
     body: rows,
     startY: 136,
-    styles: { fontSize: 7, cellPadding: 2, fontStyle: 'normal' }, // smaller, thin text
+    styles: { fontSize: 7, cellPadding, fontStyle: 'normal', valign: 'middle' },
     headStyles: { fillColor: [0, 70, 255], textColor: 255, fontStyle: 'bold', fontSize: 8 },
     alternateRowStyles: { fillColor: [245, 245, 245] },
-    margin: { left: 14, right: 14 },
-    columnStyles: { 7: { cellWidth: 50 } },
+    margin: { left: 14, right: 14, top: 20 },
+    columnStyles: { 0: { cellWidth: 50 } },
+    didParseCell: (data: any) => {
+      if (data.section === 'body') {
+        const idx = data.row.index;
+        const imgInnerH = (rowHeights[idx] || 46);
+        const desired = imgInnerH + cellPadding.top + cellPadding.bottom;
+        data.cell.styles.minCellHeight = Math.max(data.cell.styles.minCellHeight || 0, desired, 52);
+      }
+    },
+    didDrawCell: (data: any) => {
+      if (data.section === 'body' && data.column.index === 0) {
+        const idx = data.row.index;
+        const dataUrl = imageDataUrls[idx];
+        const innerW = data.cell.width - (cellPadding.left + cellPadding.right);
+        const innerH = (data.cell.height || 0) - (cellPadding.top + cellPadding.bottom);
+        const imgW = Math.max(1, Math.min(targetImgWidth, innerW));
+        const rawH = Math.max(46, (rowHeights[idx] || 46));
+        const imgH = Math.min(rawH, innerH);
+        const x = data.cell.x + cellPadding.left + (innerW - imgW) / 2;
+        const y = data.cell.y + cellPadding.top + (innerH - imgH) / 2;
+        if (dataUrl) {
+          try { doc.addImage(dataUrl, 'JPEG', x, y, imgW, imgH); } catch {}
+        } else {
+          try {
+            (doc as any).setFillColor(240);
+            doc.rect(x, y, imgW, imgH, 'F');
+            (doc as any).setTextColor(120);
+            doc.setFontSize(6);
+            const label = 'No Image';
+            const tw = doc.getTextWidth(label);
+            const tx = x + (imgW - tw) / 2;
+            const ty = y + imgH / 2 + 2;
+            doc.text(label, tx, ty);
+          } catch {}
+        }
+      }
+    },
   });
 
   // Total Amount - slightly bold

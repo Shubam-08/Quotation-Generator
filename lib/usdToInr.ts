@@ -6,7 +6,7 @@ let lastFetched: number | null = null;
 
 // Configuration
 const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour
-const FALLBACK_RATE = 83; // fallback USD → INR rate
+const FALLBACK_RATE = 88.65; // fallback USD → INR rate
 
 // Fetch latest USD → INR rate
 async function fetchUsdToInrRate(): Promise<number> {

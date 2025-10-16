@@ -18,6 +18,8 @@ type Product = {
   dimension?: string;
   cutOut?: string;
   ipRating?: string | string[]; // Support both single string and array for backward compatibility
+  images?: string[];
+  productImages?: string[];
 };
 
 type CartContextType = {
@@ -88,6 +90,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       dimension: product.dimension || '-',
       cutOut: product.cutOut || '-',
       ipRating: productIpRating || 'N/A',
+      images: product.images || [],
+      productImages: product.productImages || [],
       quantity: validQuantity,
       cartItemId: cartItemId
     };
