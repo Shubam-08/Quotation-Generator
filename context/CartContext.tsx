@@ -55,15 +55,19 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       ? product.ipRating[0] 
       : product.ipRating;
     
-    // Create unique cart item ID based on product ID + IP rating
-    const cartItemId = `${product._id}_${productIpRating || 'default'}`;
+    // Get beam angle for unique identification
+    const productBeamAngle = product.beamAngle || 'default';
     
-    // Check if this specific product + IP rating combination already exists
+    // Create unique cart item ID based on product ID + IP rating + beam angle
+    const cartItemId = `${product._id}_${productIpRating || 'default'}_${productBeamAngle}`;
+    
+    // Check if this specific product + IP rating + beam angle combination already exists
     const exists = cart.find(item => item.cartItemId === cartItemId);
     
     if (exists) {
       const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
-      showToast(`${product.sku}${ipRatingText} is already in your list`, 'info');
+      const beamAngleText = product.beamAngle && product.beamAngle !== '-' ? ` - ${product.beamAngle}` : '';
+      showToast(`${product.sku}${ipRatingText}${beamAngleText} is already in your list`, 'info');
       return; // Prevent duplicate
     }
 
@@ -90,7 +94,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
     setCart(prev => [...prev, cartItem]);
     const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
-    showToast(`${product.sku}${ipRatingText} added to your list`, 'success');
+    const beamAngleText = product.beamAngle && product.beamAngle !== '-' ? ` - ${product.beamAngle}` : '';
+    showToast(`${product.sku}${ipRatingText}${beamAngleText} added to your list`, 'success');
   };
 
   const removeFromCart = (cartItemId: string) => {

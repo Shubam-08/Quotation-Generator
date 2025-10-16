@@ -217,7 +217,22 @@ const exportPDF = () => {
                       <p style={{ fontSize: '0.8125rem', color: '#64748b' }}>{item.category}</p>
                       {item.ipRating && item.ipRating !== 'N/A' && (
                         <span style={{ fontSize: '0.75rem', backgroundColor: '#fef3c7', color: '#92400e', padding: '0.125rem 0.5rem', borderRadius: '0.25rem', fontWeight: 600 }}>
-                          {item.ipRating}
+                          IP: {item.ipRating}
+                        </span>
+                      )}
+                      {item.watt && item.watt !== '-' && (
+                        <span style={{ fontSize: '0.75rem', backgroundColor: '#dbeafe', color: '#1e40af', padding: '0.125rem 0.5rem', borderRadius: '0.25rem', fontWeight: 600 }}>
+                          {item.watt}W
+                        </span>
+                      )}
+                      {item.lumen && item.lumen !== '-' && (
+                        <span style={{ fontSize: '0.75rem', backgroundColor: '#fce7f3', color: '#9f1239', padding: '0.125rem 0.5rem', borderRadius: '0.25rem', fontWeight: 600 }}>
+                          {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen} lm`}
+                        </span>
+                      )}
+                      {item.beamAngle && item.beamAngle !== '-' && (
+                        <span style={{ fontSize: '0.75rem', backgroundColor: '#dcfce7', color: '#166534', padding: '0.125rem 0.5rem', borderRadius: '0.25rem', fontWeight: 600 }}>
+                          {item.beamAngle}
                         </span>
                       )}
                     </div>

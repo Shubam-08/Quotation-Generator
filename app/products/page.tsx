@@ -74,6 +74,7 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [selectedIpRatings, setSelectedIpRatings] = useState<Record<string, string>>({});
+  const [selectedBeamAngles, setSelectedBeamAngles] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
   
@@ -154,12 +155,32 @@ export default function ProductsPage() {
           })
           .filter((v): v is string => Boolean(v));
         
+        // Custom numeric sort function for values with units
+        const numericSort = (a: string, b: string) => {
+          const numA = parseFloat(a.replace(/[^\d.-]/g, ''));
+          const numB = parseFloat(b.replace(/[^\d.-]/g, ''));
+          return numA - numB;
+        };
+        
+        // Sort function that puts non-numeric values (like "NA") at the end
+        const numericSortWithNALast = (a: string, b: string) => {
+          const numA = parseFloat(a.replace(/[^\d.-]/g, ''));
+          const numB = parseFloat(b.replace(/[^\d.-]/g, ''));
+          const isANumeric = !isNaN(numA);
+          const isBNumeric = !isNaN(numB);
+          
+          if (isANumeric && isBNumeric) return numA - numB;
+          if (isANumeric && !isBNumeric) return -1; // a comes first
+          if (!isANumeric && isBNumeric) return 1;  // b comes first
+          return a.localeCompare(b); // both non-numeric, sort alphabetically
+        };
+        
         setFilterOptions({
           skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
           categories: [...new Set(categoryFilters)].sort() as string[],
           applications: [...new Set(products.map(p => p.application).filter((v): v is string => Boolean(v)))].sort() as string[],
-          inputVoltages: [...new Set(products.map(p => p.inputVoltage).filter((v): v is string => Boolean(v)))].sort() as string[],
-          beamAngles: [...new Set(products.map(p => p.beamAngle).filter((v): v is string => Boolean(v)))].sort() as string[],
+          inputVoltages: [...new Set(products.map(p => p.inputVoltage).filter((v): v is string => Boolean(v)))].sort(numericSortWithNALast) as string[],
+          beamAngles: [...new Set(products.map(p => p.beamAngle).filter((v): v is string => Boolean(v)))].sort(numericSort) as string[],
         });
       }
     } catch (err) {
@@ -532,7 +553,11 @@ export default function ProductsPage() {
                         currentPrice = p.price;
                       }
                       
-                      const cartItemId = `${p._id}_${currentIpRating || 'default'}`;
+                      // Get current beam angle selection
+                      const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
+                      const currentBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
+                      
+                      const cartItemId = `${p._id}_${currentIpRating || 'default'}_${currentBeamAngle || 'default'}`;
                       const isInCart = cart.some(item => item.cartItemId === cartItemId);
 
                       return (
@@ -583,7 +608,43 @@ export default function ProductsPage() {
                           <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                             {p.lumen ? (p.lumen.toLowerCase().includes('lm') ? p.lumen : `${p.lumen} lm`) : '-'}
                           </td>
-                          <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{p.beamAngle || '-'}</td>
+                          <td className="px-4 py-4">
+                            {(() => {
+                              if (!p.beamAngle || p.beamAngle === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
+                              
+                              // Parse beam angles - split by / or comma
+                              const beamAngles = p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean);
+                              
+                              if (beamAngles.length === 1) {
+                                return (
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-semibold inline-block ${
+                                    isDarkMode
+                                      ? 'bg-gray-800 border border-white/20 text-gray-300'
+                                      : 'bg-white border border-gray-300 text-gray-700'
+                                  }`}>
+                                    {beamAngles[0]}
+                                  </span>
+                                );
+                              } else if (beamAngles.length > 1) {
+                                return (
+                                  <select
+                                    value={selectedBeamAngles[p._id] || beamAngles[0]}
+                                    onChange={(e) => setSelectedBeamAngles(prev => ({ ...prev, [p._id]: e.target.value }))}
+                                    className={`px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer outline-none transition-colors ${
+                                      isDarkMode
+                                        ? 'bg-gray-800 border border-white/20 text-gray-300 hover:border-yellow-400/50'
+                                        : 'bg-white border border-gray-300 text-gray-700 hover:border-yellow-400'
+                                    }`}
+                                  >
+                                    {beamAngles.map((angle) => (
+                                      <option key={angle} value={angle}>{angle}</option>
+                                    ))}
+                                  </select>
+                                );
+                              }
+                              return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
+                            })()}
+                          </td>
                           <td className="px-4 py-4">
                             {p.ipRatings && p.ipRatings.length > 0 ? (
                               p.ipRatings.length === 1 ? (
@@ -713,9 +774,14 @@ export default function ProductsPage() {
                               onClick={() => {
                                 if (!isInCart) {
                                   setAddingProductId(p._id);
+                                  // Get selected beam angle if multiple exist
+                                  const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
+                                  const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
+                                  
                                   const productToAdd = {
                                     ...p,
                                     ipRating: currentIpRating,
+                                    beamAngle: selectedBeamAngle,
                                     price: currentPrice
                                   };
                                   addToCart(productToAdd);

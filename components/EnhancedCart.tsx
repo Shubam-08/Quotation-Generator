@@ -441,25 +441,34 @@ export default function EnhancedCart() {
                       <div className="flex flex-wrap gap-2 mb-3">
                         {item.ipRating && item.ipRating !== 'N/A' && (
                           <span className="inline-block bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-2 py-1 rounded text-xs font-semibold">
-                            {item.ipRating}
+                            IP: {item.ipRating}
                           </span>
                         )}
-                        {item.watt && (
-                          <span className={`inline-block px-2 py-1 rounded text-xs ${
+                        {item.watt && item.watt !== '-' && (
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
                             isDarkMode 
-                              ? 'bg-white/5 border border-white/10 text-gray-300' 
-                              : 'bg-gray-100 border border-gray-200 text-gray-700'
+                              ? 'bg-blue-500/10 border border-blue-500/30 text-blue-400' 
+                              : 'bg-blue-50 border border-blue-200 text-blue-700'
                           }`}>
                             {item.watt}W
                           </span>
                         )}
-                        {item.lumen && (
-                          <span className={`inline-block px-2 py-1 rounded text-xs ${
+                        {item.lumen && item.lumen !== '-' && (
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
                             isDarkMode 
-                              ? 'bg-white/5 border border-white/10 text-gray-300' 
-                              : 'bg-gray-100 border border-gray-200 text-gray-700'
+                              ? 'bg-purple-500/10 border border-purple-500/30 text-purple-400' 
+                              : 'bg-purple-50 border border-purple-200 text-purple-700'
                           }`}>
                             {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen} lm`}
+                          </span>
+                        )}
+                        {item.beamAngle && item.beamAngle !== '-' && (
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                            isDarkMode 
+                              ? 'bg-green-500/10 border border-green-500/30 text-green-400' 
+                              : 'bg-green-50 border border-green-200 text-green-700'
+                          }`}>
+                            {item.beamAngle}
                           </span>
                         )}
                       </div>
