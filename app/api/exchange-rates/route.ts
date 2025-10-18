@@ -17,11 +17,11 @@ const FALLBACK_RATES = {
   USD: 0.01128, // Updated to match 88.65 INR per USD
   GBP: 0.00893,
   EUR: 0.01032,
-  QAR: 0.04101,
-  AED: 0.04136,
+  QAR: 0.04201,
+  AED: 0.04201,
   SAR: 0.04224,
-  BHD: 0.00424,
-  OMR: 0.00433,
+  BHD: 0.00429,
+  OMR: 0.00439,
   INR: 1,
 };
 

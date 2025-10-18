@@ -69,6 +69,11 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(20);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  
+  // Inline editing states
+  const [editingPrice, setEditingPrice] = useState<{productId: string, ipIndex: number} | null>(null);
+  const [editPriceValue, setEditPriceValue] = useState<string>("");
+  const [savingPrice, setSavingPrice] = useState<boolean>(false);
 
   useEffect(() => {
     if (status === "loading") {
@@ -288,35 +293,48 @@ export default function AdminDashboard() {
     const existingIndex = ipRatings.findIndex(ip => ip.rating === trimmed);
     if (existingIndex !== -1) {
       // Update existing IP rating price instead of blocking
-      if (confirm(`IP rating ${trimmed} already exists with price ${ipRatings[existingIndex].price}. Do you want to update the price to ${priceValue}?`)) {
-        const updatedRatings = [...ipRatings];
-        updatedRatings[existingIndex].price = priceValue;
-        setIpRatings(updatedRatings);
-        setNewIpRating("");
-        setNewIpPrice("");
-        setError("");
+      if (confirm(`IP rating ${trimmed} already exists. Do you want to update the price to $${priceValue} USD?`)) {
+        // Convert USD to INR for the update
+        try {
+          const response = await fetch('/api/convert-usd-to-inr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usdAmount: priceValue })
+          });
+          const data = await response.json();
+          if (response.ok && data.inrAmount) {
+            const finalPrice = Math.round(data.inrAmount * 10) / 10;
+            const updatedRatings = [...ipRatings];
+            updatedRatings[existingIndex].price = finalPrice;
+            setIpRatings(updatedRatings);
+            setNewIpRating("");
+            setNewIpPrice("");
+            setError("");
+          }
+        } catch (err) {
+          console.error('Error converting USD to INR:', err);
+          setError('Failed to convert currency. Please try again.');
+        }
       }
       return;
     }
     
-    // Convert USD to INR only when adding new product (not editing)
+    // Convert USD to INR (always, since we display USD in the form)
     let finalPrice = priceValue;
-    if (!editingProduct) {
-      try {
-        const response = await fetch('/api/convert-usd-to-inr', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usdAmount: priceValue })
-        });
-        const data = await response.json();
-        if (response.ok && data.inrAmount) {
-          finalPrice = Math.round(data.inrAmount * 10) / 10;
-        }
-      } catch (err) {
-        console.error('Error converting USD to INR:', err);
-        setError('Failed to convert currency. Please try again.');
-        return;
+    try {
+      const response = await fetch('/api/convert-usd-to-inr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usdAmount: priceValue })
+      });
+      const data = await response.json();
+      if (response.ok && data.inrAmount) {
+        finalPrice = Math.round(data.inrAmount * 10) / 10;
       }
+    } catch (err) {
+      console.error('Error converting USD to INR:', err);
+      setError('Failed to convert currency. Please try again.');
+      return;
     }
     
     setIpRatings((prev) => [...prev, { rating: trimmed, price: finalPrice }]);
@@ -329,7 +347,7 @@ export default function AdminDashboard() {
     setIpRatings((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleOpenModal = (product?: Product) => {
+  const handleOpenModal = async (product?: Product) => {
     if (product) {
       setEditingProduct(product);
       setFormData(product);
@@ -338,14 +356,67 @@ export default function AdminDashboard() {
       setDatasheets(product.datasheets || []);
       setIesFiles(product.iesFiles || []);
       setCertifications(product.certifications || []);
-      // Migrate old format to new format if needed
-      if (product.ipRatings && product.ipRatings.length > 0) {
-        setIpRatings(product.ipRatings);
-      } else if (product.ipRating && product.ipRating.length > 0) {
-        // Convert old format to new format
-        setIpRatings(product.ipRating.map(rating => ({ rating, price: product.price || 0 })));
-      } else {
-        setIpRatings([]);
+      
+      // Convert INR prices back to USD for editing using API
+      try {
+        // Migrate old format to new format if needed
+        if (product.ipRatings && product.ipRatings.length > 0) {
+          // Convert INR prices to USD for display in edit mode
+          const convertedRatings = await Promise.all(
+            product.ipRatings.map(async (ip) => {
+              try {
+                const response = await fetch('/api/convert-inr-to-usd', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ inrAmount: ip.price })
+                });
+                const data = await response.json();
+                return {
+                  rating: ip.rating,
+                  price: response.ok && data.usdAmount 
+                    ? Math.round(data.usdAmount * 100) / 100
+                    : Math.round((ip.price / 88.65) * 100) / 100 // Fallback
+                };
+              } catch {
+                return {
+                  rating: ip.rating,
+                  price: Math.round((ip.price / 88.65) * 100) / 100 // Fallback
+                };
+              }
+            })
+          );
+          setIpRatings(convertedRatings);
+        } else if (product.ipRating && product.ipRating.length > 0) {
+          // Convert old format to new format
+          const response = await fetch('/api/convert-inr-to-usd', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inrAmount: product.price })
+          });
+          const data = await response.json();
+          const priceInUSD = response.ok && data.usdAmount
+            ? Math.round(data.usdAmount * 100) / 100
+            : Math.round((product.price / 88.65) * 100) / 100; // Fallback
+          setIpRatings(product.ipRating.map(rating => ({ rating, price: priceInUSD })));
+        } else {
+          setIpRatings([]);
+        }
+      } catch (err) {
+        console.error('Error converting prices:', err);
+        // Fallback to hardcoded conversion
+        const INR_TO_USD_RATE = 88.65;
+        if (product.ipRatings && product.ipRatings.length > 0) {
+          const convertedRatings = product.ipRatings.map(ip => ({
+            rating: ip.rating,
+            price: Math.round((ip.price / INR_TO_USD_RATE) * 100) / 100
+          }));
+          setIpRatings(convertedRatings);
+        } else if (product.ipRating && product.ipRating.length > 0) {
+          const priceInUSD = Math.round((product.price / INR_TO_USD_RATE) * 100) / 100;
+          setIpRatings(product.ipRating.map(rating => ({ rating, price: priceInUSD })));
+        } else {
+          setIpRatings([]);
+        }
       }
     } else {
       setEditingProduct(null);
@@ -468,6 +539,103 @@ export default function AdminDashboard() {
       alert("An error occurred while deleting");
     }
   }, []);
+
+  // Inline price editing handlers
+  const handleStartInlineEdit = async (productId: string, ipIndex: number, currentPriceInINR: number) => {
+    try {
+      // Convert INR to USD using the same API to ensure consistency
+      const response = await fetch('/api/convert-inr-to-usd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inrAmount: currentPriceInINR })
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.usdAmount) {
+        const priceInUSD = Math.round(data.usdAmount * 100) / 100;
+        setEditingPrice({ productId, ipIndex });
+        setEditPriceValue(priceInUSD.toString());
+      } else {
+        // Fallback to hardcoded rate if API fails
+        const INR_TO_USD_RATE = 88.65;
+        const priceInUSD = Math.round((currentPriceInINR / INR_TO_USD_RATE) * 100) / 100;
+        setEditingPrice({ productId, ipIndex });
+        setEditPriceValue(priceInUSD.toString());
+      }
+    } catch (err) {
+      console.error('Error converting INR to USD:', err);
+      // Fallback to hardcoded rate
+      const INR_TO_USD_RATE = 88.65;
+      const priceInUSD = Math.round((currentPriceInINR / INR_TO_USD_RATE) * 100) / 100;
+      setEditingPrice({ productId, ipIndex });
+      setEditPriceValue(priceInUSD.toString());
+    }
+  };
+
+  const handleSaveInlinePrice = async (productId: string, ipIndex: number, currentIpRatings: IpRatingPrice[]) => {
+    const newPriceUSD = parseFloat(editPriceValue);
+    
+    if (isNaN(newPriceUSD) || newPriceUSD <= 0) {
+      alert("Please enter a valid price");
+      return;
+    }
+
+    setSavingPrice(true);
+
+    try {
+      // Convert USD to INR
+      const response = await fetch('/api/convert-usd-to-inr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usdAmount: newPriceUSD })
+      });
+      const data = await response.json();
+      
+      if (!response.ok || !data.inrAmount) {
+        alert('Failed to convert currency. Please try again.');
+        setSavingPrice(false);
+        return;
+      }
+
+      const newPriceINR = Math.round(data.inrAmount * 10) / 10;
+
+      // Update the IP rating price
+      const updatedIpRatings = [...currentIpRatings];
+      updatedIpRatings[ipIndex].price = newPriceINR;
+
+      // Save to database
+      const updateResponse = await fetch(`/api/products?id=${productId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ipRatings: updatedIpRatings,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        alert(errorData.error || "Failed to update price");
+        setSavingPrice(false);
+        return;
+      }
+
+      // Update local state
+      setProducts(prev => prev.map(p => 
+        p._id === productId 
+          ? { ...p, ipRatings: updatedIpRatings }
+          : p
+      ));
+
+      // Clear editing state
+      setEditingPrice(null);
+      setEditPriceValue("");
+      setSavingPrice(false);
+    } catch (err) {
+      console.error('Error updating price:', err);
+      alert('An error occurred while updating the price');
+      setSavingPrice(false);
+    }
+  };
 
   // File upload handlers
   const handleFileUpload = async (
@@ -689,9 +857,57 @@ export default function AdminDashboard() {
                       <div className="flex flex-wrap gap-1">
                         {product.ipRatings && product.ipRatings.length > 0 ? (
                           product.ipRatings.map((ip, idx) => (
-                            <div key={idx} className="flex flex-col bg-blue-50 border border-blue-200 rounded px-2 py-1">
+                            <div key={idx} className="flex flex-col bg-blue-50 border border-blue-200 rounded px-2 py-1 group relative">
                               <span className="text-xs font-semibold text-blue-800">{ip.rating}</span>
-                              <span className="text-xs text-blue-600">₹{ip.price.toFixed(2)}</span>
+                              {editingPrice?.productId === product._id && editingPrice?.ipIndex === idx ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-blue-600">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editPriceValue}
+                                    onChange={(e) => setEditPriceValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveInlinePrice(product._id, idx, product.ipRatings!);
+                                      } else if (e.key === 'Escape') {
+                                        setEditingPrice(null);
+                                        setEditPriceValue("");
+                                      }
+                                    }}
+                                    className="w-16 px-1 py-0.5 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                    autoFocus
+                                    disabled={savingPrice}
+                                  />
+                                  <button
+                                    onClick={() => handleSaveInlinePrice(product._id, idx, product.ipRatings!)}
+                                    disabled={savingPrice}
+                                    className="text-green-600 hover:text-green-700 disabled:opacity-50"
+                                    title="Save (Enter)"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingPrice(null);
+                                      setEditPriceValue("");
+                                    }}
+                                    disabled={savingPrice}
+                                    className="text-red-600 hover:text-red-700 disabled:opacity-50"
+                                    title="Cancel (Esc)"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleStartInlineEdit(product._id, idx, ip.price)}
+                                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline text-left"
+                                  title="Click to edit price in USD"
+                                >
+                                  ₹{ip.price.toFixed(2)}
+                                </button>
+                              )}
                             </div>
                           ))
                         ) : product.ipRating && product.ipRating.length > 0 ? (
@@ -1036,7 +1252,7 @@ export default function AdminDashboard() {
 
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      IP Ratings with Prices {editingProduct ? '(INR)' : '(USD)'}
+                      IP Ratings with Prices (USD)
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -1055,7 +1271,7 @@ export default function AdminDashboard() {
                       <input
                         type="number"
                         step="0.01"
-                        placeholder={editingProduct ? "Price (INR)" : "Price (USD)"}
+                        placeholder="Price (USD)"
                         value={newIpPrice}
                         onChange={(e) => setNewIpPrice(e.target.value)}
                         onKeyPress={(e) => {
@@ -1075,9 +1291,7 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      {editingProduct 
-                        ? 'Enter IP rating (e.g., IP20 or just 20) with price in INR. "IP" prefix is added automatically if you enter just numbers.'
-                        : 'Enter IP rating (e.g., IP20 or just 20) with price in USD. "IP" prefix is added automatically if you enter just numbers.'}
+                      Enter IP rating (e.g., IP20 or just 20) with price in USD. "IP" prefix is added automatically if you enter just numbers. Price will be converted to INR when saved.
                     </p>
 
                     {ipRatings.length > 0 && (
@@ -1089,7 +1303,7 @@ export default function AdminDashboard() {
                           >
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-blue-900">{ip.rating}</span>
-                              <span className="text-xs text-blue-700">₹{ip.price.toFixed(2)}</span>
+                              <span className="text-xs text-blue-700">${ip.price.toFixed(2)}</span>
                             </div>
                             <button
                               type="button"
@@ -1106,7 +1320,7 @@ export default function AdminDashboard() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Base Price {editingProduct ? '(INR)' : '(USD)'}
+                      Base Price (USD)
                     </label>
                     <input
                       type="number"
@@ -1119,9 +1333,7 @@ export default function AdminDashboard() {
                     <p className="text-xs text-gray-500 mt-1">
                       {ipRatings.length > 0 
                         ? "Price is set per IP rating above" 
-                        : editingProduct 
-                          ? "Base price in INR (optional if using IP ratings)" 
-                          : "Base price in USD - will be converted to INR (optional if using IP ratings)"}
+                        : "Base price in USD - will be converted to INR when saved (optional if using IP ratings)"}
                     </p>
                   </div>
 
