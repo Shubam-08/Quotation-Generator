@@ -80,7 +80,7 @@ export default function ProductsPage() {
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(20);
+  const [itemsPerPage] = useState<number>(30);
 
   const [filters, setFilters] = useState<Filters>({
     search: '',
