@@ -60,16 +60,20 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     // Get beam angle for unique identification
     const productBeamAngle = product.beamAngle || 'default';
     
-    // Create unique cart item ID based on product ID + IP rating + beam angle
-    const cartItemId = `${product._id}_${productIpRating || 'default'}_${productBeamAngle}`;
+    // Get lumen for unique identification
+    const productLumen = product.lumen || 'default';
     
-    // Check if this specific product + IP rating + beam angle combination already exists
+    // Create unique cart item ID based on product ID + IP rating + beam angle + lumen
+    const cartItemId = `${product._id}_${productIpRating || 'default'}_${productBeamAngle}_${productLumen}`;
+    
+    // Check if this specific product + IP rating + beam angle + lumen combination already exists
     const exists = cart.find(item => item.cartItemId === cartItemId);
     
     if (exists) {
       const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
       const beamAngleText = product.beamAngle && product.beamAngle !== '-' ? ` - ${product.beamAngle}` : '';
-      showToast(`${product.sku}${ipRatingText}${beamAngleText} is already in your list`, 'info');
+      const lumenText = product.lumen && product.lumen !== '-' ? ` - ${product.lumen}` : '';
+      showToast(`${product.sku}${ipRatingText}${beamAngleText}${lumenText} is already in your list`, 'info');
       return; // Prevent duplicate
     }
 
@@ -99,7 +103,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     setCart(prev => [...prev, cartItem]);
     const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
     const beamAngleText = product.beamAngle && product.beamAngle !== '-' ? ` - ${product.beamAngle}` : '';
-    showToast(`${product.sku}${ipRatingText}${beamAngleText} added to your list`, 'success');
+    const lumenText = product.lumen && product.lumen !== '-' ? ` - ${product.lumen}` : '';
+    showToast(`${product.sku}${ipRatingText}${beamAngleText}${lumenText} added to your list`, 'success');
   };
 
   const removeFromCart = (cartItemId: string) => {

@@ -75,6 +75,7 @@ export default function ProductsPage() {
   const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [selectedIpRatings, setSelectedIpRatings] = useState<Record<string, string>>({});
   const [selectedBeamAngles, setSelectedBeamAngles] = useState<Record<string, string>>({});
+  const [selectedLumens, setSelectedLumens] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
   
@@ -557,7 +558,11 @@ export default function ProductsPage() {
                       const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
                       const currentBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
                       
-                      const cartItemId = `${p._id}_${currentIpRating || 'default'}_${currentBeamAngle || 'default'}`;
+                      // Get current lumen selection
+                      const lumenValues = p.lumen ? p.lumen.split(/[\/,]/).map(lumen => lumen.trim()).filter(Boolean) : [];
+                      const currentLumen = lumenValues.length > 1 ? (selectedLumens[p._id] || lumenValues[0]) : p.lumen;
+                      
+                      const cartItemId = `${p._id}_${currentIpRating || 'default'}_${currentBeamAngle || 'default'}_${currentLumen || 'default'}`;
                       const isInCart = cart.some(item => item.cartItemId === cartItemId);
 
                       return (
@@ -605,8 +610,46 @@ export default function ProductsPage() {
                           </td>
                           <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{p.inputVoltage || '-'}</td>
                           <td className={`px-4 py-4 text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{p.watt ? `${p.watt}W` : '-'}</td>
-                          <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {p.lumen ? (p.lumen.toLowerCase().includes('lm') ? p.lumen : `${p.lumen} lm`) : '-'}
+                          <td className="px-4 py-4">
+                            {(() => {
+                              if (!p.lumen || p.lumen === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
+                              
+                              // Parse lumen values - split by / or comma
+                              const lumenValues = p.lumen.split(/[\/,]/).map(lumen => lumen.trim()).filter(Boolean);
+                              
+                              if (lumenValues.length === 1) {
+                                const displayValue = lumenValues[0].toLowerCase().includes('lm') ? lumenValues[0] : `${lumenValues[0]} lm`;
+                                return (
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-semibold inline-block ${
+                                    isDarkMode
+                                      ? 'bg-gray-800 border border-white/20 text-gray-300'
+                                      : 'bg-white border border-gray-300 text-gray-700'
+                                  }`}>
+                                    {displayValue}
+                                  </span>
+                                );
+                              } else if (lumenValues.length > 1) {
+                                return (
+                                  <select
+                                    value={selectedLumens[p._id] || lumenValues[0]}
+                                    onChange={(e) => setSelectedLumens(prev => ({ ...prev, [p._id]: e.target.value }))}
+                                    className={`px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer outline-none transition-colors ${
+                                      isDarkMode
+                                        ? 'bg-gray-800 border border-white/20 text-gray-300 hover:border-yellow-400/50'
+                                        : 'bg-white border border-gray-300 text-gray-700 hover:border-yellow-400'
+                                    }`}
+                                  >
+                                    {lumenValues.map((lumen) => {
+                                      const displayValue = lumen.toLowerCase().includes('lm') ? lumen : `${lumen} lm`;
+                                      return (
+                                        <option key={lumen} value={lumen}>{displayValue}</option>
+                                      );
+                                    })}
+                                  </select>
+                                );
+                              }
+                              return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
+                            })()}
                           </td>
                           <td className="px-4 py-4">
                             {(() => {
@@ -778,10 +821,15 @@ export default function ProductsPage() {
                                   const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
                                   const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
                                   
+                                  // Get selected lumen if multiple exist
+                                  const lumenValues = p.lumen ? p.lumen.split(/[\/,]/).map(lumen => lumen.trim()).filter(Boolean) : [];
+                                  const selectedLumen = lumenValues.length > 1 ? (selectedLumens[p._id] || lumenValues[0]) : p.lumen;
+                                  
                                   const productToAdd = {
                                     ...p,
                                     ipRating: currentIpRating,
                                     beamAngle: selectedBeamAngle,
+                                    lumen: selectedLumen,
                                     price: currentPrice
                                   };
                                   addToCart(productToAdd);

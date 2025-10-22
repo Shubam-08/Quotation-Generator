@@ -1146,7 +1146,11 @@ export default function AdminDashboard() {
                       value={formData.lumen || ""}
                       onChange={(e) => setFormData({ ...formData, lumen: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      placeholder="e.g., 400lm or 400lm/800lm/1200lm"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      💡 For multiple lumen options, separate with / or comma (e.g., 400lm/800lm or 400lm, 800lm)
+                    </p>
                   </div>
 
                   <div>
