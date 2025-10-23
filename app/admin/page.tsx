@@ -278,11 +278,6 @@ export default function AdminDashboard() {
       trimmed = `IP${trimmed}`;
     }
     
-    if (!newIpPrice || isNaN(priceValue) || priceValue <= 0) {
-      setError("Please enter a valid price for this IP rating");
-      return;
-    }
-    
     // Validate IP rating format (e.g., IP20, IP30, IP40, IP65, etc.)
     if (!/^IP\d{2}$/.test(trimmed)) {
       setError("Please enter a valid IP rating (e.g., IP20, IP65, or just 20, 65)");
@@ -293,48 +288,63 @@ export default function AdminDashboard() {
     const existingIndex = ipRatings.findIndex(ip => ip.rating === trimmed);
     if (existingIndex !== -1) {
       // Update existing IP rating price instead of blocking
-      if (confirm(`IP rating ${trimmed} already exists. Do you want to update the price to $${priceValue} USD?`)) {
-        // Convert USD to INR for the update
-        try {
-          const response = await fetch('/api/convert-usd-to-inr', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usdAmount: priceValue })
-          });
-          const data = await response.json();
-          if (response.ok && data.inrAmount) {
-            const finalPrice = Math.round(data.inrAmount * 10) / 10;
-            const updatedRatings = [...ipRatings];
-            updatedRatings[existingIndex].price = finalPrice;
-            setIpRatings(updatedRatings);
-            setNewIpRating("");
-            setNewIpPrice("");
-            setError("");
+      const priceMsg = newIpPrice && !isNaN(priceValue) && priceValue > 0 
+        ? `$${priceValue} USD` 
+        : "TBD (no price)";
+      if (confirm(`IP rating ${trimmed} already exists. Do you want to update the price to ${priceMsg}?`)) {
+        // If price is provided, convert USD to INR
+        if (newIpPrice && !isNaN(priceValue) && priceValue > 0) {
+          try {
+            const response = await fetch('/api/convert-usd-to-inr', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ usdAmount: priceValue })
+            });
+            const data = await response.json();
+            if (response.ok && data.inrAmount) {
+              const finalPrice = Math.round(data.inrAmount * 10) / 10;
+              const updatedRatings = [...ipRatings];
+              updatedRatings[existingIndex].price = finalPrice;
+              setIpRatings(updatedRatings);
+              setNewIpRating("");
+              setNewIpPrice("");
+              setError("");
+            }
+          } catch (err) {
+            console.error('Error converting USD to INR:', err);
+            setError('Failed to convert currency. Please try again.');
           }
-        } catch (err) {
-          console.error('Error converting USD to INR:', err);
-          setError('Failed to convert currency. Please try again.');
+        } else {
+          // No price provided, set to 0
+          const updatedRatings = [...ipRatings];
+          updatedRatings[existingIndex].price = 0;
+          setIpRatings(updatedRatings);
+          setNewIpRating("");
+          setNewIpPrice("");
+          setError("");
         }
       }
       return;
     }
     
-    // Convert USD to INR (always, since we display USD in the form)
-    let finalPrice = priceValue;
-    try {
-      const response = await fetch('/api/convert-usd-to-inr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usdAmount: priceValue })
-      });
-      const data = await response.json();
-      if (response.ok && data.inrAmount) {
-        finalPrice = Math.round(data.inrAmount * 10) / 10;
+    // Convert USD to INR if price is provided, otherwise set to 0
+    let finalPrice = 0;
+    if (newIpPrice && !isNaN(priceValue) && priceValue > 0) {
+      try {
+        const response = await fetch('/api/convert-usd-to-inr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usdAmount: priceValue })
+        });
+        const data = await response.json();
+        if (response.ok && data.inrAmount) {
+          finalPrice = Math.round(data.inrAmount * 10) / 10;
+        }
+      } catch (err) {
+        console.error('Error converting USD to INR:', err);
+        setError('Failed to convert currency. Please try again.');
+        return;
       }
-    } catch (err) {
-      console.error('Error converting USD to INR:', err);
-      setError('Failed to convert currency. Please try again.');
-      return;
     }
     
     setIpRatings((prev) => [...prev, { rating: trimmed, price: finalPrice }]);
@@ -468,7 +478,7 @@ export default function AdminDashboard() {
     }
 
     if (ipRatings.length === 0) {
-      setError("Please add at least one IP rating with price");
+      setError("Please add at least one IP rating");
       setSubmitting(false);
       return;
     }
@@ -575,29 +585,33 @@ export default function AdminDashboard() {
   const handleSaveInlinePrice = async (productId: string, ipIndex: number, currentIpRatings: IpRatingPrice[]) => {
     const newPriceUSD = parseFloat(editPriceValue);
     
-    if (isNaN(newPriceUSD) || newPriceUSD <= 0) {
-      alert("Please enter a valid price");
+    if (isNaN(newPriceUSD) || newPriceUSD < 0) {
+      alert("Please enter a valid price (0 or greater)");
       return;
     }
 
     setSavingPrice(true);
 
     try {
-      // Convert USD to INR
-      const response = await fetch('/api/convert-usd-to-inr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usdAmount: newPriceUSD })
-      });
-      const data = await response.json();
+      let newPriceINR = 0;
       
-      if (!response.ok || !data.inrAmount) {
-        alert('Failed to convert currency. Please try again.');
-        setSavingPrice(false);
-        return;
-      }
+      // Only convert if price is greater than 0
+      if (newPriceUSD > 0) {
+        const response = await fetch('/api/convert-usd-to-inr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usdAmount: newPriceUSD })
+        });
+        const data = await response.json();
+        
+        if (!response.ok || !data.inrAmount) {
+          alert('Failed to convert currency. Please try again.');
+          setSavingPrice(false);
+          return;
+        }
 
-      const newPriceINR = Math.round(data.inrAmount * 10) / 10;
+        newPriceINR = Math.round(data.inrAmount * 10) / 10;
+      }
 
       // Update the IP rating price
       const updatedIpRatings = [...currentIpRatings];
@@ -905,7 +919,7 @@ export default function AdminDashboard() {
                                   className="text-xs text-blue-600 hover:text-blue-800 hover:underline text-left"
                                   title="Click to edit price in USD"
                                 >
-                                  ₹{ip.price.toFixed(2)}
+                                  {ip.price > 0 ? `₹${ip.price.toFixed(2)}` : 'TBD'}
                                 </button>
                               )}
                             </div>
@@ -1275,7 +1289,7 @@ export default function AdminDashboard() {
                       <input
                         type="number"
                         step="0.01"
-                        placeholder="Price (USD)"
+                        placeholder="Price (USD) - Optional"
                         value={newIpPrice}
                         onChange={(e) => setNewIpPrice(e.target.value)}
                         onKeyPress={(e) => {
@@ -1307,7 +1321,7 @@ export default function AdminDashboard() {
                           >
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-blue-900">{ip.rating}</span>
-                              <span className="text-xs text-blue-700">${ip.price.toFixed(2)}</span>
+                              <span className="text-xs text-blue-700">{ip.price > 0 ? `$${ip.price.toFixed(2)}` : 'TBD'}</span>
                             </div>
                             <button
                               type="button"
