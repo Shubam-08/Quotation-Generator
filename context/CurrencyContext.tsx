@@ -8,22 +8,22 @@ export interface CurrencyInfo {
   code: Currency;
   symbol: string;
   name: string;
-  rate: number; // Exchange rate relative to INR (base currency)
+  rate: number; // Exchange rate relative to USD (base currency)
 }
 
 // Fallback exchange rates (used if API fails or during initial load)
-// Rate calculation: 1 INR = (1 / exchange_rate_to_INR)
-// Example: If 1 USD = 88.65 INR, then 1 INR = 0.01128 USD (1 / 88.65)
+// Rate calculation: Exchange rate relative to USD (base currency)
+// Example: 1 USD = 88.65 INR, 1 USD = 0.79 GBP, etc.
 const FALLBACK_RATES: Record<Currency, number> = {
-  INR: 1,
-  USD: 0.01128, // Updated to match 88.65 INR per USD
-  GBP: 0.00893,
-  EUR: 0.01032,
-  QAR: 0.04101,
-  AED: 0.04136,
-  SAR: 0.04224,
-  BHD: 0.00424,
-  OMR: 0.00433,
+  USD: 1,        // Base currency
+  INR: 88.65,    // 1 USD = 88.65 INR
+  GBP: 0.79,     // 1 USD = 0.79 GBP
+  EUR: 0.92,     // 1 USD = 0.92 EUR
+  QAR: 3.64,     // 1 USD = 3.64 QAR
+  AED: 3.67,     // 1 USD = 3.67 AED
+  SAR: 3.75,     // 1 USD = 3.75 SAR
+  BHD: 0.376,    // 1 USD = 0.376 BHD
+  OMR: 0.385,    // 1 USD = 0.385 OMR
 };
 
 // Currency metadata (symbols and names)
@@ -43,8 +43,8 @@ interface CurrencyContextType {
   currency: Currency;
   setCurrency: (currency: Currency) => void;
   currencyInfo: CurrencyInfo;
-  convertPrice: (priceInINR: number) => number;
-  formatPrice: (priceInINR: number) => string;
+  convertPrice: (priceInUSD: number) => number;
+  formatPrice: (priceInUSD: number) => string;
   getAllCurrencies: () => CurrencyInfo[];
   lastUpdated: number | null;
   refreshRates: () => Promise<void>;
@@ -53,7 +53,7 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 export const CurrencyProvider = ({ children }: { children: React.ReactNode }) => {
-  const [currency, setCurrencyState] = useState<Currency>('INR');
+  const [currency, setCurrencyState] = useState<Currency>('USD');
   const [exchangeRates, setExchangeRates] = useState<Record<Currency, number>>(FALLBACK_RATES);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
@@ -64,7 +64,7 @@ export const CurrencyProvider = ({ children }: { children: React.ReactNode }) =>
       if (!response.ok) throw new Error('Failed to fetch rates');
       
       const data = await response.json();
-      setExchangeRates({ ...data.rates, INR: 1 });
+      setExchangeRates({ ...data.rates, USD: 1 });
       setLastUpdated(data.lastUpdated);
       
       // Store rates in localStorage for offline use
@@ -77,7 +77,7 @@ export const CurrencyProvider = ({ children }: { children: React.ReactNode }) =>
       const storedLastUpdated = localStorage.getItem('ratesLastUpdated');
       
       if (storedRates) {
-        setExchangeRates({ ...JSON.parse(storedRates), INR: 1 });
+        setExchangeRates({ ...JSON.parse(storedRates), USD: 1 });
         setLastUpdated(storedLastUpdated ? parseInt(storedLastUpdated) : null);
       }
     }
@@ -95,7 +95,7 @@ export const CurrencyProvider = ({ children }: { children: React.ReactNode }) =>
     const storedLastUpdated = localStorage.getItem('ratesLastUpdated');
     
     if (storedRates) {
-      setExchangeRates({ ...JSON.parse(storedRates), INR: 1 });
+      setExchangeRates({ ...JSON.parse(storedRates), USD: 1 });
       setLastUpdated(storedLastUpdated ? parseInt(storedLastUpdated) : null);
     }
 
@@ -121,12 +121,12 @@ export const CurrencyProvider = ({ children }: { children: React.ReactNode }) =>
     rate: exchangeRates[currency],
   };
 
-  const convertPrice = (priceInINR: number): number => {
-    return priceInINR * exchangeRates[currency];
+  const convertPrice = (priceInUSD: number): number => {
+    return priceInUSD * exchangeRates[currency];
   };
 
-  const formatPrice = (priceInINR: number): string => {
-    const convertedPrice = convertPrice(priceInINR);
+  const formatPrice = (priceInUSD: number): string => {
+    const convertedPrice = convertPrice(priceInUSD);
     const formatted = convertedPrice.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,

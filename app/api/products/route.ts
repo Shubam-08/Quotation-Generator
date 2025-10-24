@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Product from "@/lib/models/Product";
-import { convertUsdToInr } from "@/lib/usdToInr";
 import { requireAdmin, forbiddenResponse, unauthorizedResponse } from "@/lib/auth-helpers";
 
 export async function POST(req: Request) {
@@ -25,15 +24,22 @@ export async function POST(req: Request) {
       );
     }
 
-    // Handle legacy price field (for backward compatibility)
-    let inrPrice = data.price ? await convertUsdToInr(Number(data.price)) : 0;
-    inrPrice = Math.round(inrPrice * 10) / 10;
+    // Prices are stored directly in USD (no conversion)
+    // Round price to 2 decimal places for consistency
+    if (data.price) {
+      data.price = Math.round(Number(data.price) * 100) / 100;
+    }
+    // Round ipRatings prices to 2 decimal places
+    if (data.ipRatings && Array.isArray(data.ipRatings)) {
+      data.ipRatings = data.ipRatings.map((ip: any) => ({
+        rating: ip.rating,
+        price: Math.round(Number(ip.price || 0) * 100) / 100
+      }));
+    }
 
     const newProduct = new Product({
       ...data,
-      price: inrPrice,
       images: data.images || [],
-      ipRatings: data.ipRatings || [], // New field with individual prices
     });
 
     await newProduct.save();
@@ -59,10 +65,16 @@ export async function PUT(req: Request) {
     if (!id) return NextResponse.json({ error: "Product ID required" }, { status: 400 });
 
     const data = await req.json();
-    // Price is already in INR when updating, so don't convert it again
-    // Only round it to one decimal place for consistency
+    // Prices are stored in USD - round to 2 decimal places for consistency
     if (data.price) {
-      data.price = Math.round(Number(data.price) * 10) / 10;
+      data.price = Math.round(Number(data.price) * 100) / 100;
+    }
+    // Round ipRatings prices to 2 decimal places
+    if (data.ipRatings && Array.isArray(data.ipRatings)) {
+      data.ipRatings = data.ipRatings.map((ip: any) => ({
+        rating: ip.rating,
+        price: Math.round(Number(ip.price || 0) * 100) / 100
+      }));
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(id, data, { new: true, runValidators: true });

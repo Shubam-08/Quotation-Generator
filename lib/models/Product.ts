@@ -13,7 +13,7 @@ const ProductSchema = new mongoose.Schema(
     beamAngle: { type: String },
     dimension: { type: String },
     cutOut: { type: String },
-    // IP ratings with individual prices: [{ rating: "IP20", price: 100 }, { rating: "IP30", price: 120 }]
+    // IP ratings with individual prices (stored in USD): [{ rating: "IP20", price: 59.00 }, { rating: "IP30", price: 120.00 }]
     // Price is optional - can be null/0 if not yet determined
     ipRatings: { 
       type: [{ 

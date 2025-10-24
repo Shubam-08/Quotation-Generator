@@ -11,23 +11,23 @@ let cachedRates: {
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
 // Fallback rates (used if API fails)
-// These rates represent: 1 INR = X foreign currency
-// Example: If 1 USD = 88.65 INR, then 1 INR = 0.01128 USD (1 / 88.65)
+// These rates represent: 1 USD = X foreign currency
+// Example: 1 USD = 88.65 INR, 1 USD = 0.79 GBP, etc.
 const FALLBACK_RATES = {
-  USD: 0.01128, // Updated to match 88.65 INR per USD
-  GBP: 0.00893,
-  EUR: 0.01032,
-  QAR: 0.04201,
-  AED: 0.04201,
-  SAR: 0.04224,
-  BHD: 0.00429,
-  OMR: 0.00439,
-  INR: 1,
+  USD: 1,        // Base currency
+  INR: 88.65,    // 1 USD = 88.65 INR
+  GBP: 0.79,     // 1 USD = 0.79 GBP
+  EUR: 0.92,     // 1 USD = 0.92 EUR
+  QAR: 3.64,     // 1 USD = 3.64 QAR
+  AED: 3.67,     // 1 USD = 3.67 AED
+  SAR: 3.75,     // 1 USD = 3.75 SAR
+  BHD: 0.376,    // 1 USD = 0.376 BHD
+  OMR: 0.385,    // 1 USD = 0.385 OMR
 };
 
 // Free exchange rate API (no API key required)
 // Alternative: Use exchangerate-api.com with API key for better reliability
-const EXCHANGE_API_URL = 'https://open.er-api.com/v6/latest/INR';
+const EXCHANGE_API_URL = 'https://open.er-api.com/v6/latest/USD';
 
 async function fetchLiveRates(): Promise<Record<string, number>> {
   try {
@@ -44,7 +44,8 @@ async function fetchLiveRates(): Promise<Record<string, number>> {
     if (data.result === 'success' && data.rates) {
       // Extract only the currencies we support
       return {
-        USD: data.rates.USD || FALLBACK_RATES.USD,
+        USD: 1, // Base currency
+        INR: data.rates.INR || FALLBACK_RATES.INR,
         GBP: data.rates.GBP || FALLBACK_RATES.GBP,
         EUR: data.rates.EUR || FALLBACK_RATES.EUR,
         QAR: data.rates.QAR || FALLBACK_RATES.QAR,
@@ -52,7 +53,6 @@ async function fetchLiveRates(): Promise<Record<string, number>> {
         SAR: data.rates.SAR || FALLBACK_RATES.SAR,
         BHD: data.rates.BHD || FALLBACK_RATES.BHD,
         OMR: data.rates.OMR || FALLBACK_RATES.OMR,
-        INR: 1,
       };
     }
 
