@@ -22,12 +22,13 @@ const ProductSchema = new mongoose.Schema(
       }], 
       default: [] 
     },
-    // Voltage variants with individual wattage and prices (stored in USD)
-    // Example: [{ voltage: "12V DC", watt: 5, price: 45.00 }, { voltage: "24V DC", watt: 5, price: 48.00 }]
+    // Voltage variants with individual wattage, lumen, and prices (stored in USD)
+    // Example: [{ voltage: "12V DC", watt: 5, lumen: "500", price: 45.00 }, { voltage: "24V DC", watt: 5, lumen: "600", price: 48.00 }]
     voltageVariants: {
       type: [{
         voltage: { type: String, required: true },
         watt: { type: Number, required: false, default: 0 },
+        lumen: { type: String, required: false },
         price: { type: Number, required: false, default: 0 }
       }],
       default: []

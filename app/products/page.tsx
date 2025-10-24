@@ -17,6 +17,7 @@ type IpRatingPrice = {
 type VoltageVariant = {
   voltage: string;
   watt: number;
+  lumen?: string;
   price: number;
 };
 
@@ -585,7 +586,7 @@ export default function ProductsPage() {
                       
                       // Get current lumen selection
                       const lumenValues = p.lumen ? p.lumen.split(/[\/,]/).map(lumen => lumen.trim()).filter(Boolean) : [];
-                      const currentLumen = lumenValues.length > 1 ? (selectedLumens[p._id] || lumenValues[0]) : p.lumen;
+                      const currentLumen = currentVoltageVariant?.lumen || (lumenValues.length > 1 ? (selectedLumens[p._id] || lumenValues[0]) : p.lumen);
                       
                       // Get current voltage for cart ID
                       const currentVoltage = currentVoltageVariant?.voltage || p.inputVoltage || 'default';
@@ -671,6 +672,27 @@ export default function ProductsPage() {
                           </td>
                           <td className="px-4 py-4">
                             {(() => {
+                              // Check if product has voltage variants - prioritize variant lumen
+                              if (p.voltageVariants && p.voltageVariants.length > 0) {
+                                const selectedIdx = selectedVoltageVariants[p._id] ?? 0;
+                                const variant = p.voltageVariants[selectedIdx];
+                                if (variant?.lumen) {
+                                  const displayValue = variant.lumen.toLowerCase().includes('lm') ? variant.lumen : `${variant.lumen} lm`;
+                                  return (
+                                    <span className={`px-2 py-1 rounded-lg text-xs font-semibold inline-block ${
+                                      isDarkMode
+                                        ? 'bg-gray-800 border border-white/20 text-gray-300'
+                                        : 'bg-white border border-gray-300 text-gray-700'
+                                    }`}>
+                                      {displayValue}
+                                    </span>
+                                  );
+                                } else {
+                                  // Variant exists but no lumen specified
+                                  return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
+                                }
+                              }
+                              
                               if (!p.lumen || p.lumen === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
                               
                               // Parse lumen values - split by / or comma
@@ -880,17 +902,13 @@ export default function ProductsPage() {
                                   const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
                                   const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
                                   
-                                  // Get selected lumen if multiple exist
-                                  const lumenValues = p.lumen ? p.lumen.split(/[\/,]/).map(lumen => lumen.trim()).filter(Boolean) : [];
-                                  const selectedLumen = lumenValues.length > 1 ? (selectedLumens[p._id] || lumenValues[0]) : p.lumen;
-                                  
                                   const productToAdd = {
                                     ...p,
                                     ipRating: currentIpRating,
                                     inputVoltage: currentVoltage !== 'default' ? currentVoltage : p.inputVoltage,
                                     watt: currentWatt !== 'default' ? currentWatt : p.watt,
                                     beamAngle: selectedBeamAngle,
-                                    lumen: selectedLumen,
+                                    lumen: currentLumen,
                                     price: currentPrice
                                   };
                                   addToCart(productToAdd);

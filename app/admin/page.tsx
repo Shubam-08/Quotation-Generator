@@ -14,6 +14,7 @@ interface IpRatingPrice {
 interface VoltageVariant {
   voltage: string;
   watt: number;
+  lumen?: string;
   price: number;
 }
 
@@ -59,6 +60,7 @@ export default function AdminDashboard() {
   const [voltageVariants, setVoltageVariants] = useState<VoltageVariant[]>([]);
   const [newVoltage, setNewVoltage] = useState<string>("");
   const [newVoltageWatt, setNewVoltageWatt] = useState<string>("");
+  const [newVoltageLumen, setNewVoltageLumen] = useState<string>("");
   const [newVoltagePrice, setNewVoltagePrice] = useState<string>("");
   
   // Auto-update application when IP ratings change
@@ -362,6 +364,7 @@ export default function AdminDashboard() {
   // Voltage variant handlers
   const handleAddVoltageVariant = () => {
     const trimmedVoltage = newVoltage.trim();
+    const trimmedLumen = newVoltageLumen.trim();
     const wattValue = parseFloat(newVoltageWatt);
     const priceValue = parseFloat(newVoltagePrice);
     
@@ -380,10 +383,16 @@ export default function AdminDashboard() {
           ? Math.round(priceValue * 100) / 100 
           : 0;
         const updatedVariants = [...voltageVariants];
-        updatedVariants[existingIndex] = { voltage: trimmedVoltage, watt: finalWatt, price: finalPrice };
+        updatedVariants[existingIndex] = { 
+          voltage: trimmedVoltage, 
+          watt: finalWatt, 
+          lumen: trimmedLumen || undefined,
+          price: finalPrice 
+        };
         setVoltageVariants(updatedVariants);
         setNewVoltage("");
         setNewVoltageWatt("");
+        setNewVoltageLumen("");
         setNewVoltagePrice("");
         setError("");
       }
@@ -396,9 +405,15 @@ export default function AdminDashboard() {
       ? Math.round(priceValue * 100) / 100 
       : 0;
     
-    setVoltageVariants((prev) => [...prev, { voltage: trimmedVoltage, watt: finalWatt, price: finalPrice }]);
+    setVoltageVariants((prev) => [...prev, { 
+      voltage: trimmedVoltage, 
+      watt: finalWatt, 
+      lumen: trimmedLumen || undefined,
+      price: finalPrice 
+    }]);
     setNewVoltage("");
     setNewVoltageWatt("");
+    setNewVoltageLumen("");
     setNewVoltagePrice("");
     setError("");
   };
@@ -461,6 +476,7 @@ export default function AdminDashboard() {
     setVoltageVariants([]);
     setNewVoltage("");
     setNewVoltageWatt("");
+    setNewVoltageLumen("");
     setNewVoltagePrice("");
     setProductImages([]);
     setDatasheets([]);
@@ -1308,7 +1324,7 @@ export default function AdminDashboard() {
                   {/* Voltage Variants Section */}
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Voltage Variants with Watt & Price (Optional)
+                      Voltage Variants with Watt, Lumen & Price (Optional)
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -1345,6 +1361,19 @@ export default function AdminDashboard() {
                         className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                       />
                       <input
+                        type="text"
+                        placeholder="Lumen"
+                        value={newVoltageLumen}
+                        onChange={(e) => setNewVoltageLumen(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddVoltageVariant();
+                          }
+                        }}
+                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      />
+                      <input
                         type="number"
                         step="0.01"
                         placeholder="Price (USD)"
@@ -1367,7 +1396,7 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      💡 Select from existing voltages or type a new one. Add different voltage options with their wattage and price. Leave empty if product has single voltage.
+                      💡 Select from existing voltages or type a new one. Add different voltage options with their wattage, lumen, and price. Leave empty if product has single voltage.
                     </p>
 
                     {voltageVariants.length > 0 && (
@@ -1380,7 +1409,7 @@ export default function AdminDashboard() {
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-green-900">{variant.voltage}</span>
                               <span className="text-xs text-green-700">
-                                {variant.watt > 0 ? `${variant.watt}W` : 'No watt'} • {variant.price > 0 ? `$${variant.price.toFixed(2)}` : 'TBD'}
+                                {variant.watt > 0 ? `${variant.watt}W` : 'No watt'} • {variant.lumen ? `${variant.lumen}` : 'No lumen'} • {variant.price > 0 ? `$${variant.price.toFixed(2)}` : 'TBD'}
                               </span>
                             </div>
                             <button

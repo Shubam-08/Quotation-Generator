@@ -41,6 +41,7 @@ export async function POST(req: Request) {
       data.voltageVariants = data.voltageVariants.map((v: any) => ({
         voltage: v.voltage,
         watt: Number(v.watt || 0),
+        lumen: v.lumen || undefined,
         price: Math.round(Number(v.price || 0) * 100) / 100
       }));
     }
@@ -89,6 +90,7 @@ export async function PUT(req: Request) {
       data.voltageVariants = data.voltageVariants.map((v: any) => ({
         voltage: v.voltage,
         watt: Number(v.watt || 0),
+        lumen: v.lumen || undefined,
         price: Math.round(Number(v.price || 0) * 100) / 100
       }));
     }
