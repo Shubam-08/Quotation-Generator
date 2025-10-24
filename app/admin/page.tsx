@@ -11,6 +11,12 @@ interface IpRatingPrice {
   price: number;
 }
 
+interface VoltageVariant {
+  voltage: string;
+  watt: number;
+  price: number;
+}
+
 interface Product {
   _id: string;
   sku: string;
@@ -25,6 +31,7 @@ interface Product {
   cutOut?: string;
   ipRatings?: IpRatingPrice[]; // New structure with individual prices
   ipRating?: string[]; // Legacy field for backward compatibility
+  voltageVariants?: VoltageVariant[]; // Voltage variants with watt and price
   price: number; // Legacy field
   images?: string[];
   productImages?: string[]; // S3 uploaded images
@@ -47,6 +54,12 @@ export default function AdminDashboard() {
   const [ipRatings, setIpRatings] = useState<IpRatingPrice[]>([]);
   const [newIpRating, setNewIpRating] = useState<string>("");
   const [newIpPrice, setNewIpPrice] = useState<string>("");
+  
+  // Voltage variants states
+  const [voltageVariants, setVoltageVariants] = useState<VoltageVariant[]>([]);
+  const [newVoltage, setNewVoltage] = useState<string>("");
+  const [newVoltageWatt, setNewVoltageWatt] = useState<string>("");
+  const [newVoltagePrice, setNewVoltagePrice] = useState<string>("");
   
   // Auto-update application when IP ratings change
   useEffect(() => {
@@ -321,6 +334,54 @@ export default function AdminDashboard() {
     setIpRatings((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Voltage variant handlers
+  const handleAddVoltageVariant = () => {
+    const trimmedVoltage = newVoltage.trim();
+    const wattValue = parseFloat(newVoltageWatt);
+    const priceValue = parseFloat(newVoltagePrice);
+    
+    if (!trimmedVoltage) {
+      setError("Please enter a voltage (e.g., 12V DC, 24V DC, 110-240V AC)");
+      return;
+    }
+    
+    // Check if voltage already exists
+    const existingIndex = voltageVariants.findIndex(v => v.voltage === trimmedVoltage);
+    if (existingIndex !== -1) {
+      const msg = `Voltage ${trimmedVoltage} already exists. Update it?`;
+      if (confirm(msg)) {
+        const finalWatt = (newVoltageWatt && !isNaN(wattValue) && wattValue > 0) ? wattValue : 0;
+        const finalPrice = (newVoltagePrice && !isNaN(priceValue) && priceValue > 0) 
+          ? Math.round(priceValue * 100) / 100 
+          : 0;
+        const updatedVariants = [...voltageVariants];
+        updatedVariants[existingIndex] = { voltage: trimmedVoltage, watt: finalWatt, price: finalPrice };
+        setVoltageVariants(updatedVariants);
+        setNewVoltage("");
+        setNewVoltageWatt("");
+        setNewVoltagePrice("");
+        setError("");
+      }
+      return;
+    }
+    
+    // Add new voltage variant
+    const finalWatt = (newVoltageWatt && !isNaN(wattValue) && wattValue > 0) ? wattValue : 0;
+    const finalPrice = (newVoltagePrice && !isNaN(priceValue) && priceValue > 0) 
+      ? Math.round(priceValue * 100) / 100 
+      : 0;
+    
+    setVoltageVariants((prev) => [...prev, { voltage: trimmedVoltage, watt: finalWatt, price: finalPrice }]);
+    setNewVoltage("");
+    setNewVoltageWatt("");
+    setNewVoltagePrice("");
+    setError("");
+  };
+
+  const handleRemoveVoltageVariant = (index: number) => {
+    setVoltageVariants((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleOpenModal = async (product?: Product) => {
     if (product) {
       setEditingProduct(product);
@@ -340,6 +401,13 @@ export default function AdminDashboard() {
       } else {
         setIpRatings([]);
       }
+      
+      // Load voltage variants
+      if (product.voltageVariants && product.voltageVariants.length > 0) {
+        setVoltageVariants(product.voltageVariants);
+      } else {
+        setVoltageVariants([]);
+      }
     } else {
       setEditingProduct(null);
       setFormData({});
@@ -349,6 +417,7 @@ export default function AdminDashboard() {
       setIesFiles([]);
       setCertifications([]);
       setIpRatings([]);
+      setVoltageVariants([]);
     }
     setShowModal(true);
     setError("");
@@ -364,6 +433,10 @@ export default function AdminDashboard() {
     setIpRatings([]);
     setNewIpRating("");
     setNewIpPrice("");
+    setVoltageVariants([]);
+    setNewVoltage("");
+    setNewVoltageWatt("");
+    setNewVoltagePrice("");
     setProductImages([]);
     setDatasheets([]);
     setIesFiles([]);
@@ -408,6 +481,7 @@ export default function AdminDashboard() {
           ...formData,
           images: images,
           ipRatings: ipRatings,
+          voltageVariants: voltageVariants,
           productImages: productImages,
           datasheets: datasheets,
           iesFiles: iesFiles,
@@ -436,7 +510,7 @@ export default function AdminDashboard() {
     } finally {
       setSubmitting(false);
     }
-  }, [formData, images, ipRatings, productImages, datasheets, iesFiles, certifications, editingProduct]);
+  }, [formData, images, ipRatings, voltageVariants, productImages, datasheets, iesFiles, certifications, editingProduct]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
@@ -1196,6 +1270,91 @@ export default function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => handleRemoveIpRating(idx)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Voltage Variants Section */}
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Voltage Variants with Watt & Price (Optional)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g., 12V DC, 24V DC, 110-240V AC"
+                        value={newVoltage}
+                        onChange={(e) => setNewVoltage(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddVoltageVariant();
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Watt"
+                        value={newVoltageWatt}
+                        onChange={(e) => setNewVoltageWatt(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddVoltageVariant();
+                          }
+                        }}
+                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Price (USD)"
+                        value={newVoltagePrice}
+                        onChange={(e) => setNewVoltagePrice(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddVoltageVariant();
+                          }
+                        }}
+                        className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddVoltageVariant}
+                        className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Add different voltage options with their wattage and price. Leave empty if product has single voltage.
+                    </p>
+
+                    {voltageVariants.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {voltageVariants.map((variant, idx) => (
+                          <div
+                            key={`${variant.voltage}-${idx}`}
+                            className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5"
+                          >
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-green-900">{variant.voltage}</span>
+                              <span className="text-xs text-green-700">
+                                {variant.watt > 0 ? `${variant.watt}W` : 'No watt'} • {variant.price > 0 ? `$${variant.price.toFixed(2)}` : 'TBD'}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveVoltageVariant(idx)}
                               className="text-red-600 hover:text-red-700"
                             >
                               <X size={16} />

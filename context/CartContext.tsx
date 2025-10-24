@@ -57,23 +57,29 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       ? product.ipRating[0] 
       : product.ipRating;
     
+    // Get voltage and watt for unique identification
+    const productVoltage = product.inputVoltage || 'default';
+    const productWatt = product.watt || 'default';
+    
     // Get beam angle for unique identification
     const productBeamAngle = product.beamAngle || 'default';
     
     // Get lumen for unique identification
     const productLumen = product.lumen || 'default';
     
-    // Create unique cart item ID based on product ID + IP rating + beam angle + lumen
-    const cartItemId = `${product._id}_${productIpRating || 'default'}_${productBeamAngle}_${productLumen}`;
+    // Create unique cart item ID based on product ID + IP rating + voltage + watt + beam angle + lumen
+    const cartItemId = `${product._id}_${productIpRating || 'default'}_${productVoltage}_${productWatt}_${productBeamAngle}_${productLumen}`;
     
-    // Check if this specific product + IP rating + beam angle + lumen combination already exists
+    // Check if this specific combination already exists
     const exists = cart.find(item => item.cartItemId === cartItemId);
     
     if (exists) {
       const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
+      const voltageText = product.inputVoltage && product.inputVoltage !== '-' ? ` - ${product.inputVoltage}` : '';
+      const wattText = product.watt ? ` - ${product.watt}W` : '';
       const beamAngleText = product.beamAngle && product.beamAngle !== '-' ? ` - ${product.beamAngle}` : '';
       const lumenText = product.lumen && product.lumen !== '-' ? ` - ${product.lumen}` : '';
-      showToast(`${product.sku}${ipRatingText}${beamAngleText}${lumenText} is already in your list`, 'info');
+      showToast(`${product.sku}${ipRatingText}${voltageText}${wattText}${beamAngleText}${lumenText} is already in your list`, 'info');
       return; // Prevent duplicate
     }
 

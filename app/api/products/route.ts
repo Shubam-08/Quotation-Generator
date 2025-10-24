@@ -36,6 +36,14 @@ export async function POST(req: Request) {
         price: Math.round(Number(ip.price || 0) * 100) / 100
       }));
     }
+    // Round voltageVariants prices to 2 decimal places
+    if (data.voltageVariants && Array.isArray(data.voltageVariants)) {
+      data.voltageVariants = data.voltageVariants.map((v: any) => ({
+        voltage: v.voltage,
+        watt: Number(v.watt || 0),
+        price: Math.round(Number(v.price || 0) * 100) / 100
+      }));
+    }
 
     const newProduct = new Product({
       ...data,
@@ -74,6 +82,14 @@ export async function PUT(req: Request) {
       data.ipRatings = data.ipRatings.map((ip: any) => ({
         rating: ip.rating,
         price: Math.round(Number(ip.price || 0) * 100) / 100
+      }));
+    }
+    // Round voltageVariants prices to 2 decimal places
+    if (data.voltageVariants && Array.isArray(data.voltageVariants)) {
+      data.voltageVariants = data.voltageVariants.map((v: any) => ({
+        voltage: v.voltage,
+        watt: Number(v.watt || 0),
+        price: Math.round(Number(v.price || 0) * 100) / 100
       }));
     }
 
