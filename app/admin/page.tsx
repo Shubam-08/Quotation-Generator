@@ -135,6 +135,31 @@ export default function AdminDashboard() {
     return Array.from(new Set(voltages)).sort();
   }, [products]);
 
+  // Memoized unique voltages from both inputVoltage and voltageVariants
+  const allUniqueVoltages = useMemo(() => {
+    const voltages = new Set<string>();
+    
+    // Add voltages from inputVoltage field
+    products.forEach(p => {
+      if (p.inputVoltage && p.inputVoltage.trim() !== '') {
+        voltages.add(p.inputVoltage);
+      }
+    });
+    
+    // Add voltages from voltageVariants
+    products.forEach(p => {
+      if (p.voltageVariants && p.voltageVariants.length > 0) {
+        p.voltageVariants.forEach(variant => {
+          if (variant.voltage && variant.voltage.trim() !== '') {
+            voltages.add(variant.voltage);
+          }
+        });
+      }
+    });
+    
+    return Array.from(voltages).sort();
+  }, [products]);
+
   // Memoized unique beam angles from existing products
   const uniqueBeamAngles = useMemo(() => {
     const angles = products
@@ -1288,6 +1313,7 @@ export default function AdminDashboard() {
                     <div className="flex gap-2">
                       <input
                         type="text"
+                        list="voltage-variant-suggestions"
                         placeholder="e.g., 12V DC, 24V DC, 110-240V AC"
                         value={newVoltage}
                         onChange={(e) => setNewVoltage(e.target.value)}
@@ -1299,6 +1325,11 @@ export default function AdminDashboard() {
                         }}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                       />
+                      <datalist id="voltage-variant-suggestions">
+                        {allUniqueVoltages.map((voltage) => (
+                          <option key={voltage} value={voltage} />
+                        ))}
+                      </datalist>
                       <input
                         type="number"
                         step="0.01"
@@ -1336,7 +1367,7 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Add different voltage options with their wattage and price. Leave empty if product has single voltage.
+                      💡 Select from existing voltages or type a new one. Add different voltage options with their wattage and price. Leave empty if product has single voltage.
                     </p>
 
                     {voltageVariants.length > 0 && (
