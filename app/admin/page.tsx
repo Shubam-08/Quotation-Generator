@@ -821,6 +821,9 @@ export default function AdminDashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Category
                   </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Image
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Watt
                   </th>
@@ -848,6 +851,21 @@ export default function AdminDashboard() {
                           🔍 Filter: {product.categoryFilter || 'Not Set'}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {(product.productImages && product.productImages.length > 0) || (product.images && product.images.length > 0) ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <ImageIcon size={16} className="text-green-600" />
+                          <span className="text-xs font-medium text-green-600">
+                            {(product.productImages?.length || 0) + (product.images?.length || 0)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1">
+                          <ImageIcon size={16} className="text-gray-300" />
+                          <span className="text-xs text-gray-400">No</span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {product.watt}W
