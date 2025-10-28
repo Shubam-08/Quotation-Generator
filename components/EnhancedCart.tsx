@@ -5,7 +5,7 @@ import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useSession } from 'next-auth/react';
 import CurrencySelector from './CurrencySelector';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -18,6 +18,7 @@ interface Product {
   _id: string;
   sku?: string;
   category?: string;
+  description?: string;
   application?: string;
   inputVoltage?: string;
   watt?: string;
@@ -69,7 +70,29 @@ export default function EnhancedCart() {
     setShowError(false);
   };
 
-  const exportExcel = () => {
+  // Generate project description from product attributes
+  const generateProjectDescription = (item: CartItem): string => {
+    const parts = [];
+    
+    if (item.watt) parts.push(`${item.watt}W`);
+    if (item.category) parts.push(item.category);
+    
+    const details = [];
+    if (item.application) details.push(item.application);
+    if (item.lumen) details.push(`${item.lumen}lm`);
+    if (item.inputVoltage) details.push(item.inputVoltage);
+    if (item.beamAngle) details.push(`${item.beamAngle} beam angle`);
+    if (item.ipRating && item.ipRating.trim() !== '') details.push(item.ipRating);
+    
+    let description = parts.join(' ');
+    if (details.length > 0) {
+      description += ` (${details.join(', ')})`;
+    }
+    
+    return description || 'LED Light';
+  };
+
+  const exportExcel = async () => {
     // Check if user is logged in
     if (!session) {
       setShowLoginPrompt(true);
@@ -78,50 +101,193 @@ export default function EnhancedCart() {
     
     if (!canDownload) { setShowError(true); return; }
 
-    const workbook = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Cart');
     
     // Get dynamic address based on currency
     const addressInfo = getAddressInfo();
-    const headerData = [
-      ...addressInfo.lines.map(line => [line]),
-      [`Project Name - ${userInfo.project}`],
-      [`Email: ${userInfo.email}`],
-      [`Mobile: ${userInfo.mobile}`],
-      [],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(headerData);
-    ws['!merges'] = headerData.map((_, i) => ({ s: { r: i, c: 0 }, e: { r: i, c: 12 } }));
+    
+    // Add logo on the left side
+    try {
+      const logoResponse = await fetch('/logo.jpg');
+      if (logoResponse.ok) {
+        const logoBuffer = await logoResponse.arrayBuffer();
+        const logoId = workbook.addImage({
+          buffer: logoBuffer,
+          extension: 'jpeg',
+        });
+        
+        worksheet.addImage(logoId, {
+          tl: { col: 0, row: 0 },
+          ext: { width: 80, height: 90 }
+        });
+      }
+    } catch (error) {
+      console.error('Error adding logo:', error);
+    }
+
+    // Add address lines on the right side
+    addressInfo.lines.forEach((line, index) => {
+      const row = worksheet.getRow(index + 1);
+      row.getCell(10).value = line; // Start from column 10 (right side)
+      row.getCell(10).font = { bold: true, size: 9 };
+      row.getCell(10).alignment = { horizontal: 'right' };
+    });
+
+    // Add project info below logo (left side)
+    const projectInfoRow = addressInfo.lines.length + 2;
+    worksheet.getRow(projectInfoRow).getCell(1).value = `Project Name - ${userInfo.project}`;
+    worksheet.getRow(projectInfoRow).getCell(1).font = { bold: true, size: 10 };
+    
+    worksheet.getRow(projectInfoRow + 1).getCell(1).value = `Email: ${userInfo.email}`;
+    worksheet.getRow(projectInfoRow + 1).getCell(1).font = { size: 9 };
+    
+    worksheet.getRow(projectInfoRow + 2).getCell(1).value = `Mobile: ${userInfo.mobile}`;
+    worksheet.getRow(projectInfoRow + 2).getCell(1).font = { size: 9 };
 
     const excelCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
-    // Match PDF layout - same columns as PDF
-    const tableColumns = [
-      'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
+    const startRow = addressInfo.lines.length + 6; // Adjusted for new header layout
+    
+    // Add column headers
+    const headerRow = worksheet.getRow(startRow);
+    const columns = [
+      'SI No','Image','Model Number','Description','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
     ];
+    columns.forEach((col, index) => {
+      headerRow.getCell(index + 1).value = col;
+      headerRow.getCell(index + 1).font = { bold: true };
+      headerRow.getCell(index + 1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF0046FF' }
+      };
+      headerRow.getCell(index + 1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    });
+    headerRow.height = 20;
 
-    const tableData = cart.map(item => [
-      item.sku ?? 'N/A', 
-      item.category ?? '-', 
-      item.application ?? '-', 
-      item.inputVoltage ?? '-', 
-      item.watt ?? '-', 
-      item.lumen ?? '-', 
-      item.beamAngle ?? '-', 
-      item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', 
-      convertPrice(item.price ?? 0).toFixed(2), 
-      item.quantity ?? 1, 
-      (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2)
-    ]);
+    // Set column widths
+    worksheet.getColumn(1).width = 8;  // SI No
+    worksheet.getColumn(2).width = 15; // Image
+    worksheet.getColumn(3).width = 15; // Model Number
+    worksheet.getColumn(4).width = 30; // Description
+    worksheet.getColumn(5).width = 12; // Category
+    worksheet.getColumn(6).width = 12; // Application
+    worksheet.getColumn(7).width = 15; // Input Voltage
+    worksheet.getColumn(8).width = 8;  // Watt
+    worksheet.getColumn(9).width = 10; // Lumen
+    worksheet.getColumn(10).width = 12; // Beam Angle
+    worksheet.getColumn(11).width = 10; // IP Rating
+    worksheet.getColumn(12).width = 12; // Price
+    worksheet.getColumn(13).width = 10; // Quantity
+    worksheet.getColumn(14).width = 12; // Total
 
-    const startRow = addressInfo.lines.length + 4; // Dynamic start based on address length
-    XLSX.utils.sheet_add_aoa(ws, [tableColumns], { origin: startRow });
-    XLSX.utils.sheet_add_aoa(ws, tableData, { origin: startRow + 1 });
+    // Helper function to get image URL
+    const getPrimaryImageUrl = (item: CartItem): string | null => {
+      return item.productImages?.[0] || item.images?.[0] || null;
+    };
 
+    // Helper function to resolve Google Drive URLs
+    const resolveImageUrl = async (url: string): Promise<string> => {
+      try {
+        if (url.includes('drive.google.com')) {
+          const res = await fetch('/api/resolve-image', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ url }) 
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.url) return data.url as string;
+          }
+        }
+      } catch {}
+      return url;
+    };
+
+    // Helper function to fetch image as buffer
+    const fetchImageBuffer = async (url: string): Promise<ArrayBuffer | null> => {
+      try {
+        const resolvedUrl = await resolveImageUrl(url);
+        const response = await fetch(resolvedUrl, { mode: 'cors' });
+        if (!response.ok) return null;
+        return await response.arrayBuffer();
+      } catch {
+        return null;
+      }
+    };
+
+    // Add data rows with images
+    for (let i = 0; i < cart.length; i++) {
+      const item = cart[i];
+      const rowIndex = startRow + 1 + i;
+      const row = worksheet.getRow(rowIndex);
+      
+      // Set row height for images
+      row.height = 60;
+      
+      // Add data
+      row.getCell(1).value = i + 1; // SI No
+      row.getCell(3).value = item.sku ?? 'N/A'; // Model Number
+      row.getCell(4).value = item.description || ''; // Description - from product or blank
+      row.getCell(4).alignment = { wrapText: true, vertical: 'top' }; // Enable text wrapping
+      
+      // Debug: Log description
+      if (i === 0) {
+        console.log('First item description:', item.description);
+        console.log('First item full data:', item);
+      }
+      row.getCell(5).value = item.category ?? '-';
+      row.getCell(6).value = item.application ?? '-';
+      row.getCell(7).value = item.inputVoltage ?? '-';
+      row.getCell(8).value = item.watt ?? '-';
+      row.getCell(9).value = item.lumen ?? '-';
+      row.getCell(10).value = item.beamAngle ?? '-';
+      row.getCell(11).value = item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A';
+      row.getCell(12).value = convertPrice(item.price ?? 0).toFixed(2);
+      row.getCell(13).value = item.quantity ?? 1;
+      row.getCell(14).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2);
+
+      // Add image
+      const imageUrl = getPrimaryImageUrl(item);
+      if (imageUrl) {
+        const imageBuffer = await fetchImageBuffer(imageUrl);
+        if (imageBuffer) {
+          try {
+            const imageId = workbook.addImage({
+              buffer: imageBuffer,
+              extension: 'jpeg',
+            });
+            
+            worksheet.addImage(imageId, {
+              tl: { col: 1, row: rowIndex - 1 },
+              ext: { width: 80, height: 60 }
+            });
+          } catch (error) {
+            console.error('Error adding image:', error);
+          }
+        }
+      }
+    }
+
+    // Add total row
     const totalAmount = cart.reduce((sum, item) => sum + (convertPrice(item.price ?? 0) * (item.quantity ?? 1)), 0);
-    const totalRowIndex = startRow + 1 + tableData.length;
-    XLSX.utils.sheet_add_aoa(ws, [['','','','','','','','', `Total Amount (${excelCurrency}):`, totalAmount.toFixed(2)]], { origin: totalRowIndex });
+    const totalRowIndex = startRow + 1 + cart.length;
+    const totalRow = worksheet.getRow(totalRowIndex);
+    totalRow.getCell(12).value = `Total Amount (${excelCurrency}):`;
+    totalRow.getCell(12).font = { bold: true };
+    totalRow.getCell(13).value = totalAmount.toFixed(2);
+    totalRow.getCell(13).font = { bold: true };
 
-    XLSX.utils.book_append_sheet(workbook, ws, 'Cart');
-    XLSX.writeFile(workbook, `${userInfo.project}_cart.xlsx`);
+    // Generate and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${userInfo.project}_cart.xlsx`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
   };
@@ -193,7 +359,7 @@ export default function EnhancedCart() {
     
     if (!canDownload) { setShowError(true); return; }
 
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const marginRight = 20;
     const rightX = pageWidth - marginRight;
@@ -816,16 +982,14 @@ export default function EnhancedCart() {
                     Export to PDF
                   </button>
 
-                  {/* Excel export - Only visible to admins */}
-                  {isAdmin && (
-                    <button
-                      onClick={exportExcel}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
-                    >
-                      <FileSpreadsheet className="w-5 h-5" />
-                      Export to Excel
-                    </button>
-                  )}
+                  {/* Excel export - Available to all logged-in users */}
+                  <button
+                    onClick={exportExcel}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                  >
+                    <FileSpreadsheet className="w-5 h-5" />
+                    Export to Excel
+                  </button>
 
                   <button
                     onClick={() => {

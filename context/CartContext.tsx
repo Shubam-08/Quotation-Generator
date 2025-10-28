@@ -7,6 +7,7 @@ type Product = {
   _id: string;
   sku: string;
   category?: string;
+  description?: string;
   price: number;
   stock?: number;
   watt?: number;
@@ -89,6 +90,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       _id: product._id,
       sku: product.sku,
       name: product.sku, // for display on sidebar
+      description: product.description || '', // Add description field
       price: product.price ?? 0,
       watt: product.watt ?? 0,
       inputVoltage: product.inputVoltage || '-',

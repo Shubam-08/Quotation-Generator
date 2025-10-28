@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import CurrencySelector from './CurrencySelector';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet } from 'lucide-react';
@@ -14,6 +14,7 @@ interface Product {
   _id: string;
   sku?: string;
   category?: string;
+  description?: string;
   application?: string;
   inputVoltage?: string;
   watt?: string;
@@ -54,56 +55,231 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
     setShowError(false);
   };
 
+  // Generate project description from product attributes
+  const generateProjectDescription = (item: CartItem): string => {
+    const parts = [];
+    
+    if (item.watt) parts.push(`${item.watt}W`);
+    if (item.category) parts.push(item.category);
+    
+    const details = [];
+    if (item.application) details.push(item.application);
+    if (item.lumen) details.push(`${item.lumen}lm`);
+    if (item.inputVoltage) details.push(item.inputVoltage);
+    if (item.beamAngle) details.push(`${item.beamAngle} beam angle`);
+    if (item.ipRating && item.ipRating.trim() !== '') details.push(item.ipRating);
+    if (item.dimension) details.push(`Dimension: ${item.dimension}`);
+    if (item.cutOut) details.push(`Cut Out: ${item.cutOut}`);
+    
+    let description = parts.join(' ');
+    if (details.length > 0) {
+      description += ` (${details.join(', ')})`;
+    }
+    
+    return description || 'LED Light';
+  };
+
   // Export Excel
-  const exportExcel = () => {
+  const exportExcel = async () => {
     if (!canDownload) { setShowError(true); return; }
 
-    const workbook = XLSX.utils.book_new();
-    const headerData = [
-      ['QLITE CO. WLL'],
-      ['CR No.: 82699-01'],
-      ['P.O. Box: 1858'],
-      ['Manama - Kingdom of Bahrain'],
-      ['TEL: +973 17232503  FAX: +973 17242125'],
-      ['E-mail: sales@qliteglobal.com'],
-      [`Project Name - ${userInfo.project}`],
-      [`Email: ${userInfo.email}`],
-      [`Mobile: ${userInfo.mobile}`],
-      [],
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Cart');
+    
+    const addressLines = [
+      'QLITE CO. WLL',
+      'CR No.: 82699-01',
+      'P.O. Box: 1858',
+      'Manama - Kingdom of Bahrain',
+      'TEL: +973 17232503  FAX: +973 17242125',
+      'E-mail: sales@qliteglobal.com'
     ];
-    const ws = XLSX.utils.aoa_to_sheet(headerData);
-    ws['!merges'] = headerData.map((_, i) => ({ s: { r: i, c: 0 }, e: { r: i, c: 12 } }));
+    
+    // Add logo on the left side
+    try {
+      const logoResponse = await fetch('/logo.jpg');
+      if (logoResponse.ok) {
+        const logoBuffer = await logoResponse.arrayBuffer();
+        const logoId = workbook.addImage({
+          buffer: logoBuffer,
+          extension: 'jpeg',
+        });
+        
+        worksheet.addImage(logoId, {
+          tl: { col: 0, row: 0 },
+          ext: { width: 80, height: 90 }
+        });
+      }
+    } catch (error) {
+      console.error('Error adding logo:', error);
+    }
 
-    // Use currency code instead of symbol for Excel to avoid encoding issues with ₹
+    // Add address lines on the right side
+    addressLines.forEach((line, index) => {
+      const row = worksheet.getRow(index + 1);
+      row.getCell(12).value = line; // Start from column 12 (right side)
+      row.getCell(12).font = { bold: true, size: 9 };
+      row.getCell(12).alignment = { horizontal: 'right' };
+    });
+
+    // Add project info below logo (left side)
+    const projectInfoRow = addressLines.length + 2;
+    worksheet.getRow(projectInfoRow).getCell(1).value = `Project Name - ${userInfo.project}`;
+    worksheet.getRow(projectInfoRow).getCell(1).font = { bold: true, size: 10 };
+    
+    worksheet.getRow(projectInfoRow + 1).getCell(1).value = `Email: ${userInfo.email}`;
+    worksheet.getRow(projectInfoRow + 1).getCell(1).font = { size: 9 };
+    
+    worksheet.getRow(projectInfoRow + 2).getCell(1).value = `Mobile: ${userInfo.mobile}`;
+    worksheet.getRow(projectInfoRow + 2).getCell(1).font = { size: 9 };
+
     const excelCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
-    const tableColumns = [
-      'Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','Dimension','Cut Out','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
+    const startRow = addressLines.length + 6; // Adjusted for new header layout
+    
+    // Add column headers
+    const headerRow = worksheet.getRow(startRow);
+    const columns = [
+      'SI No','Image','Model Number','Description','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','Dimension','Cut Out','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
     ];
+    columns.forEach((col, index) => {
+      headerRow.getCell(index + 1).value = col;
+      headerRow.getCell(index + 1).font = { bold: true };
+      headerRow.getCell(index + 1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF0046FF' }
+      };
+      headerRow.getCell(index + 1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    });
+    headerRow.height = 20;
 
-    const tableData = cart.map(item => [
-      item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
-      item.watt ?? '-', item.lumen ?? '-', item.beamAngle ?? '-', item.dimension ?? '-', item.cutOut ?? '-', 
-      item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', 
-      convertPrice(item.price ?? 0).toFixed(2), item.quantity ?? 1, 
-      (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2)
-    ]);
+    // Set column widths
+    worksheet.getColumn(1).width = 8;  // SI No
+    worksheet.getColumn(2).width = 15; // Image
+    worksheet.getColumn(3).width = 15; // Model Number
+    worksheet.getColumn(4).width = 30; // Description
+    worksheet.getColumn(5).width = 12; // Category
+    worksheet.getColumn(6).width = 12; // Application
+    worksheet.getColumn(7).width = 15; // Input Voltage
+    worksheet.getColumn(8).width = 8;  // Watt
+    worksheet.getColumn(9).width = 10; // Lumen
+    worksheet.getColumn(10).width = 12; // Beam Angle
+    worksheet.getColumn(11).width = 12; // Dimension
+    worksheet.getColumn(12).width = 12; // Cut Out
+    worksheet.getColumn(13).width = 10; // IP Rating
+    worksheet.getColumn(14).width = 12; // Price
+    worksheet.getColumn(15).width = 10; // Quantity
+    worksheet.getColumn(16).width = 12; // Total
 
-    XLSX.utils.sheet_add_aoa(ws, [tableColumns], { origin: 10 });
-    XLSX.utils.sheet_add_aoa(ws, tableData, { origin: 11 });
+    // Helper function to get image URL
+    const getPrimaryImageUrl = (item: CartItem): string | null => {
+      return item.productImages?.[0] || item.images?.[0] || null;
+    };
 
+    // Helper function to resolve Google Drive URLs
+    const resolveImageUrl = async (url: string): Promise<string> => {
+      try {
+        if (url.includes('drive.google.com')) {
+          const res = await fetch('/api/resolve-image', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ url }) 
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.url) return data.url as string;
+          }
+        }
+      } catch {}
+      return url;
+    };
+
+    // Helper function to fetch image as buffer
+    const fetchImageBuffer = async (url: string): Promise<ArrayBuffer | null> => {
+      try {
+        const resolvedUrl = await resolveImageUrl(url);
+        const response = await fetch(resolvedUrl, { mode: 'cors' });
+        if (!response.ok) return null;
+        return await response.arrayBuffer();
+      } catch {
+        return null;
+      }
+    };
+
+    // Add data rows with images
+    for (let i = 0; i < cart.length; i++) {
+      const item = cart[i];
+      const rowIndex = startRow + 1 + i;
+      const row = worksheet.getRow(rowIndex);
+      
+      // Set row height for images
+      row.height = 60;
+      
+      // Add data
+      row.getCell(1).value = i + 1; // SI No
+      row.getCell(3).value = item.sku ?? 'N/A'; // Model Number
+      row.getCell(4).value = item.description || ''; // Description - from product or blank
+      row.getCell(4).alignment = { wrapText: true, vertical: 'top' }; // Enable text wrapping
+      row.getCell(5).value = item.category ?? '-';
+      row.getCell(6).value = item.application ?? '-';
+      row.getCell(7).value = item.inputVoltage ?? '-';
+      row.getCell(8).value = item.watt ?? '-';
+      row.getCell(9).value = item.lumen ?? '-';
+      row.getCell(10).value = item.beamAngle ?? '-';
+      row.getCell(11).value = item.dimension ?? '-';
+      row.getCell(12).value = item.cutOut ?? '-';
+      row.getCell(13).value = item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A';
+      row.getCell(14).value = convertPrice(item.price ?? 0).toFixed(2);
+      row.getCell(15).value = item.quantity ?? 1;
+      row.getCell(16).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2);
+
+      // Add image
+      const imageUrl = getPrimaryImageUrl(item);
+      if (imageUrl) {
+        const imageBuffer = await fetchImageBuffer(imageUrl);
+        if (imageBuffer) {
+          try {
+            const imageId = workbook.addImage({
+              buffer: imageBuffer,
+              extension: 'jpeg',
+            });
+            
+            worksheet.addImage(imageId, {
+              tl: { col: 1, row: rowIndex - 1 },
+              ext: { width: 80, height: 60 }
+            });
+          } catch (error) {
+            console.error('Error adding image:', error);
+          }
+        }
+      }
+    }
+
+    // Add total row
     const totalAmount = cart.reduce((sum, item) => sum + (convertPrice(item.price ?? 0) * (item.quantity ?? 1)), 0);
-    const totalRowIndex = 11 + tableData.length;
-    XLSX.utils.sheet_add_aoa(ws, [['','','','','','','','','','', `Total Amount (${excelCurrency}):`, totalAmount.toFixed(2)]], { origin: totalRowIndex });
+    const totalRowIndex = startRow + 1 + cart.length;
+    const totalRow = worksheet.getRow(totalRowIndex);
+    totalRow.getCell(14).value = `Total Amount (${excelCurrency}):`;
+    totalRow.getCell(14).font = { bold: true };
+    totalRow.getCell(15).value = totalAmount.toFixed(2);
+    totalRow.getCell(15).font = { bold: true };
 
-    XLSX.utils.book_append_sheet(workbook, ws, 'Cart');
-    XLSX.writeFile(workbook, `${userInfo.project}_cart.xlsx`);
+    // Generate and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${userInfo.project}_cart.xlsx`;
+    link.click();
+    window.URL.revokeObjectURL(url);
   };
 
   // Export PDF
 const exportPDF = async () => {
   if (!canDownload) { setShowError(true); return; }
 
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const marginRight = 20;
   const rightX = pageWidth - marginRight;

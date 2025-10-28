@@ -64,7 +64,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Stats */}
+          {/* Stats 
           <div className="grid grid-cols-3 gap-8 max-w-3xl mx-auto pt-8 border-t border-white/10">
             <div className="text-center">
               <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-500 bg-clip-text text-transparent mb-2">500+</div>
@@ -79,11 +79,12 @@ export default function HomePage() {
               <div className="text-sm md:text-base text-gray-500">Accuracy</div>
             </div>
           </div>
+          */}
         </div>
       </section>
 
       {/* Features Grid */}
-      <section className="py-20 px-6 bg-gradient-to-b from-black via-gray-900/50 to-black">
+      <section className="py-0 px-6 bg-gradient-to-b from-black via-gray-900/50 to-black">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Feature 1 */}
@@ -202,7 +203,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA Section 
       <section className="py-20 px-6 bg-gradient-to-b from-black via-gray-900/50 to-black">
         <div className="max-w-4xl mx-auto">
           <div className="relative bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-3xl p-1 shadow-2xl shadow-yellow-400/30">
@@ -224,7 +225,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+*/}
     </div>
   );
 }

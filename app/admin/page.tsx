@@ -23,6 +23,7 @@ interface Product {
   sku: string;
   category: string;
   categoryFilter?: string; // Main category for filtering
+  description?: string; // Product description
   application?: string;
   inputVoltage?: string;
   watt?: number;
@@ -1101,6 +1102,22 @@ export default function AdminDashboard() {
                     </datalist>
                     <p className="mt-1 text-xs text-gray-500">
                       💡 Select from existing categories or type a new one. Existing: {uniqueCategories.length > 0 ? uniqueCategories.join(', ') : 'None yet'}
+                    </p>
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      value={formData.description || ""}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      placeholder="Enter product description (e.g., 12W LED Bollard Lights made of die-cast aluminum powder-coated with optical lens...)"
+                      rows={3}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      💡 Optional: Add a detailed product description for Excel exports
                     </p>
                   </div>
 
