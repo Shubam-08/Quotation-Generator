@@ -55,13 +55,17 @@ export default function EnhancedCart() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [editingQuantity, setEditingQuantity] = useState<string | null>(null);
-  const [selectedRegion, setSelectedRegion] = useState<'delhi' | 'bangalore'>('delhi'); // For INR currency
+  const [selectedAddress, setSelectedAddress] = useState<'bahrain' | 'uae' | 'bangalore' | 'delhi'>('bahrain');
+  const [discount, setDiscount] = useState(0); // Discount percentage (0-15%)
+  const [showContactPopup, setShowContactPopup] = useState(false);
 
   // Calculate total in selected currency (not base INR price)
-  const total = cart.reduce((sum, item) => {
+  const subtotal = cart.reduce((sum, item) => {
     const convertedPrice = convertPrice(item.price ?? 0);
     return sum + (convertedPrice * (item.quantity ?? 1));
   }, 0);
+  const discountAmount = (subtotal * discount) / 100;
+  const total = subtotal - discountAmount;
   const canDownload = userInfo.email && userInfo.mobile && userInfo.project;
   const totalItems = cart.reduce((sum, item) => sum + (item.quantity ?? 1), 0);
 
@@ -148,10 +152,10 @@ export default function EnhancedCart() {
     const excelCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
     const startRow = addressInfo.lines.length + 6; // Adjusted for new header layout
     
-    // Add column headers
+    // Add column headers (optimized for PDF conversion)
     const headerRow = worksheet.getRow(startRow);
     const columns = [
-      'SI No','Image','Model Number','Description','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
+      'SI No','Image','Model','Description','Watt','Lumen','IP',`Price (${excelCurrency})`,'Qty',`Total (${excelCurrency})`
     ];
     columns.forEach((col, index) => {
       headerRow.getCell(index + 1).value = col;
@@ -165,21 +169,20 @@ export default function EnhancedCart() {
     });
     headerRow.height = 20;
 
-    // Set column widths
-    worksheet.getColumn(1).width = 8;  // SI No
-    worksheet.getColumn(2).width = 15; // Image
-    worksheet.getColumn(3).width = 15; // Model Number
-    worksheet.getColumn(4).width = 30; // Description
-    worksheet.getColumn(5).width = 12; // Category
-    worksheet.getColumn(6).width = 12; // Application
-    worksheet.getColumn(7).width = 15; // Input Voltage
-    worksheet.getColumn(8).width = 8;  // Watt
-    worksheet.getColumn(9).width = 10; // Lumen
-    worksheet.getColumn(10).width = 12; // Beam Angle
-    worksheet.getColumn(11).width = 10; // IP Rating
-    worksheet.getColumn(12).width = 12; // Price
-    worksheet.getColumn(13).width = 10; // Quantity
-    worksheet.getColumn(14).width = 12; // Total
+    // Set column widths (optimized for PDF - fits on one page)
+    worksheet.getColumn(1).width = 6;  // SI No
+    worksheet.getColumn(2).width = 12; // Image
+    worksheet.getColumn(3).width = 18; // Model
+    worksheet.getColumn(4).width = 35; // Description
+    worksheet.getColumn(5).width = 8;  // Watt
+    worksheet.getColumn(6).width = 10; // Lumen
+    worksheet.getColumn(7).width = 8;  // IP
+    worksheet.getColumn(8).width = 12; // Price
+    worksheet.getColumn(9).width = 6;  // Qty
+    worksheet.getColumn(10).width = 12; // Total
+    
+    // Enable text wrapping for description column
+    worksheet.getColumn(4).alignment = { wrapText: true, vertical: 'top' };
 
     // Helper function to get image URL
     const getPrimaryImageUrl = (item: CartItem): string | null => {
@@ -227,25 +230,24 @@ export default function EnhancedCart() {
       
       // Add data
       row.getCell(1).value = i + 1; // SI No
-      row.getCell(3).value = item.sku ?? 'N/A'; // Model Number
-      row.getCell(4).value = item.description || ''; // Description - from product or blank
-      row.getCell(4).alignment = { wrapText: true, vertical: 'top' }; // Enable text wrapping
+      row.getCell(2).value = ''; // Image placeholder
+      row.getCell(3).value = item.sku; // Model
       
-      // Debug: Log description
-      if (i === 0) {
-        console.log('First item description:', item.description);
-        console.log('First item full data:', item);
-      }
-      row.getCell(5).value = item.category ?? '-';
-      row.getCell(6).value = item.application ?? '-';
-      row.getCell(7).value = item.inputVoltage ?? '-';
-      row.getCell(8).value = item.watt ?? '-';
-      row.getCell(9).value = item.lumen ?? '-';
-      row.getCell(10).value = item.beamAngle ?? '-';
-      row.getCell(11).value = item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A';
-      row.getCell(12).value = convertPrice(item.price ?? 0).toFixed(2);
-      row.getCell(13).value = item.quantity ?? 1;
-      row.getCell(14).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2);
+      // Compact description with key specs
+      const specs = [];
+      if (item.category) specs.push(item.category);
+      if (item.application) specs.push(item.application);
+      if (item.inputVoltage) specs.push(item.inputVoltage);
+      if (item.beamAngle) specs.push(`${item.beamAngle}°`);
+      row.getCell(4).value = specs.join(' | ');
+      row.getCell(4).alignment = { wrapText: true, vertical: 'top' };
+      
+      row.getCell(5).value = item.watt ? `${item.watt}W` : '-';
+      row.getCell(6).value = item.lumen ?? '-';
+      row.getCell(7).value = item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A';
+      row.getCell(8).value = convertPrice(item.price ?? 0).toFixed(2);
+      row.getCell(9).value = item.quantity ?? 1;
+      row.getCell(10).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2);
 
       // Add image
       const imageUrl = getPrimaryImageUrl(item);
@@ -260,7 +262,7 @@ export default function EnhancedCart() {
             
             worksheet.addImage(imageId, {
               tl: { col: 1, row: rowIndex - 1 },
-              ext: { width: 80, height: 60 }
+              ext: { width: 70, height: 50 }
             });
           } catch (error) {
             console.error('Error adding image:', error);
@@ -269,14 +271,42 @@ export default function EnhancedCart() {
       }
     }
 
-    // Add total row
+    // Add empty row for spacing
+    const emptyRowIndex = startRow + 1 + cart.length;
+    
+    // Add total row (after empty row)
     const totalAmount = cart.reduce((sum, item) => sum + (convertPrice(item.price ?? 0) * (item.quantity ?? 1)), 0);
-    const totalRowIndex = startRow + 1 + cart.length;
+    const totalRowIndex = emptyRowIndex + 1;
     const totalRow = worksheet.getRow(totalRowIndex);
-    totalRow.getCell(12).value = `Total Amount (${excelCurrency}):`;
-    totalRow.getCell(12).font = { bold: true };
-    totalRow.getCell(13).value = totalAmount.toFixed(2);
-    totalRow.getCell(13).font = { bold: true };
+    
+    // Merge cells for total label
+    worksheet.mergeCells(totalRowIndex, 8, totalRowIndex, 9);
+    totalRow.getCell(8).value = `Total Amount (${excelCurrency}):`;
+    totalRow.getCell(8).font = { bold: true, size: 14 };
+    totalRow.getCell(8).alignment = { horizontal: 'right', vertical: 'middle' };
+    
+    // Total amount value
+    totalRow.getCell(10).value = totalAmount.toFixed(2);
+    totalRow.getCell(10).font = { bold: true, size: 14 };
+    totalRow.getCell(10).alignment = { horizontal: 'center', vertical: 'middle' };
+    totalRow.height = 25;
+    
+    // Set page setup for better PDF conversion
+    worksheet.pageSetup = {
+      paperSize: 9, // A4
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {
+        left: 0.25,
+        right: 0.25,
+        top: 0.5,
+        bottom: 0.5,
+        header: 0.3,
+        footer: 0.3
+      }
+    };
 
     // Generate and download
     const buffer = await workbook.xlsx.writeBuffer();
@@ -292,27 +322,21 @@ export default function EnhancedCart() {
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
-  // Get address based on currency
+  // Get address based on user selection
   const getAddressInfo = () => {
-    const currency = currencyInfo.code;
-    
-    // Dubai Address for AED
-    if (currency === 'AED') {
-      return {
-        lines: [
-          'Qlite Integrated Solutions',
-          'Lighting Store',
-          'Office No. 905, Sobha Ivory 1 Tower,',
-          'Business Bay, Dubai – UAE',
-          'E-mail: sales@qliteglobal.com',
-          'TEL: +973 3330 8969'
-        ]
-      };
-    }
-    
-    // India Addresses for INR
-    if (currency === 'INR') {
-      if (selectedRegion === 'bangalore') {
+    switch (selectedAddress) {
+      case 'uae':
+        return {
+          lines: [
+            'Qlite Integrated Solutions',
+            'Lighting Store',
+            'Office No. 905, Sobha Ivory 1 Tower,',
+            'Business Bay, Dubai – UAE',
+            'E-mail: sales@qliteglobal.com',
+            'TEL: +973 3330 8969'
+          ]
+        };
+      case 'bangalore':
         return {
           lines: [
             'Qlite Electronics Controls Private Limited',
@@ -323,7 +347,7 @@ export default function EnhancedCart() {
             'TEL: +973 3330 8969'
           ]
         };
-      } else {
+      case 'delhi':
         return {
           lines: [
             'Qlite Ltd',
@@ -334,20 +358,19 @@ export default function EnhancedCart() {
             'TEL: +973 3330 8969'
           ]
         };
-      }
+      case 'bahrain':
+      default:
+        return {
+          lines: [
+            'QLITE CO. WLL',
+            'CR No.: 82699-01',
+            'P.O. Box: 1858',
+            'Manama - Kingdom of Bahrain',
+            'TEL: +973 17232503  FAX: +973 17242125',
+            'E-mail: sales@qliteglobal.com'
+          ]
+        };
     }
-    
-    // Default Bahrain Address (for USD, GBP, EUR, QAR, BHD, SAR, OMR)
-    return {
-      lines: [
-        'QLITE CO. WLL',
-        'CR No.: 82699-01',
-        'P.O. Box: 1858',
-        'Manama - Kingdom of Bahrain',
-        'TEL: +973 17232503  FAX: +973 17242125',
-        'E-mail: sales@qliteglobal.com'
-      ]
-    };
   };
 
   const exportPDF = async () => {
@@ -588,10 +611,10 @@ export default function EnhancedCart() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 py-3">
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
+        <div className="mb-3">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
             <div className="flex items-center gap-3 sm:gap-4">
               <Link 
                 href="/products"
@@ -609,20 +632,24 @@ export default function EnhancedCart() {
             <CurrencySelector />
           </div>
 
-          <div className="flex items-center gap-3 mb-2">
-            <ShoppingCart className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-400" />
-            <h1 className={`text-2xl sm:text-3xl md:text-4xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              Shopping Cart
-            </h1>
-            {cart.length > 0 && (
-              <span className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-bold">
-                {totalItems}
-              </span>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ShoppingCart className="w-7 h-7 text-yellow-400" />
+              <div>
+                <h1 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  My Quotations
+                  {cart.length > 0 && (
+                    <span className="ml-2 bg-yellow-400 text-black px-2 py-0.5 rounded-full text-xs font-bold">
+                      {totalItems}
+                    </span>
+                  )}
+                </h1>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Review and generate quotations
+                </p>
+              </div>
+            </div>
           </div>
-          <p className={`text-sm sm:text-base ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            Review your items and generate quotation
-          </p>
         </div>
 
         {cart.length === 0 ? (
@@ -632,10 +659,10 @@ export default function EnhancedCart() {
           }`}>
             <Package className={`w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
             <h2 className={`text-xl sm:text-2xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              Your cart is empty
+              No Products Added Yet
             </h2>
             <p className={`mb-6 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Add products to create your quotation
+              Start by browsing our products and adding items to create your quotation
             </p>
             <Link
               href="/products"
@@ -646,21 +673,47 @@ export default function EnhancedCart() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
             {/* Cart Items - Left Column */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-3">
+              {/* Products Count Header */}
+              <div className={`mb-3 px-4 py-2 rounded-lg flex items-center justify-between ${
+                isDarkMode ? 'bg-gray-900/30 border border-white/5' : 'bg-gray-50 border border-gray-200'
+              }`}>
+                <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {cart.length} Product{cart.length !== 1 ? 's' : ''}
+                </span>
+                <button
+                  onClick={() => {
+                    if (confirm('Remove all products?')) {
+                      clearCart();
+                    }
+                  }}
+                  className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-xs transition-all ${
+                    isDarkMode 
+                      ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30' 
+                      : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
+                  }`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Clear All
+                </button>
+              </div>
+
+              {/* Scrollable Products Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[calc(100vh-220px)] overflow-y-auto pr-1 custom-scrollbar">
               {cart.map((item) => (
                 <div
                   key={item.cartItemId}
-                  className={`rounded-xl p-4 sm:p-6 transition-all ${
+                  className={`rounded-lg p-2.5 transition-all ${
                     isDarkMode 
-                      ? 'bg-gray-900/50 border border-white/10 hover:border-white/20' 
-                      : 'bg-white border border-gray-200 shadow-sm hover:shadow-md'
+                      ? 'bg-gray-900/50 border border-white/10 hover:border-yellow-400/30' 
+                      : 'bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-yellow-400/50'
                   }`}
                 >
-                  <div className="flex gap-4">
+                  <div className="flex flex-col gap-1.5">
                     {/* Product Image */}
-                    <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-lg flex-shrink-0 overflow-hidden ${
+                    <div className={`w-20 h-20 mx-auto rounded-md overflow-hidden ${
                       isDarkMode ? 'bg-gray-800 border border-white/10' : 'bg-gray-100 border border-gray-200'
                     }`}>
                       {(item.productImages?.length || item.images?.length) ? (
@@ -670,89 +723,79 @@ export default function EnhancedCart() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-1">
-                          <Package className={`w-8 h-8 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-                          <span className={`text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>No Image</span>
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className={`w-6 h-6 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
                         </div>
                       )}
                     </div>
 
                     {/* Product Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start gap-2 mb-2">
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start gap-1 mb-1">
                         <div className="flex-1 min-w-0">
-                          <h3 className={`font-bold text-base sm:text-lg mb-1 truncate ${
+                          <h3 className={`font-bold text-xs mb-0.5 truncate ${
                             isDarkMode ? 'text-white' : 'text-gray-900'
                           }`}>
                             {item.sku}
                           </h3>
-                          <p className={`text-sm mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          <p className={`text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                             {item.category}
                           </p>
                         </div>
                         <button
                           onClick={() => removeFromCart(item.cartItemId)}
-                          className={`p-2 rounded-lg transition-all flex-shrink-0 ${
+                          className={`p-1.5 rounded-md transition-all flex-shrink-0 ${
                             isDarkMode 
-                              ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30' 
-                              : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
+                              ? 'hover:bg-red-500/20 text-red-400' 
+                              : 'hover:bg-red-100 text-red-600'
                           }`}
-                          title="Remove item"
+                          title="Remove"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
                       {/* Product Specs */}
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {item.ipRating && item.ipRating !== 'N/A' && (
-                          <span className="inline-block bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-2 py-1 rounded text-xs font-semibold">
-                            IP: {item.ipRating}
-                          </span>
-                        )}
+                      <div className="flex flex-wrap gap-1 mb-1.5">
                         {item.watt && item.watt !== '-' && (
-                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
                             isDarkMode 
-                              ? 'bg-blue-500/10 border border-blue-500/30 text-blue-400' 
-                              : 'bg-blue-50 border border-blue-200 text-blue-700'
+                              ? 'bg-blue-500/10 text-blue-400' 
+                              : 'bg-blue-50 text-blue-700'
                           }`}>
                             {item.watt}W
                           </span>
                         )}
                         {item.lumen && item.lumen !== '-' && (
-                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
                             isDarkMode 
-                              ? 'bg-purple-500/10 border border-purple-500/30 text-purple-400' 
-                              : 'bg-purple-50 border border-purple-200 text-purple-700'
+                              ? 'bg-purple-500/10 text-purple-400' 
+                              : 'bg-purple-50 text-purple-700'
                           }`}>
-                            {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen} lm`}
+                            {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen}lm`}
                           </span>
                         )}
-                        {item.beamAngle && item.beamAngle !== '-' && (
-                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                            isDarkMode 
-                              ? 'bg-green-500/10 border border-green-500/30 text-green-400' 
-                              : 'bg-green-50 border border-green-200 text-green-700'
-                          }`}>
-                            {item.beamAngle}
+                        {item.ipRating && item.ipRating !== 'N/A' && (
+                          <span className="inline-block bg-yellow-400/10 text-yellow-400 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                            {item.ipRating}
                           </span>
                         )}
                       </div>
 
                       {/* Quantity and Price */}
-                      <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                          isDarkMode ? 'bg-black border border-white/20' : 'bg-gray-50 border border-gray-200'
+                      <div className="flex items-center justify-between gap-1.5">
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${
+                          isDarkMode ? 'bg-black/50 border border-white/10' : 'bg-gray-50 border border-gray-200'
                         }`}>
                           <button
                             onClick={() => decreaseQuantity(item.cartItemId)}
-                            className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+                            className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
                               isDarkMode 
-                                ? 'bg-white/10 hover:bg-white/20 text-white' 
-                                : 'bg-white hover:bg-gray-100 text-gray-900 border border-gray-200'
+                                ? 'hover:bg-white/10 text-white' 
+                                : 'hover:bg-gray-200 text-gray-900'
                             }`}
                           >
-                            <Minus className="w-4 h-4" />
+                            <Minus className="w-3 h-3" />
                           </button>
                           <input
                             type="number"
@@ -764,27 +807,27 @@ export default function EnhancedCart() {
                             }}
                             onFocus={() => setEditingQuantity(item.cartItemId)}
                             onBlur={() => setEditingQuantity(null)}
-                            className={`w-16 text-center font-bold text-sm outline-none bg-transparent ${
+                            className={`w-10 text-center font-bold text-xs outline-none bg-transparent ${
                               isDarkMode ? 'text-white' : 'text-gray-900'
                             }`}
                           />
                           <button
                             onClick={() => increaseQuantity(item.cartItemId)}
-                            className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+                            className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
                               isDarkMode 
-                                ? 'bg-white/10 hover:bg-white/20 text-white' 
-                                : 'bg-white hover:bg-gray-100 text-gray-900 border border-gray-200'
+                                ? 'hover:bg-white/10 text-white' 
+                                : 'hover:bg-gray-200 text-gray-900'
                             }`}
                           >
-                            <Plus className="w-4 h-4" />
+                            <Plus className="w-3 h-3" />
                           </button>
                         </div>
 
                         <div className="text-right">
-                          <p className={`text-xs sm:text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          <p className={`text-[10px] ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
                             {formatPrice(item.price ?? 0)} × {item.quantity}
                           </p>
-                          <p className={`text-lg sm:text-xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                          <p className={`text-sm font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
                             {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
                           </p>
                         </div>
@@ -793,65 +836,63 @@ export default function EnhancedCart() {
                   </div>
                 </div>
               ))}
+              </div>
 
               {/* Clear Cart Button - Mobile */}
               <button
                 onClick={() => {
-                  if (confirm('Are you sure you want to clear the cart?')) {
+                  if (confirm('Remove all products?')) {
                     clearCart();
                   }
                 }}
-                className={`w-full lg:hidden flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
+                className={`w-full sm:hidden mt-3 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
                   isDarkMode 
                     ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30' 
                     : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
                 }`}
               >
                 <Trash2 className="w-4 h-4" />
-                Clear Cart
+                Clear All
               </button>
             </div>
 
             {/* Summary - Right Column */}
             <div className="lg:col-span-1">
-              <div className={`rounded-xl p-6 sticky top-6 ${
+              <div className={`rounded-lg p-4 sticky top-6 ${
                 isDarkMode ? 'bg-gray-900/50 border border-white/10' : 'bg-white border border-gray-200 shadow-sm'
               }`}>
-                <h2 className={`text-xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Order Summary
+                <h2 className={`text-lg font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Summary
                 </h2>
 
                 {/* Total */}
-                <div className={`p-4 rounded-lg mb-6 ${
+                <div className={`p-3 rounded-lg mb-4 ${
                   isDarkMode ? 'bg-yellow-400/10 border border-yellow-400/30' : 'bg-yellow-50 border border-yellow-200'
                 }`}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className={`text-sm font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
-                      Total Amount
+                  <div className="flex justify-between items-center">
+                    <span className={`text-xs font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                      Total
                     </span>
-                    <span className={`text-2xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                    <span className={`text-xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
                       {currencyInfo.symbol} {total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    *Current price may vary. Final price on request.
-                  </p>
                 </div>
 
                 {/* Contact Details */}
-                <div className="mb-6">
-                  <h3 className={`text-sm font-bold uppercase tracking-wide mb-4 ${
+                <div className="mb-4">
+                  <h3 className={`text-xs font-bold uppercase tracking-wide mb-3 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
-                    Contact Details
+                    Your Details
                   </h3>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
-                      <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${
+                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
                         isDarkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
-                        <Mail className="w-4 h-4" />
+                        <Mail className="w-3.5 h-3.5" />
                         Email
                       </label>
                       <input
@@ -860,20 +901,20 @@ export default function EnhancedCart() {
                         value={userInfo.email}
                         onChange={handleChange}
                         placeholder="your@email.com"
-                        className={`w-full px-4 py-3 rounded-lg text-sm transition-all outline-none ${
+                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${
+                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
                         isDarkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
-                        <Phone className="w-4 h-4" />
-                        Mobile Number
+                        <Phone className="w-3.5 h-3.5" />
+                        Mobile
                       </label>
                       <input
                         type="tel"
@@ -881,130 +922,104 @@ export default function EnhancedCart() {
                         value={userInfo.mobile}
                         onChange={handleChange}
                         placeholder="+1234567890"
-                        className={`w-full px-4 py-3 rounded-lg text-sm transition-all outline-none ${
+                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${
+                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
                         isDarkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
-                        <Briefcase className="w-4 h-4" />
-                        Project Name
+                        <Briefcase className="w-3.5 h-3.5" />
+                        Project
                       </label>
                       <input
                         type="text"
                         name="project"
                         value={userInfo.project}
                         onChange={handleChange}
-                        placeholder="Enter project name"
-                        className={`w-full px-4 py-3 rounded-lg text-sm transition-all outline-none ${
+                        placeholder="Project name"
+                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
                         }`}
                       />
                     </div>
 
-                    {/* Region Selector for INR Currency */}
-                    {currencyInfo.code === 'INR' && (
-                      <div>
-                        <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>
-                          <Package className="w-4 h-4" />
-                          Select Region
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRegion('delhi')}
-                            className={`px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
-                              selectedRegion === 'delhi'
-                                ? isDarkMode
-                                  ? 'bg-yellow-500 text-black border-2 border-yellow-400'
-                                  : 'bg-yellow-400 text-black border-2 border-yellow-500'
-                                : isDarkMode
-                                  ? 'bg-black border border-white/20 text-gray-300 hover:border-yellow-400'
-                                  : 'bg-white border border-gray-300 text-gray-700 hover:border-yellow-400'
-                            }`}
-                          >
-                            North (Delhi)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRegion('bangalore')}
-                            className={`px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
-                              selectedRegion === 'bangalore'
-                                ? isDarkMode
-                                  ? 'bg-yellow-500 text-black border-2 border-yellow-400'
-                                  : 'bg-yellow-400 text-black border-2 border-yellow-500'
-                                : isDarkMode
-                                  ? 'bg-black border border-white/20 text-gray-300 hover:border-yellow-400'
-                                  : 'bg-white border border-gray-300 text-gray-700 hover:border-yellow-400'
-                            }`}
-                          >
-                            South (Bangalore)
-                          </button>
-                        </div>
-                        <p className={`mt-2 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {selectedRegion === 'delhi' 
-                            ? '📍 Qlite Ltd - Gurgaon, Haryana' 
-                            : '📍 Qlite Electronics Controls Pvt Ltd - Bengaluru, Karnataka'}
-                        </p>
-                      </div>
-                    )}
+                    {/* Address Selector */}
+                    <div>
+                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        <Package className="w-3.5 h-3.5" />
+                        Select Address
+                      </label>
+                      <select
+                        value={selectedAddress}
+                        onChange={(e) => setSelectedAddress(e.target.value as 'bahrain' | 'uae' | 'bangalore' | 'delhi')}
+                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400'
+                        }`}
+                      >
+                        <option value="bahrain">Bahrain</option>
+                        <option value="uae">UAE (Dubai)</option>
+                        <option value="bangalore">India - Bangalore</option>
+                        <option value="delhi">India - Delhi</option>
+                      </select>
+                    </div>
                   </div>
 
                   {showError && (
-                    <div className={`mt-4 p-3 rounded-lg flex items-start gap-2 ${
+                    <div className={`mt-3 p-2 rounded-md flex items-start gap-2 ${
                       isDarkMode 
                         ? 'bg-red-500/10 border border-red-500/30 text-red-400' 
                         : 'bg-red-50 border border-red-200 text-red-700'
                     }`}>
-                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <span className="text-xs">Please fill all details to download quotation.</span>
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span className="text-[10px]">Fill all fields to download</span>
                     </div>
                   )}
                 </div>
 
                 {/* Action Buttons */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <button
                     onClick={exportPDF}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-semibold text-sm transition-all"
                   >
-                    <FileText className="w-5 h-5" />
-                    Export to PDF
+                    <FileText className="w-4 h-4" />
+                    PDF
                   </button>
 
-                  {/* Excel export - Available to all logged-in users */}
                   <button
                     onClick={exportExcel}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-md font-semibold text-sm transition-all"
                   >
-                    <FileSpreadsheet className="w-5 h-5" />
-                    Export to Excel
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Excel
                   </button>
 
                   <button
                     onClick={() => {
-                      if (confirm('Are you sure you want to clear the cart?')) {
+                      if (confirm('Remove all products?')) {
                         clearCart();
                       }
                     }}
-                    className={`hidden lg:flex w-full items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
+                    className={`hidden lg:flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-md font-semibold text-sm transition-all ${
                       isDarkMode 
                         ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30' 
                         : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
                     }`}
                   >
-                    <Trash2 className="w-5 h-5" />
-                    Clear Cart
+                    <Trash2 className="w-4 h-4" />
+                    Clear All
                   </button>
                 </div>
               </div>
