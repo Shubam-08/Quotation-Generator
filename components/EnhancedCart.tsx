@@ -320,22 +320,41 @@ export default function EnhancedCart() {
       // Add data
       row.getCell(1).value = serialNumber; // SI No
       row.getCell(2).value = ''; // Image placeholder
-      row.getCell(3).value = item.sku ?? 'N/A'; // Model Number
-      
-      // Description - show if it's a driver
+      // Model Number
+      row.getCell(3).value = item.isDriver ? `   > ${item.sku ?? 'N/A'}` : (item.sku ?? 'N/A');
+
       if (item.isDriver) {
-        row.getCell(4).value = item.name || item.description || 'Driver';
+        // DRIVER: single merged cell for all specs (Description through IP Rating => columns 4..11)
+        const parts: string[] = [];
+        if (item.wattageRange) {
+          parts.push(`Power: ${item.wattageRange.min}W`);
+        }
+        if (item.outputVoltage) parts.push(`Output: ${item.outputVoltage}`);
+        if ((item as any).outputCurrent) parts.push(`Current: ${(item as any).outputCurrent}`);
+        if (item.inputVoltage) parts.push(`Input: ${item.inputVoltage}`);
+        if ((item as any).ipRating) parts.push(`IP: ${(item as any).ipRating}`);
+        if ((item as any).type) parts.push(`Type: ${(item as any).type}`);
+        const specText = parts.join(' | ');
+
+        // Put all specs into Description column and merge C4..C11
+        row.getCell(4).value = specText;
+        // Clear other cells in 5..11 just in case
+        for (let c = 5; c <= 11; c++) row.getCell(c).value = '';
+        // Merge Description through IP Rating
+        worksheet.mergeCells(rowIndex, 4, rowIndex, 11);
       } else {
+        // LED product: fill normal columns
         row.getCell(4).value = ''; // Description - blank for products
+        row.getCell(5).value = item.category ?? '-'; // Category
+        row.getCell(6).value = item.application ?? '-'; // Application
+        row.getCell(7).value = item.inputVoltage ?? '-'; // Input Voltage
+        row.getCell(8).value = item.watt ? `${item.watt}W` : '-'; // Watt
+        row.getCell(9).value = item.lumen ?? '-'; // Lumen
+        row.getCell(10).value = item.beamAngle ?? '-'; // Beam Angle
+        row.getCell(11).value = item.ipRating && (item.ipRating as any)?.trim ? ((item.ipRating as any).trim() !== '' ? (item.ipRating as any) : 'N/A') : (item.ipRating ?? 'N/A'); // IP Rating
       }
-      
-      row.getCell(5).value = item.category ?? '-'; // Category
-      row.getCell(6).value = item.application ?? '-'; // Application
-      row.getCell(7).value = item.inputVoltage ?? '-'; // Input Voltage
-      row.getCell(8).value = item.watt ? `${item.watt}W` : '-'; // Watt
-      row.getCell(9).value = item.lumen ?? '-'; // Lumen
-      row.getCell(10).value = item.beamAngle ?? '-'; // Beam Angle
-      row.getCell(11).value = item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A'; // IP Rating
+
+      // Common pricing fields
       row.getCell(12).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Price
       row.getCell(13).value = item.quantity ?? 1; // Quantity
       row.getCell(14).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Total
