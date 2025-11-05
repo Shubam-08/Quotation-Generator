@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
   ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet, 
-  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin
+  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -32,16 +32,47 @@ interface Product {
   productImages?: string[];
 }
 
-type CartItem = Product & { quantity: number; name?: string; cartItemId: string };
+interface Driver {
+  _id: string;
+  sku: string;
+  name: string;
+  description?: string;
+  series?: string;
+  price: number;
+  wattageRange?: { min: number; max: number };
+  outputVoltage?: string;
+  outputCurrent?: string;
+  inputVoltage?: string;
+  ipRating?: string;
+  type?: string;
+  category?: string;
+  images?: string[];
+  productImages?: string[];
+}
+
+type CartItem = Product & { 
+  quantity: number; 
+  name?: string; 
+  cartItemId: string;
+  isDriver?: boolean;
+  parentProductId?: string;
+  // Driver-specific fields
+  wattageRange?: { min: number; max: number };
+  outputVoltage?: string;
+  outputCurrent?: string;
+  type?: string;
+  series?: string;
+};
 
 export default function EnhancedCart() {
-  const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity, updateQuantity } = useCart() as {
+  const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity, updateQuantity, addDriverToCart } = useCart() as {
     cart: CartItem[];
     removeFromCart: (id: string) => void;
     clearCart: () => void;
     increaseQuantity: (id: string) => void;
     decreaseQuantity: (id: string) => void;
     updateQuantity: (id: string, quantity: number) => void;
+    addDriverToCart: (driver: Driver, parentProductId: string, quantity?: number) => void;
   };
   const { formatPrice, convertPrice, currencyInfo } = useCurrency();
   const { data: session } = useSession();
@@ -58,6 +89,10 @@ export default function EnhancedCart() {
   const [selectedAddress, setSelectedAddress] = useState<'bahrain' | 'uae' | 'bangalore' | 'delhi'>('bahrain');
   const [discount, setDiscount] = useState(0); // Discount percentage (0-15%)
   const [showContactPopup, setShowContactPopup] = useState(false);
+  const [showDriverModal, setShowDriverModal] = useState(false);
+  const [selectedProductForDriver, setSelectedProductForDriver] = useState<CartItem | null>(null);
+  const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
 
   // Calculate total in selected currency (not base INR price)
   const subtotal = cart.reduce((sum, item) => {
@@ -73,6 +108,43 @@ export default function EnhancedCart() {
     setUserInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
     setShowError(false);
   };
+
+  // Fetch all available drivers for a product
+  const fetchDriversForProduct = async (product: CartItem) => {
+    setLoadingDrivers(true);
+    setSelectedProductForDriver(product);
+    setShowDriverModal(true);
+    
+    try {
+      // Fetch all in-stock drivers without filtering by wattage
+      const response = await fetch(`/api/drivers`);
+      if (!response.ok) throw new Error('Failed to fetch drivers');
+      
+      const drivers = await response.json();
+      setAvailableDrivers(drivers);
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
+      setAvailableDrivers([]);
+    } finally {
+      setLoadingDrivers(false);
+    }
+  };
+
+  const handleAddDriver = (driver: Driver) => {
+    if (selectedProductForDriver) {
+      addDriverToCart(driver, selectedProductForDriver.cartItemId, 1);
+      setShowDriverModal(false);
+    }
+  };
+
+  // Get drivers associated with a product
+  const getDriversForProduct = (productCartItemId: string) => {
+    return cart.filter(item => item.isDriver && item.parentProductId === productCartItemId);
+  };
+
+  // Separate products and standalone drivers
+  const products = cart.filter(item => !item.isDriver);
+  const standaloneDrivers = cart.filter(item => item.isDriver && !item.parentProductId);
 
   // Generate project description from product attributes
   const generateProjectDescription = (item: CartItem): string => {
@@ -220,20 +292,43 @@ export default function EnhancedCart() {
       }
     };
 
-    // Add data rows with images
-    for (let i = 0; i < cart.length; i++) {
-      const item = cart[i];
-      const rowIndex = startRow + 1 + i;
+    // Reorganize cart to group drivers with their parent products
+    const organizedCartExcel: CartItem[] = [];
+    cart.forEach(item => {
+      if (!item.isDriver) {
+        // Add product
+        organizedCartExcel.push(item);
+        // Add its drivers right after
+        const productDrivers = cart.filter(d => d.isDriver && d.parentProductId === item.cartItemId);
+        organizedCartExcel.push(...productDrivers);
+      }
+    });
+    // Add any standalone drivers (without parent)
+    const standaloneDriversExcel = cart.filter(item => item.isDriver && !item.parentProductId);
+    organizedCartExcel.push(...standaloneDriversExcel);
+
+    // Add data rows with images (including drivers)
+    let serialNumber = 1;
+    for (let i = 0; i < organizedCartExcel.length; i++) {
+      const item = organizedCartExcel[i];
+      const rowIndex = startRow + serialNumber;
       const row = worksheet.getRow(rowIndex);
       
       // Set row height for images
       row.height = 60;
       
       // Add data
-      row.getCell(1).value = i + 1; // SI No
+      row.getCell(1).value = serialNumber; // SI No
       row.getCell(2).value = ''; // Image placeholder
       row.getCell(3).value = item.sku ?? 'N/A'; // Model Number
-      row.getCell(4).value = ''; // Description - blank
+      
+      // Description - show if it's a driver
+      if (item.isDriver) {
+        row.getCell(4).value = item.name || item.description || 'Driver';
+      } else {
+        row.getCell(4).value = ''; // Description - blank for products
+      }
+      
       row.getCell(5).value = item.category ?? '-'; // Category
       row.getCell(6).value = item.application ?? '-'; // Application
       row.getCell(7).value = item.inputVoltage ?? '-'; // Input Voltage
@@ -265,10 +360,12 @@ export default function EnhancedCart() {
           }
         }
       }
+      
+      serialNumber++;
     }
 
     // Add empty row for spacing
-    const emptyRowIndex = startRow + 1 + cart.length;
+    const emptyRowIndex = startRow + 1 + organizedCartExcel.length;
     
     // Add total row (after empty row)
     const totalRowIndex = emptyRowIndex + 1;
@@ -438,8 +535,23 @@ export default function EnhancedCart() {
       });
     };
 
+    // Reorganize cart to group drivers with their parent products
+    const organizedCart: CartItem[] = [];
+    cart.forEach(item => {
+      if (!item.isDriver) {
+        // Add product
+        organizedCart.push(item);
+        // Add its drivers right after
+        const productDrivers = cart.filter(d => d.isDriver && d.parentProductId === item.cartItemId);
+        organizedCart.push(...productDrivers);
+      }
+    });
+    // Add any standalone drivers (without parent)
+    const standaloneDrivers = cart.filter(item => item.isDriver && !item.parentProductId);
+    organizedCart.push(...standaloneDrivers);
+
     const imageDataUrls = await Promise.all(
-      cart.map(async (item) => {
+      organizedCart.map(async (item) => {
         const url = getPrimaryImageUrl(item);
         if (!url) return null;
         try { return await toDataUrl(url); } catch { return null; }
@@ -467,14 +579,58 @@ export default function EnhancedCart() {
       })
     );
 
-    const rows = cart.map(item => [
-      '',
-      item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
-      item.watt ?? '-', item.lumen ?? '-', item.beamAngle ?? '-', item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', 
-      convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
-      item.quantity ?? 1, 
-      (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    ]);
+    const rows = organizedCart.map(item => {
+      if (item.isDriver) {
+        // Driver row - all specs in one large merged cell
+        // Build complete driver specification string
+        const driverSpecs = [];
+        if (item.wattageRange) {
+          // Just show the min value as the single wattage
+          driverSpecs.push(`Power: ${item.wattageRange.min}W`);
+        }
+        if (item.outputVoltage) {
+          driverSpecs.push(`Output: ${item.outputVoltage}`);
+        }
+        if (item.outputCurrent) {
+          driverSpecs.push(`Current: ${item.outputCurrent}`);
+        }
+        if (item.inputVoltage) {
+          driverSpecs.push(`Input: ${item.inputVoltage}`);
+        }
+        if (item.ipRating) {
+          driverSpecs.push(`IP: ${item.ipRating}`);
+        }
+        if (item.type) {
+          driverSpecs.push(`Type: ${item.type}`);
+        }
+        const allSpecs = driverSpecs.join(' | ');
+        
+        return [
+          '', // No image for driver
+          `   > ${item.sku ?? 'N/A'}`, // Indented driver SKU
+          { content: allSpecs, colSpan: 7, styles: { halign: 'left' as const } }, // Merged cell with all specs
+          convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          item.quantity ?? 1,
+          (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ];
+      } else {
+        // LED Product row - normal format
+        return [
+          '',
+          item.sku ?? 'N/A',
+          item.category ?? '-',
+          item.application ?? '-',
+          item.inputVoltage ?? '-',
+          item.watt ?? '-',
+          item.lumen ?? '-',
+          item.beamAngle ?? '-',
+          item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A',
+          convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          item.quantity ?? 1,
+          (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ];
+      }
+    });
 
     const cellPadding = { top: 6, right: 2, bottom: 6, left: 2 } as const;
     autoTable(doc, {
@@ -482,21 +638,39 @@ export default function EnhancedCart() {
       body: rows,
       startY: 136,
       styles: { fontSize: 7, cellPadding, fontStyle: 'normal', valign: 'middle' },
-      headStyles: { fillColor: [0, 0, 0], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      headStyles: { fillColor: [0, 70, 255], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [245, 245, 245] },
       margin: { left: 14, right: 14, top: 20 },
       columnStyles: { 0: { cellWidth: 50 } },
       didParseCell: (data: any) => {
         if (data.section === 'body') {
           const idx = data.row.index;
-          const imgInnerH = (rowHeights[idx] || 46);
-          const desired = imgInnerH + cellPadding.top + cellPadding.bottom;
-          data.cell.styles.minCellHeight = Math.max(data.cell.styles.minCellHeight || 0, desired, 52);
+          const item = organizedCart[idx];
+          
+          // For driver rows, use lighter background and smaller height
+          if (item?.isDriver) {
+            data.cell.styles.fillColor = [250, 250, 250]; // Very light gray
+            data.cell.styles.textColor = [60, 60, 60]; // Dark gray text
+            data.cell.styles.fontSize = 6.5;
+            data.cell.styles.minCellHeight = 30; // Smaller height for drivers
+          } else {
+            const imgInnerH = (rowHeights[idx] || 46);
+            const desired = imgInnerH + cellPadding.top + cellPadding.bottom;
+            data.cell.styles.minCellHeight = Math.max(data.cell.styles.minCellHeight || 0, desired, 52);
+          }
         }
       },
       didDrawCell: (data: any) => {
         if (data.section === 'body' && data.column.index === 0) {
           const idx = data.row.index;
+          const item = organizedCart[idx];
+          
+          // Skip image rendering for driver rows
+          if (item?.isDriver) {
+            return;
+          }
+          
+          // For LED products, render image as normal
           const dataUrl = imageDataUrls[idx];
           const innerW = data.cell.width - (cellPadding.left + cellPadding.right);
           const innerH = (data.cell.height || 0) - (cellPadding.top + cellPadding.bottom);
@@ -743,6 +917,11 @@ export default function EnhancedCart() {
 
                       {/* Product Specs */}
                       <div className="flex flex-wrap gap-1 mb-1.5">
+                        {item.inputVoltage && item.inputVoltage !== '-' && (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700">
+                            {item.inputVoltage}
+                          </span>
+                        )}
                         {item.watt && item.watt !== '-' && (
                           <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700">
                             {item.watt}W
@@ -751,6 +930,11 @@ export default function EnhancedCart() {
                         {item.lumen && item.lumen !== '-' && (
                           <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700">
                             {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen}lm`}
+                          </span>
+                        )}
+                        {item.beamAngle && item.beamAngle !== '-' && (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-50 text-orange-700">
+                            {item.beamAngle}
                           </span>
                         )}
                         {item.ipRating && item.ipRating !== 'N/A' && (
@@ -798,6 +982,38 @@ export default function EnhancedCart() {
                           </p>
                         </div>
                       </div>
+
+                      {/* Add Driver Button */}
+                      {!item.isDriver && (
+                        <button
+                          onClick={() => fetchDriversForProduct(item)}
+                          className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all text-xs font-semibold"
+                        >
+                          <Zap className="w-3 h-3" />
+                          Add Driver
+                        </button>
+                      )}
+
+                      {/* Associated Drivers */}
+                      {!item.isDriver && getDriversForProduct(item.cartItemId).length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <p className="text-[10px] font-semibold text-gray-600 mb-1">Drivers:</p>
+                          {getDriversForProduct(item.cartItemId).map((driver) => (
+                            <div key={driver.cartItemId} className="flex items-center justify-between gap-1 mb-1 p-1.5 bg-blue-50 rounded">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-semibold text-blue-900 truncate">{driver.name}</p>
+                                <p className="text-[9px] text-blue-700">Qty: {driver.quantity}</p>
+                              </div>
+                              <button
+                                onClick={() => removeFromCart(driver.cartItemId)}
+                                className="p-1 rounded hover:bg-red-100 text-red-600"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -948,18 +1164,24 @@ export default function EnhancedCart() {
                   <h3 className={`text-xs font-bold uppercase tracking-wide mb-3 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
-                    Apply Discount
+                    💎 Apply Discount
                   </h3>
-                  <div className={`p-3 rounded-lg ${
-                    isDarkMode ? 'bg-gray-800/50 border border-white/10' : 'bg-gray-50 border border-gray-200'
+                  <div className={`p-4 rounded-xl border ${
+                    isDarkMode 
+                      ? 'bg-gradient-to-br from-gray-900 to-gray-800 border-yellow-400/40 shadow-xl shadow-yellow-400/10' 
+                      : 'bg-gradient-to-br from-white to-yellow-50/30 border-yellow-400/50 shadow-xl'
                   }`}>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className={`text-xs font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Discount (0-15%)
+                    <div className="flex items-center justify-between mb-4">
+                      <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Discount Rate
                       </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <div className={`px-4 py-1.5 rounded-lg font-bold text-lg transition-all ${
+                        isDarkMode 
+                          ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50 shadow-lg shadow-yellow-400/20' 
+                          : 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white border border-yellow-500 shadow-lg'
+                      }`}>
                         {discount}%
-                      </span>
+                      </div>
                     </div>
                     
                     <input
@@ -969,33 +1191,39 @@ export default function EnhancedCart() {
                       step="1"
                       value={discount}
                       onChange={(e) => setDiscount(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400"
+                      className="w-full h-2.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-yellow-500 transition-all"
                     />
-                    <div className="flex justify-between mt-1 mb-3">
-                      <span className={`text-[10px] ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>0%</span>
-                      <span className={`text-[10px] ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>15%</span>
+                    <div className="flex justify-between mt-2 mb-4">
+                      <span className={`text-xs font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>0%</span>
+                      <span className={`text-xs font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-orange-600'}`}>15% Max</span>
                     </div>
                     
                     {discount > 0 && (
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Savings:
-                        </span>
-                        <span className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                          -{currencyInfo.symbol} {discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
+                      <div className={`p-3 rounded-lg mb-3 border-l-4 transition-all ${
+                        isDarkMode 
+                          ? 'bg-green-500/10 border-green-400 shadow-md shadow-green-400/10' 
+                          : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500 shadow-md'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`text-sm font-semibold ${isDarkMode ? 'text-green-300' : 'text-green-700'}`}>
+                            ✨ Total Savings
+                          </span>
+                          <span className={`text-lg font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                            -{currencyInfo.symbol} {discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
                     )}
                     
                     <button
                       onClick={() => setShowContactPopup(true)}
-                      className={`w-full py-2.5 px-4 rounded-md font-bold text-xs transition-all border-2 ${
+                      className={`w-full py-2.5 px-4 rounded-lg font-bold text-sm transition-all border-2 ${
                         isDarkMode 
-                          ? 'bg-white text-black border-white hover:bg-gray-100' 
-                          : 'bg-black text-white border-black hover:bg-gray-800'
+                          ? 'bg-white text-black border-white hover:bg-gray-100 hover:shadow-lg' 
+                          : 'bg-black text-white border-black hover:bg-gray-800 hover:shadow-xl'
                       }`}
                     >
-                     Need a personalized quote? Contact our team
+                      Request Custom Quotation
                     </button>
                   </div>
 
@@ -1150,6 +1378,179 @@ export default function EnhancedCart() {
               </p>
             </div>
           </div>
+          </div>
+        </div>
+      )}
+
+      {/* Driver Selection Modal */}
+      {showDriverModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`max-w-5xl w-full rounded-xl max-h-[85vh] overflow-hidden ${
+            isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-lg'
+          }`}>
+            {/* Header - Sticky */}
+            <div className={`sticky top-0 z-10 p-4 border-b ${
+              isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-white'
+            }`}>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <Zap className="w-5 h-5 text-blue-500" />
+                    Select Driver for {selectedProductForDriver?.sku}
+                    {selectedProductForDriver?.watt && (
+                      <span className="text-blue-500">
+                        ({selectedProductForDriver.watt}W)
+                      </span>
+                    )}
+                  </h3>
+                  <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {availableDrivers.length} driver{availableDrivers.length !== 1 ? 's' : ''} available
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDriverModal(false)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="p-4 overflow-y-auto max-h-[calc(85vh-80px)]">
+              {loadingDrivers ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className={`w-12 h-12 border-4 rounded-full animate-spin mb-4 ${
+                    isDarkMode ? 'border-white/10 border-t-blue-500' : 'border-gray-200 border-t-blue-500'
+                  }`}></div>
+                  <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading compatible drivers...</p>
+                </div>
+              ) : availableDrivers.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                  <p className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    No drivers available
+                  </p>
+                  <p className={`mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    No drivers have been added to the system yet
+                  </p>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                    Add drivers in the admin panel to make them available
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {availableDrivers.map((driver) => (
+                    <div
+                      key={driver._id}
+                      className={`p-3 rounded-lg border transition-all cursor-pointer ${
+                        isDarkMode 
+                          ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800' 
+                          : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
+                      }`}
+                      onClick={() => handleAddDriver(driver)}
+                    >
+                      {/* Header with Name and Price */}
+                      <div className="flex items-start justify-between mb-2 pb-2 border-b border-gray-200/30">
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`font-bold text-sm mb-0.5 truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {driver.name}
+                          </h4>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {driver.sku}
+                          </p>
+                        </div>
+                        <div className="text-right ml-2">
+                          <p className="text-base font-bold text-blue-600 whitespace-nowrap">
+                            {formatPrice(driver.price)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Compact Specifications */}
+                      <div className="space-y-1 mb-2">
+                        {driver.wattageRange && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Power:</span>
+                            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {driver.wattageRange.min}-{driver.wattageRange.max}W
+                            </span>
+                          </div>
+                        )}
+                        
+                        {driver.outputVoltage && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Output:</span>
+                            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {driver.outputVoltage}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {driver.outputCurrent && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Current:</span>
+                            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {driver.outputCurrent}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {driver.inputVoltage && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Input:</span>
+                            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {driver.inputVoltage}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {driver.ipRating && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>IP Rating:</span>
+                            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {driver.ipRating}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {driver.type && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Type:</span>
+                            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {driver.type}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {driver.series && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Series:</span>
+                            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {driver.series}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Add Button - Compact */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddDriver(driver);
+                        }}
+                        className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

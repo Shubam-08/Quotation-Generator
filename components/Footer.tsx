@@ -88,41 +88,51 @@ export default function Footer() {
           </div>
 
           {/* Contact Info */}
-          <div>
-            <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
-              <Phone className="w-5 h-5 text-yellow-400" />
-              Contact Us
-            </h3>
-            <ul className="space-y-3">
-              <li>
-                <a 
-                  href="mailto:sales@qliteglobal.com" 
-                  className="text-gray-400 hover:text-yellow-400 transition-colors text-sm flex items-start gap-2 group"
-                >
-                  <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span className="break-all">sales@qliteglobal.com</span>
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="tel:+97333308969" 
-                  className="text-gray-400 hover:text-yellow-400 transition-colors text-sm flex items-start gap-2 group"
-                >
-                  <Phone className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>+973 3330 8969</span>
-                </a>
-              </li>
-              <li className="text-gray-400 text-sm flex items-start gap-2">
-                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-yellow-400" />
-                <span className="leading-relaxed">
-                  Qlite Electronics Controls Private Limited<br />
-                  First Floor, Block -2, KSSIDC Complex, A-203,<br />
-                  Indra Nagar, Electronic City Phase I,<br />
-                  Electronic City, Bengaluru, Karnataka 560100
-                </span>
-              </li>
-            </ul>
-          </div>
+<div>
+  <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+    <Phone className="w-5 h-5 text-yellow-400" />
+    Contact Us
+  </h3>
+
+  <ul className="space-y-6">
+
+    {/* India Contact */}
+    <li>
+      <h4 className="text-yellow-400 font-semibold text-sm mb-2">India Office</h4>
+      <a 
+        href="mailto:revant@qliteglobal.com" 
+        className="text-gray-400 hover:text-yellow-400 transition-colors text-sm flex items-start gap-2 group"
+      >
+        <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
+        <span className="break-all">ankit.mittal@qliteglobal.com</span>
+      </a>
+
+      <p className="text-gray-400 text-sm mt-2 flex items-start gap-2">
+        <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-yellow-400" />
+        <span className="leading-relaxed">
+          Qlite Electronics Controls Private Limited<br />
+          First Floor, Block -2, KSSIDC Complex, A-203,<br />
+          Indra Nagar, Electronic City Phase I,<br />
+          Electronic City, Bengaluru, Karnataka 560100
+        </span>
+      </p>
+    </li>
+
+    {/* Gulf Contact */}
+    <li>
+      <h4 className="text-yellow-400 font-semibold text-sm mb-2">Gulf Office</h4>
+      <a 
+        href="mailto:ankit.mittal@qliteglobal.com" 
+        className="text-gray-400 hover:text-yellow-400 transition-colors text-sm flex items-start gap-2 group"
+      >
+        <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
+        <span className="break-all">revant@qliteglobal.com</span>
+      </a>
+    </li>
+
+  </ul>
+</div>
+
 
           {/* Support & Resources */}
           <div>

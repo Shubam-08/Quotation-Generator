@@ -23,9 +23,36 @@ type Product = {
   productImages?: string[];
 };
 
+type Driver = {
+  _id: string;
+  sku: string;
+  name: string;
+  description?: string;
+  series?: string;
+  price: number;
+  wattageRange?: { min: number; max: number };
+  outputVoltage?: string;
+  outputCurrent?: string;
+  inputVoltage?: string;
+  ipRating?: string;
+  type?: string;
+  category?: string;
+  images?: string[];
+  productImages?: string[];
+};
+
+type CartItem = (Product | Driver) & {
+  quantity: number;
+  name: string;
+  cartItemId: string;
+  isDriver?: boolean;
+  parentProductId?: string; // For drivers, links to the product they're associated with
+};
+
 type CartContextType = {
-  cart: (Product & { quantity: number; name: string; cartItemId: string })[];
+  cart: CartItem[];
   addToCart: (product: Product, quantity?: number) => void;
+  addDriverToCart: (driver: Driver, parentProductId: string, quantity?: number) => void;
   removeFromCart: (cartItemId: string) => void;
   increaseQuantity: (cartItemId: string) => void;
   decreaseQuantity: (cartItemId: string) => void;
@@ -36,7 +63,7 @@ type CartContextType = {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
-  const [cart, setCart] = useState<(Product & { quantity: number; name: string; cartItemId: string })[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const { showToast } = useToast();
 
   // Load cart from localStorage on mount
@@ -115,6 +142,48 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     showToast(`${product.sku}${ipRatingText}${beamAngleText}${lumenText} added to your list`, 'success');
   };
 
+  const addDriverToCart = (driver: Driver, parentProductId: string, quantity: number = 1) => {
+    // Create unique cart item ID for driver
+    const cartItemId = `driver_${driver._id}_${parentProductId}_${Date.now()}`;
+    
+    // Check if this driver is already added for this product
+    const exists = cart.find(
+      item => item.isDriver && item._id === driver._id && item.parentProductId === parentProductId
+    );
+    
+    if (exists) {
+      showToast(`${driver.name} is already added for this product`, 'info');
+      return;
+    }
+
+    const validQuantity = Math.max(1, Math.floor(quantity));
+
+    const cartItem: CartItem = {
+      _id: driver._id,
+      sku: driver.sku,
+      name: driver.name,
+      description: driver.description || '',
+      price: driver.price ?? 0,
+      category: driver.category || 'Driver',
+      images: driver.images || [],
+      productImages: driver.productImages || [],
+      quantity: validQuantity,
+      cartItemId: cartItemId,
+      isDriver: true,
+      parentProductId: parentProductId,
+      wattageRange: driver.wattageRange,
+      outputVoltage: driver.outputVoltage,
+      outputCurrent: driver.outputCurrent,
+      inputVoltage: driver.inputVoltage,
+      ipRating: driver.ipRating,
+      type: driver.type,
+      series: driver.series
+    } as any;
+
+    setCart(prev => [...prev, cartItem]);
+    showToast(`${driver.name} added to your list`, 'success');
+  };
+
   const removeFromCart = (cartItemId: string) => {
     setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
   };
@@ -146,7 +215,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, removeFromCart, increaseQuantity, decreaseQuantity, updateQuantity, clearCart }}
+      value={{ cart, addToCart, addDriverToCart, removeFromCart, increaseQuantity, decreaseQuantity, updateQuantity, clearCart }}
     >
       {children}
     </CartContext.Provider>

@@ -2,10 +2,9 @@
 
 import React from 'react';
 import { useCurrency } from '@/context/CurrencyContext';
-import { DollarSign } from 'lucide-react';
 
 export default function CurrencySelector() {
-  const { currency, setCurrency, getAllCurrencies } = useCurrency();
+  const { currency, setCurrency, getAllCurrencies, currencyInfo } = useCurrency();
   const currencies = getAllCurrencies();
 
   return (
@@ -21,7 +20,9 @@ export default function CurrencySelector() {
         boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
       }}
     >
-      <DollarSign size={18} color="#64748b" />
+      <span style={{ fontSize: '1.125rem', color: '#64748b' }}>
+        {currencyInfo.symbol}
+      </span>
       <select
         value={currency}
         onChange={(e) => setCurrency(e.target.value as any)}
@@ -38,7 +39,7 @@ export default function CurrencySelector() {
       >
         {currencies.map((curr) => (
           <option key={curr.code} value={curr.code}>
-            {curr.code} - {curr.name}
+            {curr.symbol} {curr.code}
           </option>
         ))}
       </select>
