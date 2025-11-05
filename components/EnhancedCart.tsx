@@ -137,6 +137,30 @@ export default function EnhancedCart() {
     }
   };
 
+  // Helper function to extract numeric IP rating from string (e.g., "IP67" -> 67)
+  const getNumericIPRating = (ipRating: string | undefined): number => {
+    if (!ipRating) return 0;
+    const match = ipRating.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+  };
+
+  // Categorize drivers by IP rating
+  const categorizeDrivers = () => {
+    const indoor: Driver[] = [];
+    const outdoor: Driver[] = [];
+    
+    availableDrivers.forEach(driver => {
+      const ipValue = getNumericIPRating(driver.ipRating);
+      if (ipValue <= 64) {
+        indoor.push(driver);
+      } else {
+        outdoor.push(driver);
+      }
+    });
+    
+    return { indoor, outdoor };
+  };
+
   // Get drivers associated with a product
   const getDriversForProduct = (productCartItemId: string) => {
     return cart.filter(item => item.isDriver && item.parentProductId === productCartItemId);
@@ -1372,7 +1396,7 @@ export default function EnhancedCart() {
                   </div>
 
                   {/* Delhi */}
-                  <div className={`p-4 rounded-lg border ${
+                   <div className={`p-4 rounded-lg border ${
                     isDarkMode ? 'bg-gray-800/50 border-white/10' : 'bg-gray-50 border-gray-200'
                   }`}>
                     <div className={`text-xs font-semibold mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -1380,9 +1404,9 @@ export default function EnhancedCart() {
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Mail className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                      <span className={`${isDarkMode ? 'text-gray-500 italic' : 'text-gray-400 italic'}`}>
-                        Contact information coming soon
-                      </span>
+                      <a href="mailto:revant@qliteglobal.com" className={`hover:text-yellow-400 transition-colors ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        ankit.mittal@qliteglobal.com
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -1460,8 +1484,38 @@ export default function EnhancedCart() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {availableDrivers.map((driver) => (
+                <div>
+                  {(() => {
+                    const { indoor, outdoor } = categorizeDrivers();
+                    
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Indoor Drivers Section */}
+                        {indoor.length > 0 && (
+                          <div className={`rounded-lg border p-4 ${
+                            isDarkMode ? 'bg-gray-800/30 border-white/10' : 'bg-gray-50 border-gray-200'
+                          }`}>
+                            <div className={`flex items-center gap-2 mb-3 pb-2 border-b ${
+                              isDarkMode ? 'border-white/10' : 'border-gray-200'
+                            }`}>
+                              <div className={`p-1.5 rounded-lg ${
+                                isDarkMode ? 'bg-blue-500/10' : 'bg-blue-50'
+                              }`}>
+                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h4 className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  Indoor Drivers
+                                </h4>
+                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  IP Rating ≤ 64 ({indoor.length} driver{indoor.length !== 1 ? 's' : ''})
+                                </p>
+                              </div>
+                            </div>
+                            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                              {indoor.map((driver) => (
                     <div
                       key={driver._id}
                       className={`p-3 rounded-lg border transition-all cursor-pointer ${
@@ -1566,7 +1620,148 @@ export default function EnhancedCart() {
                         Add
                       </button>
                     </div>
-                  ))}
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Outdoor Drivers Section */}
+                        {outdoor.length > 0 && (
+                          <div className={`rounded-lg border p-4 ${
+                            isDarkMode ? 'bg-gray-800/30 border-white/10' : 'bg-gray-50 border-gray-200'
+                          }`}>
+                            <div className={`flex items-center gap-2 mb-3 pb-2 border-b ${
+                              isDarkMode ? 'border-white/10' : 'border-gray-200'
+                            }`}>
+                              <div className={`p-1.5 rounded-lg ${
+                                isDarkMode ? 'bg-green-500/10' : 'bg-green-50'
+                              }`}>
+                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h4 className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  Outdoor Drivers
+                                </h4>
+                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  IP Rating ≥ 65 ({outdoor.length} driver{outdoor.length !== 1 ? 's' : ''})
+                                </p>
+                              </div>
+                            </div>
+                            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                              {outdoor.map((driver) => (
+                                <div
+                                  key={driver._id}
+                                  className={`p-3 rounded-lg border transition-all cursor-pointer ${
+                                    isDarkMode 
+                                      ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800' 
+                                      : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
+                                  }`}
+                                  onClick={() => handleAddDriver(driver)}
+                                >
+                                  {/* Header with Name and Price */}
+                                  <div className="flex items-start justify-between mb-2 pb-2 border-b border-gray-200/30">
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className={`font-bold text-sm mb-0.5 truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                        {driver.name}
+                                      </h4>
+                                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        {driver.sku}
+                                      </p>
+                                    </div>
+                                    <div className="text-right ml-2">
+                                      <p className="text-base font-bold text-blue-600 whitespace-nowrap">
+                                        {formatPrice(driver.price)}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Compact Specifications */}
+                                  <div className="space-y-1 mb-2">
+                                    {driver.wattageRange && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Power:</span>
+                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {driver.wattageRange.min}-{driver.wattageRange.max}W
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {driver.outputVoltage && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Output:</span>
+                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {driver.outputVoltage}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {driver.outputCurrent && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Current:</span>
+                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {driver.outputCurrent}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {driver.inputVoltage && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Input:</span>
+                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {driver.inputVoltage}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {driver.ipRating && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>IP Rating:</span>
+                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {driver.ipRating}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {driver.type && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Type:</span>
+                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {driver.type}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {driver.series && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Series:</span>
+                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {driver.series}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Add Button - Compact */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddDriver(driver);
+                                    }}
+                                    className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Add
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
