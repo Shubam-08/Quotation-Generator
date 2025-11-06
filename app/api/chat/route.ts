@@ -544,17 +544,21 @@ export async function POST(req: NextRequest) {
     });
     
     // Apply price filter AFTER processing (since real prices are in ipRatings/voltageVariants)
-    if (parsedQuery.minPrice && parsedQuery.maxPrice) {
+    if (parsedQuery.minPrice !== null && parsedQuery.maxPrice !== null) {
+      const minPrice = parsedQuery.minPrice;
+      const maxPrice = parsedQuery.maxPrice;
       processedProducts = processedProducts.filter((p: any) => 
-        p.price >= parsedQuery.minPrice && p.price <= parsedQuery.maxPrice
+        p.price >= minPrice && p.price <= maxPrice
       );
-    } else if (parsedQuery.maxPrice) {
+    } else if (parsedQuery.maxPrice !== null) {
+      const maxPrice = parsedQuery.maxPrice;
       processedProducts = processedProducts.filter((p: any) => 
-        p.price <= parsedQuery.maxPrice
+        p.price <= maxPrice
       );
-    } else if (parsedQuery.minPrice) {
+    } else if (parsedQuery.minPrice !== null) {
+      const minPrice = parsedQuery.minPrice;
       processedProducts = processedProducts.filter((p: any) => 
-        p.price >= parsedQuery.minPrice
+        p.price >= minPrice
       );
     }
     
