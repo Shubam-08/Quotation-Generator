@@ -5,7 +5,7 @@ import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import CurrencySelector from '@/components/CurrencySelector';
 import CurrencyInfo from '@/components/CurrencyInfo';
-import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Sparkles, Sun, Moon, FileText, Download, File, Award, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Sparkles, Sun, Moon, FileText, Download, File, Award, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
 import CartButton from '@/components/CartButton';
 import { getApplicationFromIpRating } from '@/lib/ipRatingUtils';
 
@@ -74,7 +74,7 @@ const lumenRanges = [
 ];
 
 export default function ProductsPage() {
-  const { addToCart, cart } = useCart();
+  const { addToCart, cart, increaseQuantity, decreaseQuantity, removeFromCart } = useCart();
   const { formatPrice } = useCurrency();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -894,39 +894,76 @@ export default function ProductsPage() {
                             )}
                           </td>
                           <td className="px-4 py-4">
-                            <button 
-                              onClick={() => {
-                                if (!isInCart && addingProductId !== cartItemId) {
-                                  setAddingProductId(cartItemId);
-                                  // Get selected beam angle if multiple exist
-                                  const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
-                                  const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
-                                  
-                                  const productToAdd = {
-                                    ...p,
-                                    ipRating: currentIpRating,
-                                    inputVoltage: currentVoltage !== 'default' ? currentVoltage : p.inputVoltage,
-                                    watt: currentWatt !== 'default' ? currentWatt : p.watt,
-                                    beamAngle: selectedBeamAngle,
-                                    lumen: currentLumen,
-                                    price: currentPrice
-                                  };
-                                  addToCart(productToAdd);
-                                  setTimeout(() => setAddingProductId(null), 500);
-                                }
-                              }}
-                              disabled={isInCart || addingProductId === cartItemId}
-                              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                                isInCart 
-                                  ? 'bg-green-600 text-white cursor-not-allowed' 
-                                  : addingProductId === cartItemId
+                            {isInCart ? (
+                              // Show increment/decrement controls when item is in cart
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => {
+                                    const currentQuantity = cart.find(item => item.cartItemId === cartItemId)?.quantity || 0;
+                                    if (currentQuantity <= 1) {
+                                      removeFromCart(cartItemId);
+                                    } else {
+                                      decreaseQuantity(cartItemId);
+                                    }
+                                  }}
+                                  className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
+                                    isDarkMode 
+                                      ? 'bg-gray-800 hover:bg-gray-700 text-white border border-white/20' 
+                                      : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
+                                  }`}
+                                >
+                                  <Minus size={16} />
+                                </button>
+                                <span className={`min-w-[40px] text-center font-bold text-sm ${
+                                  isDarkMode ? 'text-white' : 'text-gray-900'
+                                }`}>
+                                  {cart.find(item => item.cartItemId === cartItemId)?.quantity || 0}
+                                </span>
+                                <button 
+                                  onClick={() => increaseQuantity(cartItemId)}
+                                  className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
+                                    isDarkMode 
+                                      ? 'bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-400 border border-yellow-400/30' 
+                                      : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border border-yellow-300'
+                                  }`}
+                                >
+                                  <Plus size={16} />
+                                </button>
+                              </div>
+                            ) : (
+                              // Show Add to Cart button when item is not in cart
+                              <button 
+                                onClick={() => {
+                                  if (addingProductId !== cartItemId) {
+                                    setAddingProductId(cartItemId);
+                                    // Get selected beam angle if multiple exist
+                                    const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
+                                    const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
+                                    
+                                    const productToAdd = {
+                                      ...p,
+                                      ipRating: currentIpRating,
+                                      inputVoltage: currentVoltage !== 'default' ? currentVoltage : p.inputVoltage,
+                                      watt: currentWatt !== 'default' ? currentWatt : p.watt,
+                                      beamAngle: selectedBeamAngle,
+                                      lumen: currentLumen,
+                                      price: currentPrice
+                                    };
+                                    addToCart(productToAdd);
+                                    setTimeout(() => setAddingProductId(null), 500);
+                                  }
+                                }}
+                                disabled={addingProductId === cartItemId}
+                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                  addingProductId === cartItemId
                                   ? 'bg-blue-500 text-white cursor-wait'
                                   : 'bg-yellow-400 hover:bg-yellow-500 text-black hover:scale-105'
-                              }`}
-                            >
-                              <ShoppingCart className="w-4 h-4" />
-                              {isInCart ? 'In Cart' : addingProductId === cartItemId ? 'Adding...' : 'Add to Cart'}
-                            </button>
+                                }`}
+                              >
+                                <ShoppingCart className="w-4 h-4" />
+                                {addingProductId === cartItemId ? 'Adding...' : 'Add to Cart'}
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );

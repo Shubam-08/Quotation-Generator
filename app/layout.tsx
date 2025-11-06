@@ -5,6 +5,7 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import ProductChatbot from "@/components/ProductChatbot";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +38,8 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <ProductChatbot /> 
+          {/* <ProductChatbot /> */}
         </Providers>
       </body>
     </html>
