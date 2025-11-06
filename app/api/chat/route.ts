@@ -50,7 +50,12 @@ function parseUserQuery(message: string) {
   
   // Extract requested number of results
   const limitMatch = lowerMessage.match(/(?:show|give|find|get)\s+(?:me\s+)?(\d+)\s+(?:products?|items?|results?)/i);
-  const requestedLimit = limitMatch ? parseInt(limitMatch[1]) : null;
+  let requestedLimit = limitMatch ? parseInt(limitMatch[1]) : null;
+  
+  // Check for "all" keyword
+  if (lowerMessage.match(/\ball\b|\bevery\b/i) && !requestedLimit) {
+    requestedLimit = 50; // Show up to 50 when "all" is requested
+  }
   
   // Extract price range (USD only)
   // Check for range first (e.g., "$50-$150", "50 to 100", "between 50 and 100", "between the 50 to 100")
@@ -105,11 +110,23 @@ function parseUserQuery(message: string) {
   const voltageMatch = lowerMessage.match(/(\d+)\s*v(?:olt)?/i);
   const voltage = voltageMatch ? voltageMatch[1] : null;
   
-  // Extract category keywords
+  // Extract category keywords - comprehensive list matching database categories
+  // Note: 'outdoor' and 'indoor' are handled separately as application filters, not categories
   const categoryKeywords = [
-    'downlight', 'track', 'spotlight', 'panel', 'strip', 'bulb', 
-    'tube', 'flood', 'wall', 'ceiling', 'pendant', 'linear',
-    'cob', 'led', 'driver'
+    'downlight', 'down light', 'track', 'tracklight', 'spotlight', 'spot light', 'panel', 'strip', 'bulb', 
+    'tube', 'flood', 'floodlight', 'wall', 'ceiling', 'pendant', 'linear',
+    'cob', 'led', 'driver', 'underwater', 'under water', 'rgb', 'recessed',
+    'surface', 'mounted', 'hanging', 'chandelier', 'sconce', 'lamp',
+    'garden', 'landscape', 'street', 'streetlight', 'decorative', 'high bay', 'low bay', 'bay',
+    'bollard', 'bollards', 'pole', 'post', 'path', 'pathway',
+    'step', 'stair', 'deck', 'well', 'inground', 'in-ground',
+    'facade', 'wall washer', 'wallwasher', 'graze', 'grazing',
+    'canopy', 'soffit', 'cove', 'profile', 'extrusion',
+    'neon', 'flex', 'flexible', 'rope', 'tape',
+    'puck', 'cabinet', 'under cabinet', 'task',
+    'troffer', 'grid', 'drop ceiling', 'suspended',
+    'emergency', 'exit', 'sign', 'indicator',
+    'smart', 'dimmer', 'controller', 'sensor', 'bulkhead', 'projector', 'industrial'
   ];
   
   const detectedCategories = categoryKeywords.filter(keyword => 
@@ -117,7 +134,7 @@ function parseUserQuery(message: string) {
   );
   
   // Extract general search terms (remove common words)
-  const stopWords = ['show', 'me', 'find', 'need', 'want', 'looking', 'for', 'the', 'a', 'an', 'with', 'in', 'under', 'below', 'above'];
+  const stopWords = ['show', 'me', 'find', 'need', 'want', 'looking', 'for', 'the', 'a', 'an', 'with', 'in', 'under', 'below', 'above', 'ok', 'okay', 'give', 'get', 'some', 'any', 'light', 'lights'];
   const words = lowerMessage.split(/\s+/).filter(word => 
     word.length > 2 && !stopWords.includes(word) && !word.match(/^\d+$/)
   );
@@ -171,13 +188,15 @@ function buildQuery(parsedQuery: any) {
     );
   }
   
-  // Category search
+  // Category search - prioritize category fields over SKU
   if (parsedQuery.categories.length > 0) {
     const categoryRegex = parsedQuery.categories.join('|');
+    // Search in category fields first, then SKU and description
     orConditions.push(
       { category: { $regex: categoryRegex, $options: 'i' } },
       { categoryFilter: { $regex: categoryRegex, $options: 'i' } },
-      { sku: { $regex: categoryRegex, $options: 'i' } }
+      { sku: { $regex: categoryRegex, $options: 'i' } },
+      { description: { $regex: categoryRegex, $options: 'i' } }
     );
   }
   
@@ -266,7 +285,7 @@ export async function POST(req: NextRequest) {
     }
     if (lastAssistantMessage) {
       // Extract product categories mentioned
-      const categoryMatches = lastAssistantMessage.match(/underwater|downlight|track|panel|strip|flood|spotlight|bulb|tube/gi);
+      const categoryMatches = lastAssistantMessage.match(/underwater|downlight|track|panel|strip|flood|spotlight|bulb|tube|linear|bollard|rgb|recessed|surface|pendant|chandelier|wall|ceiling|high bay|low bay/gi);
       if (categoryMatches) {
         contextKeywords.push(...categoryMatches.map((m: string) => m.toLowerCase()));
       }
@@ -333,6 +352,31 @@ export async function POST(req: NextRequest) {
     
     // Detect query type
     const queryType = detectQueryType(message);
+    
+    // Handle "categories" request or vague queries - ask for category selection
+    if (lowerMessage === 'categories' || lowerMessage === 'category' || lowerMessage === 'show categories') {
+      // Get all unique categories from database
+      const categories = await Product.distinct('categoryFilter');
+      const categoryList = categories.filter((c: string) => c).sort().join('\n• ');
+      
+      return NextResponse.json({
+        message: `Here are all our product categories:\n\n• ${categoryList}\n\nWhich one would you like to explore? Just type the category name!`,
+        products: []
+      });
+    }
+    
+    const vagueLightQueries = /^(lights?|products?|show|find|search|i want|give me|looking for)$/i;
+    if (vagueLightQueries.test(lowerMessage.trim())) {
+      
+      // Get all unique categories from database
+      const categories = await Product.distinct('categoryFilter');
+      const categoryList = categories.filter((c: string) => c).sort().slice(0, 15).join('\n• ');
+      
+      return NextResponse.json({
+        message: `I'd be happy to help you find the perfect lighting! 🔦\n\nWhich category are you interested in?\n\n• ${categoryList}\n\n...and more! Type "categories" to see all, or just tell me what you need!`,
+        products: []
+      });
+    }
     
     // Handle analytical queries
     if (queryType === 'average_price') {
@@ -469,16 +513,18 @@ export async function POST(req: NextRequest) {
     let searchMessage = message;
     
     // If message is very short and we have context, combine them
-    if (message.split(/\s+/).length <= 3 && contextKeywords.length > 0) {
-      // Check if message contains price info
-      const hasPrice = message.match(/\d+|\$|price|budget|cheap|expensive/i);
-      if (hasPrice) {
-        // Keep price context, add category from history
-        const categoryFromContext = contextKeywords.find(k => 
-          ['underwater', 'downlight', 'track', 'panel', 'strip', 'flood', 'spotlight', 'bulb', 'tube'].includes(k)
+    if (message.split(/\s+/).length <= 5 && contextKeywords.length > 0) {
+      // Check if message contains price, wattage, IP rating, or application filters
+      const hasFilter = message.match(/\d+|\$|price|budget|cheap|expensive|under|over|between|ip\d+|watt|indoor|outdoor/i);
+      if (hasFilter) {
+        // Keep filter context, add category from history
+        const categoryFromContext = contextKeywords.find((k: string) => 
+          ['underwater', 'downlight', 'track', 'panel', 'strip', 'flood', 'spotlight', 'bulb', 'tube', 
+           'linear', 'bollard', 'rgb', 'recessed', 'surface', 'pendant', 'chandelier', 'wall', 'ceiling'].includes(k)
         );
         if (categoryFromContext) {
           searchMessage = `${categoryFromContext} ${message}`;
+          console.log('Combined search:', searchMessage); // Debug log
         }
       }
     }
@@ -496,15 +542,16 @@ export async function POST(req: NextRequest) {
     }
     
     // Query database
-    // Get more products since we'll filter by price after processing
+    // Get more products since we'll filter by price after processing and sort by relevance
     // If user requested specific number, fetch more to ensure we have enough after filtering
     const defaultLimit = 5;
     const userLimit = parsedQuery.requestedLimit || defaultLimit;
-    const fetchLimit = parsedQuery.minPrice || parsedQuery.maxPrice ? userLimit * 10 : userLimit;
+    // Fetch more products to ensure we get the best matches after relevance sorting
+    const fetchLimit = parsedQuery.minPrice || parsedQuery.maxPrice ? userLimit * 10 : Math.max(userLimit * 5, 25);
     
     let products = await Product.find(dbQuery)
       .limit(fetchLimit)
-      .select('sku category description price watt lumen beamAngle inputVoltage ipRating ipRatings application voltageVariants')
+      .select('sku category description price watt lumen beamAngle inputVoltage ipRating ipRatings application voltageVariants categoryFilter')
       .lean();
     
     // Process products to get the right price and IP rating
@@ -528,6 +575,22 @@ export async function POST(req: NextRequest) {
         }
       }
       
+      // Calculate relevance score for sorting
+      let relevanceScore = 0;
+      const lowerCategory = (product.category || '').toLowerCase();
+      const lowerCategoryFilter = (product.categoryFilter || '').toLowerCase();
+      
+      // Exact category match gets highest priority
+      if (parsedQuery.categories.length > 0) {
+        parsedQuery.categories.forEach((cat: string) => {
+          if (lowerCategory === cat.toLowerCase()) relevanceScore += 100;
+          else if (lowerCategory.includes(cat.toLowerCase())) relevanceScore += 50;
+          
+          if (lowerCategoryFilter === cat.toLowerCase()) relevanceScore += 100;
+          else if (lowerCategoryFilter.includes(cat.toLowerCase())) relevanceScore += 50;
+        });
+      }
+      
       return {
         _id: product._id.toString(),
         sku: product.sku,
@@ -539,9 +602,13 @@ export async function POST(req: NextRequest) {
         beamAngle: product.beamAngle,
         inputVoltage: product.inputVoltage,
         ipRating: finalIpRating,
-        application: product.application
+        application: product.application,
+        relevanceScore
       };
     });
+    
+    // Sort by relevance score (highest first)
+    processedProducts.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
     
     // Apply price filter AFTER processing (since real prices are in ipRatings/voltageVariants)
     if (parsedQuery.minPrice !== null && parsedQuery.maxPrice !== null) {
@@ -566,7 +633,12 @@ export async function POST(req: NextRequest) {
     processedProducts = processedProducts.slice(0, userLimit);
     
     // Generate response message
-    const responseMessage = generateResponseMessage(processedProducts, parsedQuery);
+    let responseMessage = generateResponseMessage(processedProducts, parsedQuery);
+    
+    // Add follow-up questions if products found and no specific filters applied
+    if (processedProducts.length > 0 && !parsedQuery.minPrice && !parsedQuery.maxPrice && !parsedQuery.wattage && !parsedQuery.ipRating) {
+      responseMessage += "\n\n💡 Want to narrow down your search?\n• \"Show me under $100\"\n• \"I need IP65 rating\"\n• \"10W to 20W\"\n• \"Outdoor use\"";
+    }
     
     return NextResponse.json({
       message: responseMessage,

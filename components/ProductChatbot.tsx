@@ -33,7 +33,7 @@ export default function ProductChatbot() {
     {
       id: '1',
       role: 'assistant',
-      content: "Hi! 👋 I'm your lighting assistant. I can help you find products, answer questions, and give recommendations.\n\nTry asking:\n• \"Show me outdoor lights\"\n• \"What's the average price?\"\n• \"I need a 10W downlight\"\n• \"List all categories\"\n\nOr just chat naturally - I'll understand! 😊",
+      content: "Hi! 👋 I'm your lighting assistant.\n\nTo get started, type:\n• \"categories\" - to see all available product categories\n• Or directly tell me what you need (e.g., \"bollard lights\", \"linear lights\")\n\nI can also answer questions like:\n• \"What's the average price?\"\n• \"How many products do you have?\"",
       timestamp: new Date(),
     },
   ]);
