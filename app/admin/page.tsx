@@ -39,7 +39,9 @@ interface Product {
   productImages?: string[]; // S3 uploaded images
   datasheets?: string[]; // S3 uploaded datasheets
   iesFiles?: string[]; // S3 uploaded IES files
-  certifications?: string[]; // S3 uploaded certifications
+  certifications?: string[]; // S3 uploaded certifications (general)
+  bisApproval?: string[]; // S3 uploaded BIS Approval documents
+  isoCertificate?: string[]; // S3 uploaded ISO Certificate documents
 }
 
 export default function AdminDashboard() {
@@ -77,6 +79,8 @@ export default function AdminDashboard() {
   const [datasheets, setDatasheets] = useState<string[]>([]);
   const [iesFiles, setIesFiles] = useState<string[]>([]);
   const [certifications, setCertifications] = useState<string[]>([]);
+  const [bisApproval, setBisApproval] = useState<string[]>([]);
+  const [isoCertificate, setIsoCertificate] = useState<string[]>([]);
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   
@@ -432,6 +436,8 @@ export default function AdminDashboard() {
       setDatasheets(product.datasheets || []);
       setIesFiles(product.iesFiles || []);
       setCertifications(product.certifications || []);
+      setBisApproval(product.bisApproval || []);
+      setIsoCertificate(product.isoCertificate || []);
       
       // Prices are stored in USD - no conversion needed
       if (product.ipRatings && product.ipRatings.length > 0) {
@@ -457,6 +463,8 @@ export default function AdminDashboard() {
       setDatasheets([]);
       setIesFiles([]);
       setCertifications([]);
+      setBisApproval([]);
+      setIsoCertificate([]);
       setIpRatings([]);
       setVoltageVariants([]);
     }
@@ -483,6 +491,8 @@ export default function AdminDashboard() {
     setDatasheets([]);
     setIesFiles([]);
     setCertifications([]);
+    setBisApproval([]);
+    setIsoCertificate([]);
     setUploadingFile(false);
   };
 
@@ -528,6 +538,8 @@ export default function AdminDashboard() {
           datasheets: datasheets,
           iesFiles: iesFiles,
           certifications: certifications,
+          bisApproval: bisApproval,
+          isoCertificate: isoCertificate,
         }),
       });
 
@@ -552,7 +564,7 @@ export default function AdminDashboard() {
     } finally {
       setSubmitting(false);
     }
-  }, [formData, images, ipRatings, voltageVariants, productImages, datasheets, iesFiles, certifications, editingProduct]);
+  }, [formData, images, ipRatings, voltageVariants, productImages, datasheets, iesFiles, certifications, bisApproval, isoCertificate, editingProduct]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
@@ -640,7 +652,7 @@ export default function AdminDashboard() {
   // File upload handlers
   const handleFileUpload = async (
     file: File,
-    fileType: "image" | "datasheet" | "ies" | "certification"
+    fileType: "image" | "datasheet" | "ies" | "certification" | "bisApproval" | "isoCertificate"
   ) => {
     setUploadingFile(true);
     setError("");
@@ -676,6 +688,12 @@ export default function AdminDashboard() {
         case "certification":
           setCertifications((prev) => [...prev, data.url]);
           break;
+        case "bisApproval":
+          setBisApproval((prev) => [...prev, data.url]);
+          break;
+        case "isoCertificate":
+          setIsoCertificate((prev) => [...prev, data.url]);
+          break;
       }
     } catch (err) {
       setError("An error occurred while uploading the file");
@@ -686,7 +704,7 @@ export default function AdminDashboard() {
 
   const handleRemoveFile = (
     fileUrl: string,
-    fileType: "image" | "datasheet" | "ies" | "certification"
+    fileType: "image" | "datasheet" | "ies" | "certification" | "bisApproval" | "isoCertificate"
   ) => {
     switch (fileType) {
       case "image":
@@ -700,6 +718,12 @@ export default function AdminDashboard() {
         break;
       case "certification":
         setCertifications((prev) => prev.filter((url) => url !== fileUrl));
+        break;
+      case "bisApproval":
+        setBisApproval((prev) => prev.filter((url) => url !== fileUrl));
+        break;
+      case "isoCertificate":
+        setIsoCertificate((prev) => prev.filter((url) => url !== fileUrl));
         break;
     }
   };
@@ -1634,6 +1658,86 @@ export default function AdminDashboard() {
                               <button
                                 type="button"
                                 onClick={() => handleRemoveFile(url, "certification")}
+                                className="text-red-600 hover:text-red-700 ml-2"
+                              >
+                                <X size={16} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* BIS Approval Upload */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Award size={16} />
+                        BIS Approval
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "bisApproval");
+                          e.target.value = "";
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        disabled={uploadingFile}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload BIS Approval documents (PDF, JPG, PNG - Max 10MB)
+                      </p>
+                      {bisApproval.length > 0 && (
+                        <ul className="mt-3 space-y-2">
+                          {bisApproval.map((url, idx) => (
+                            <li key={idx} className="flex items-center justify-between bg-gray-50 border rounded-lg p-2">
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">
+                                BIS Approval {idx + 1}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(url, "bisApproval")}
+                                className="text-red-600 hover:text-red-700 ml-2"
+                              >
+                                <X size={16} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* ISO Certificate Upload */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Award size={16} />
+                        ISO Certificate
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file, "isoCertificate");
+                          e.target.value = "";
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        disabled={uploadingFile}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload ISO Certificate documents (PDF, JPG, PNG - Max 10MB)
+                      </p>
+                      {isoCertificate.length > 0 && (
+                        <ul className="mt-3 space-y-2">
+                          {isoCertificate.map((url, idx) => (
+                            <li key={idx} className="flex items-center justify-between bg-gray-50 border rounded-lg p-2">
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">
+                                ISO Certificate {idx + 1}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(url, "isoCertificate")}
                                 className="text-red-600 hover:text-red-700 ml-2"
                               >
                                 <X size={16} />

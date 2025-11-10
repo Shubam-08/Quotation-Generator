@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
   ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet, 
-  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap
+  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -93,6 +93,9 @@ export default function EnhancedCart() {
   const [selectedProductForDriver, setSelectedProductForDriver] = useState<CartItem | null>(null);
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
   const [loadingDrivers, setLoadingDrivers] = useState(false);
+  
+  // Driver search state
+  const [driverSearchTerm, setDriverSearchTerm] = useState('');
 
   // Calculate total in selected currency (not base INR price)
   const subtotal = cart.reduce((sum, item) => {
@@ -115,6 +118,9 @@ export default function EnhancedCart() {
     setSelectedProductForDriver(product);
     setShowDriverModal(true);
     
+    // Reset search when opening modal
+    setDriverSearchTerm('');
+    
     try {
       // Fetch all in-stock drivers without filtering by wattage
       const response = await fetch(`/api/drivers`);
@@ -134,7 +140,15 @@ export default function EnhancedCart() {
     if (selectedProductForDriver) {
       addDriverToCart(driver, selectedProductForDriver.cartItemId, 1);
       setShowDriverModal(false);
+      // Reset search when closing
+      setDriverSearchTerm('');
     }
+  };
+  
+  const handleCloseDriverModal = () => {
+    setShowDriverModal(false);
+    // Reset search when closing
+    setDriverSearchTerm('');
   };
 
   // Helper function to extract numeric IP rating from string (e.g., "IP67" -> 67)
@@ -144,12 +158,29 @@ export default function EnhancedCart() {
     return match ? parseInt(match[0], 10) : 0;
   };
 
-  // Categorize drivers by IP rating
+  // Filter and categorize drivers by IP rating with search
   const categorizeDrivers = () => {
+    let filtered = [...availableDrivers];
+    
+    // Apply search filter
+    if (driverSearchTerm.trim()) {
+      const searchLower = driverSearchTerm.toLowerCase();
+      filtered = filtered.filter(driver => 
+        driver.name?.toLowerCase().includes(searchLower) ||
+        driver.sku?.toLowerCase().includes(searchLower) ||
+        driver.series?.toLowerCase().includes(searchLower) ||
+        driver.description?.toLowerCase().includes(searchLower) ||
+        driver.outputVoltage?.toLowerCase().includes(searchLower) ||
+        driver.type?.toLowerCase().includes(searchLower) ||
+        driver.wattageRange && `${driver.wattageRange.min}-${driver.wattageRange.max}w`.includes(searchLower)
+      );
+    }
+    
+    // Categorize by IP rating
     const indoor: Driver[] = [];
     const outdoor: Driver[] = [];
     
-    availableDrivers.forEach(driver => {
+    filtered.forEach(driver => {
       const ipValue = getNumericIPRating(driver.ipRating);
       if (ipValue <= 64) {
         indoor.push(driver);
@@ -1451,7 +1482,7 @@ export default function EnhancedCart() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowDriverModal(false)}
+                  onClick={handleCloseDriverModal}
                   className={`p-2 rounded-lg transition-colors ${
                     isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
                   }`}
@@ -1459,10 +1490,56 @@ export default function EnhancedCart() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
+              
+              {/* Search Bar */}
+              {!loadingDrivers && availableDrivers.length > 0 && (
+                <div className="mt-4">
+                  <div className="relative">
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`} />
+                    <input
+                      type="text"
+                      placeholder="Search by name, SKU, series, voltage, type..."
+                      value={driverSearchTerm}
+                      onChange={(e) => setDriverSearchTerm(e.target.value)}
+                      className={`w-full pl-10 pr-10 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                        isDarkMode 
+                          ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500' 
+                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      }`}
+                    />
+                    {driverSearchTerm && (
+                      <button
+                        onClick={() => setDriverSearchTerm('')}
+                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
+                          isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Results Count */}
+                  {driverSearchTerm && (() => {
+                    const { indoor, outdoor } = categorizeDrivers();
+                    const totalFiltered = indoor.length + outdoor.length;
+                    if (totalFiltered < availableDrivers.length) {
+                      return (
+                        <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Showing {totalFiltered} of {availableDrivers.length} drivers
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              )}
             </div>
             
             {/* Content */}
-            <div className="p-4 overflow-y-auto max-h-[calc(85vh-80px)]">
+            <div className="p-4 overflow-y-auto max-h-[calc(85vh-240px)]">
               {loadingDrivers ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className={`w-12 h-12 border-4 rounded-full animate-spin mb-4 ${
@@ -1487,6 +1564,32 @@ export default function EnhancedCart() {
                 <div>
                   {(() => {
                     const { indoor, outdoor } = categorizeDrivers();
+                    const totalFiltered = indoor.length + outdoor.length;
+                    
+                    // Show "No results" message if search is applied but no drivers match
+                    if (totalFiltered === 0 && driverSearchTerm) {
+                      return (
+                        <div className="text-center py-12">
+                          <Search className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                          <p className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            No drivers found
+                          </p>
+                          <p className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Try a different search term
+                          </p>
+                          <button
+                            onClick={() => setDriverSearchTerm('')}
+                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                              isDarkMode 
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            }`}
+                          >
+                            Clear Search
+                          </button>
+                        </div>
+                      );
+                    }
                     
                     return (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

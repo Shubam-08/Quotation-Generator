@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import CurrencySelector from '@/components/CurrencySelector';
@@ -43,6 +45,8 @@ type Product = {
   datasheets?: string[];
   iesFiles?: string[];
   certifications?: string[];
+  bisApproval?: string[];
+  isoCertificate?: string[];
 };
 
 type Filters = {
@@ -74,6 +78,8 @@ const lumenRanges = [
 ];
 
 export default function ProductsPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
   const { addToCart, cart, increaseQuantity, decreaseQuantity, removeFromCart } = useCart();
   const { formatPrice } = useCurrency();
 
@@ -87,6 +93,7 @@ export default function ProductsPage() {
   const [selectedLumens, setSelectedLumens] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -230,6 +237,15 @@ export default function ProductsPage() {
   };
 
   const activeFilterCount = Object.values(filters).filter(v => v && v !== 'sku' && v !== 'asc').length;
+
+  // Handle file download with authentication check
+  const handleFileDownload = (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
+    if (!session) {
+      e.preventDefault();
+      setShowLoginModal(true);
+    }
+    // If session exists, allow default download behavior
+  };
 
   // Pagination calculations
   const totalPages = Math.ceil(products.length / itemsPerPage);
@@ -810,7 +826,7 @@ export default function ProductsPage() {
                             {formatPrice(currentPrice)}
                           </td>
                           <td className="px-4 py-4">
-                            {(p.datasheets?.length || p.iesFiles?.length || p.certifications?.length) ? (
+                            {(p.datasheets?.length || p.iesFiles?.length || p.certifications?.length || p.bisApproval?.length || p.isoCertificate?.length) ? (
                               <div className="relative group">
                                 <button className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                                   isDarkMode 
@@ -836,6 +852,7 @@ export default function ProductsPage() {
                                         download
                                         target="_blank"
                                         rel="noopener noreferrer"
+                                        onClick={(e) => handleFileDownload(e, url)}
                                         className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
                                           isDarkMode 
                                             ? 'text-gray-300 hover:bg-blue-500/20 hover:text-blue-400' 
@@ -855,6 +872,7 @@ export default function ProductsPage() {
                                         download
                                         target="_blank"
                                         rel="noopener noreferrer"
+                                        onClick={(e) => handleFileDownload(e, url)}
                                         className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
                                           isDarkMode 
                                             ? 'text-gray-300 hover:bg-purple-500/20 hover:text-purple-400' 
@@ -874,6 +892,7 @@ export default function ProductsPage() {
                                         download
                                         target="_blank"
                                         rel="noopener noreferrer"
+                                        onClick={(e) => handleFileDownload(e, url)}
                                         className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
                                           isDarkMode 
                                             ? 'text-gray-300 hover:bg-green-500/20 hover:text-green-400' 
@@ -883,6 +902,46 @@ export default function ProductsPage() {
                                       >
                                         <Award size={16} className="text-green-500" />
                                         <span className="font-medium">Certificate</span>
+                                        <Download size={12} className="ml-auto opacity-50" />
+                                      </a>
+                                    ))}
+                                    {p.bisApproval?.map((url, idx) => (
+                                      <a
+                                        key={`bis-${idx}`}
+                                        href={url}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => handleFileDownload(e, url)}
+                                        className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                          isDarkMode 
+                                            ? 'text-gray-300 hover:bg-orange-500/20 hover:text-orange-400' 
+                                            : 'text-gray-700 hover:bg-orange-50 hover:text-orange-700'
+                                        }`}
+                                        title="Click to download BIS Approval"
+                                      >
+                                        <Award size={16} className="text-orange-500" />
+                                        <span className="font-medium">BIS Approval</span>
+                                        <Download size={12} className="ml-auto opacity-50" />
+                                      </a>
+                                    ))}
+                                    {p.isoCertificate?.map((url, idx) => (
+                                      <a
+                                        key={`iso-${idx}`}
+                                        href={url}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => handleFileDownload(e, url)}
+                                        className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                          isDarkMode 
+                                            ? 'text-gray-300 hover:bg-teal-500/20 hover:text-teal-400' 
+                                            : 'text-gray-700 hover:bg-teal-50 hover:text-teal-700'
+                                        }`}
+                                        title="Click to download ISO Certificate"
+                                      >
+                                        <Award size={16} className="text-teal-500" />
+                                        <span className="font-medium">ISO Certificate</span>
                                         <Download size={12} className="ml-auto opacity-50" />
                                       </a>
                                     ))}
@@ -1055,6 +1114,51 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
+
+      {/* Login Required Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-lg shadow-2xl max-w-md w-full p-6 ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className="text-center">
+              <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                isDarkMode ? 'bg-yellow-500/20' : 'bg-yellow-100'
+              }`}>
+                <Download size={32} className="text-yellow-500" />
+              </div>
+              <h3 className={`text-xl font-bold mb-2 ${
+                isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                Login Required
+              </h3>
+              <p className={`mb-6 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-600'
+              }`}>
+                Please log in to download product files, datasheets, and certificates.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLoginModal(false)}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                    isDarkMode 
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => router.push('/login')}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Go to Login
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

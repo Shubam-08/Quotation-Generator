@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File;
-    const fileType = formData.get("fileType") as string; // 'image', 'datasheet', 'ies', 'certification'
+    const fileType = formData.get("fileType") as string; // 'image', 'datasheet', 'ies', 'certification', 'bisApproval', 'isoCertificate'
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
@@ -45,6 +45,12 @@ export async function POST(req: Request) {
         break;
       case "certification":
         allowedTypes = ALLOWED_FILE_TYPES.certifications;
+        break;
+      case "bisApproval":
+        allowedTypes = ALLOWED_FILE_TYPES.bisApproval;
+        break;
+      case "isoCertificate":
+        allowedTypes = ALLOWED_FILE_TYPES.isoCertificate;
         break;
       default:
         return NextResponse.json({ error: "Invalid file type" }, { status: 400 });

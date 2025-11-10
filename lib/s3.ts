@@ -104,6 +104,10 @@ export function getFolderForFileType(fileType: string): string {
     return "datasheets";
   } else if (type.includes("ies")) {
     return "ies-files";
+  } else if (type === "bisapproval") {
+    return "bis-approval";
+  } else if (type === "isocertificate") {
+    return "iso-certificate";
   } else if (type.includes("certification") || type.includes("certificate")) {
     return "certifications";
   }
@@ -148,4 +152,6 @@ export const ALLOWED_FILE_TYPES = {
   datasheets: ["application/pdf"],
   iesFiles: [".ies", "text/plain", "application/octet-stream"], // IES files are often text-based
   certifications: ["application/pdf", "image/jpeg", "image/jpg", "image/png"],
+  bisApproval: ["application/pdf", "image/jpeg", "image/jpg", "image/png"],
+  isoCertificate: ["application/pdf", "image/jpeg", "image/jpg", "image/png"],
 };

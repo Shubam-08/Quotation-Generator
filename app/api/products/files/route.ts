@@ -62,6 +62,12 @@ export async function PUT(req: Request) {
       case "certification":
         fieldName = "certifications";
         break;
+      case "bisApproval":
+        fieldName = "bisApproval";
+        break;
+      case "isoCertificate":
+        fieldName = "isoCertificate";
+        break;
       default:
         return NextResponse.json({ error: "Invalid file type" }, { status: 400 });
     }
@@ -136,6 +142,8 @@ export async function GET(req: Request) {
         datasheets: product.datasheets || [],
         iesFiles: product.iesFiles || [],
         certifications: product.certifications || [],
+        bisApproval: product.bisApproval || [],
+        isoCertificate: product.isoCertificate || [],
         legacyImages: product.images || [], // Include legacy images for backward compatibility
       },
     });
