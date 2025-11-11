@@ -6,7 +6,7 @@ import { useCurrency } from '@/context/CurrencyContext';
 import CurrencySelector from './CurrencySelector';
 import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { CellHookData } from 'jspdf-autotable';
 import { ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet } from 'lucide-react';
 
 // Define Product & CartItem types
@@ -406,7 +406,7 @@ const exportPDF = async () => {
     margin: { left: 14, right: 14, top: 20 },
     columnStyles: { 0: { cellWidth: 50 } },
     theme: 'grid', // Use grid theme to show all borders
-    didParseCell: (data: any) => {
+    didParseCell: (data: CellHookData) => {
       if (data.section === 'body') {
         const idx = data.row.index;
         const imgInnerH = (rowHeights[idx] || 46);
@@ -414,7 +414,7 @@ const exportPDF = async () => {
         data.cell.styles.minCellHeight = Math.max(data.cell.styles.minCellHeight || 0, desired, 52);
       }
     },
-    didDrawCell: (data: any) => {
+    didDrawCell: (data: CellHookData) => {
       if (data.section === 'body' && data.column.index === 0) {
         const idx = data.row.index;
         const dataUrl = imageDataUrls[idx];

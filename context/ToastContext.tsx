@@ -1,7 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import Toast, { ToastType } from '@/components/Toast';
+import Toast from '@/components/ToastNotification';
+
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastMessage {
   id: string;

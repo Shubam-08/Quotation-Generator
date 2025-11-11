@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import CurrencySelector from './CurrencySelector';
 import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { CellHookData } from 'jspdf-autotable';
 import { 
   ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet, 
   Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search, Settings
@@ -428,24 +428,23 @@ export default function EnhancedCart() {
 
     // Add data rows with images (including drivers)
     let serialNumber = 1;
+    let currentRowIndex = startRow + 1; // Start after header row
+    
     for (let i = 0; i < organizedCartExcel.length; i++) {
       const item = organizedCartExcel[i];
-      const rowIndex = startRow + serialNumber;
-      const row = worksheet.getRow(rowIndex);
-      
-      // Set row height for images
-      row.height = 60;
-      
-      // Add data in new column order
-      row.getCell(1).value = serialNumber; // SI No
-      row.getCell(2).value = item.isDriver ? (item.sku ?? 'N/A') : ''; // Type (Model Number for drivers, blank for products)
       
       if (item.isDriver) {
-        // DRIVER: single merged cell for all specs (Description through Description => columns 3..6)
+        // DRIVER: single row with merged specs
+        const rowIndex = currentRowIndex;
+        const row = worksheet.getRow(rowIndex);
+        row.height = 60;
+        
+        row.getCell(1).value = serialNumber; // SI No
+        row.getCell(2).value = item.sku ?? 'N/A'; // Type (Model Number for drivers)
+        
+        // Build driver specs
         const parts: string[] = [];
-        if (item.wattageRange) {
-          parts.push(`Power: ${item.wattageRange.min}W`);
-        }
+        if (item.wattageRange) parts.push(`Power: ${item.wattageRange.min}W`);
         if (item.outputVoltage) parts.push(`Output: ${item.outputVoltage}`);
         if ((item as any).outputCurrent) parts.push(`Current: ${(item as any).outputCurrent}`);
         if (item.inputVoltage) parts.push(`Input: ${item.inputVoltage}`);
@@ -453,72 +452,125 @@ export default function EnhancedCart() {
         if ((item as any).type) parts.push(`Type: ${(item as any).type}`);
         const specText = parts.join(' | ');
 
-        // Put all specs into Description column and merge columns 3-6
+        // Merge columns 3-6 for specs
         row.getCell(3).value = specText;
-        // Clear other cells in 4..6 just in case
         for (let c = 4; c <= 6; c++) row.getCell(c).value = '';
-        // Merge Description through Description (second)
         worksheet.mergeCells(rowIndex, 3, rowIndex, 6);
+        
+        row.getCell(7).value = item.quantity ?? 1; // QTY
+        row.getCell(8).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Unit Rate
+        row.getCell(9).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Total
+
+        // Add borders
+        for (let col = 1; col <= 9; col++) {
+          const cell = row.getCell(col);
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.font = { bold: true, size: 9 };
+        }
+        
+        currentRowIndex++;
+        serialNumber++;
       } else {
-        // LED product: fill normal columns
-        row.getCell(3).value = item.category ?? '-'; // Description (Category)
-        row.getCell(4).value = ''; // Image placeholder
-        row.getCell(5).value = item.sku ?? 'N/A'; // Code (Model Number)
-        row.getCell(6).value = ''; // Description (blank)
-      }
-      
-      row.getCell(7).value = item.quantity ?? 1; // QTY
-      row.getCell(8).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Unit Rate
-      row.getCell(9).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Total
-
-      // Add borders to all cells in the row
-      for (let col = 1; col <= 9; col++) {
-        const cell = row.getCell(col);
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.font = { bold: true, size: 9 };
-      }
-
-      // Add image
-      const imageUrl = getPrimaryImageUrl(item);
-      if (imageUrl) {
-        const imageBuffer = await fetchImageBuffer(imageUrl);
-        if (imageBuffer) {
-          try {
-            const imageId = workbook.addImage({
-              buffer: imageBuffer,
-              extension: 'jpeg',
-            });
-            
-            // Center the image in the cell
-            const imgWidth = 70;
-            const imgHeight = 50;
-            const colWidth = worksheet.getColumn(4).width || 15;
-            const cellWidthPx = colWidth * 7; // Approximate conversion
-            const offsetX = (cellWidthPx - imgWidth) / 2;
-            const offsetY = (row.height - imgHeight) / 2;
-            
-            worksheet.addImage(imageId, {
-              tl: { col: 3, row: rowIndex - 1 },
-              ext: { width: imgWidth, height: imgHeight },
-              editAs: 'oneCell'
-            });
-          } catch (error) {
-            console.error('Error adding image:', error);
+        // LED PRODUCT: Single row with each cell merged vertically across 2 rows
+        const row1Index = currentRowIndex;
+        const row2Index = row1Index + 1;
+        
+        const row1 = worksheet.getRow(row1Index);
+        const row2 = worksheet.getRow(row2Index);
+        row1.height = 50;
+        row2.height = 50;
+        
+        // SI No - merge 2 rows vertically
+        row1.getCell(1).value = serialNumber;
+        worksheet.mergeCells(row1Index, 1, row2Index, 1);
+        
+        // Type - merge 2 rows vertically (blank for LED)
+        row1.getCell(2).value = '';
+        worksheet.mergeCells(row1Index, 2, row2Index, 2);
+        
+        // Description (Category) - merge 2 rows vertically
+        row1.getCell(3).value = item.category ?? '-';
+        worksheet.mergeCells(row1Index, 3, row2Index, 3);
+        
+        // Image - merge 2 rows vertically
+        row1.getCell(4).value = '';
+        worksheet.mergeCells(row1Index, 4, row2Index, 4);
+        
+        // Code (Model Number) - merge 2 rows vertically
+        row1.getCell(5).value = item.sku ?? 'N/A';
+        worksheet.mergeCells(row1Index, 5, row2Index, 5);
+        
+        // Description (blank) - merge 2 rows vertically
+        row1.getCell(6).value = '';
+        worksheet.mergeCells(row1Index, 6, row2Index, 6);
+        
+        // QTY - merge 2 rows vertically
+        row1.getCell(7).value = item.quantity ?? 1;
+        worksheet.mergeCells(row1Index, 7, row2Index, 7);
+        
+        // Unit Rate - merge 2 rows vertically
+        row1.getCell(8).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        worksheet.mergeCells(row1Index, 8, row2Index, 8);
+        
+        // Total - merge 2 rows vertically
+        row1.getCell(9).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        worksheet.mergeCells(row1Index, 9, row2Index, 9);
+        
+        // Add borders to all cells in both rows
+        for (let r = row1Index; r <= row2Index; r++) {
+          for (let col = 1; col <= 9; col++) {
+            const cell = worksheet.getRow(r).getCell(col);
+            cell.border = {
+              top: { style: 'thin' },
+              left: { style: 'thin' },
+              bottom: { style: 'thin' },
+              right: { style: 'thin' }
+            };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.font = { bold: true, size: 9, color: { argb: 'FF000000' } };
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFFFFF' }
+            };
           }
         }
+        
+        // Add image
+        const imageUrl = getPrimaryImageUrl(item);
+        if (imageUrl) {
+          const imageBuffer = await fetchImageBuffer(imageUrl);
+          if (imageBuffer) {
+            try {
+              const imageId = workbook.addImage({
+                buffer: imageBuffer,
+                extension: 'jpeg',
+              });
+              
+              worksheet.addImage(imageId, {
+                tl: { col: 3, row: row1Index - 1 },
+                ext: { width: 70, height: 70 },
+                editAs: 'oneCell'
+              });
+            } catch (error) {
+              console.error('Error adding image:', error);
+            }
+          }
+        }
+        
+        currentRowIndex += 2; // Move by 2 rows for LED products
+        serialNumber++;
       }
-      
-      serialNumber++;
     }
 
     // Add empty row for spacing
-    const emptyRowIndex = startRow + 1 + organizedCartExcel.length;
+    const emptyRowIndex = currentRowIndex + 1;
     
     // Add total row (after empty row)
     const totalRowIndex = emptyRowIndex + 1;
@@ -954,7 +1006,7 @@ export default function EnhancedCart() {
         1: { cellWidth: 50 }  // Image column
       },
       theme: 'grid', // Use grid theme to show all borders
-      didParseCell: (data: any) => {
+      didParseCell: (data: CellHookData) => {
         if (data.section === 'body') {
           const idx = data.row.index;
           const item = organizedCart[idx];
@@ -973,7 +1025,7 @@ export default function EnhancedCart() {
           }
         }
       },
-      didDrawCell: (data: any) => {
+      didDrawCell: (data: CellHookData) => {
         if (data.section === 'body') {
           const idx = data.row.index;
           const item = organizedCart[idx];
