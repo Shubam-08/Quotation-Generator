@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useSession } from 'next-auth/react';
@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
   ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet, 
-  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search
+  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search, Settings
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -80,7 +80,7 @@ export default function EnhancedCart() {
   // Check if user is admin
   const isAdmin = session?.user?.role === 'admin';
 
-  const [userInfo, setUserInfo] = useState({ email: '', mobile: '', project: '' });
+  const [userInfo, setUserInfo] = useState({ email: '', mobile: '', project: '', company: '', subject: '', invoiceNo: '' });
   const [showError, setShowError] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
@@ -96,6 +96,18 @@ export default function EnhancedCart() {
   
   // Driver search state
   const [driverSearchTerm, setDriverSearchTerm] = useState('');
+  
+  // Terms and Conditions state
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsAndConditions, setTermsAndConditions] = useState({
+    deliveryLocation: 'DDP Bahrain',
+    deliveryTime: '8-10 Weeks',
+    paymentTerms: '50% advance and balance 50% on delivery',
+    productMake: 'Qlite UK make',
+    validityDays: '45 days',
+    vatNote: 'VAT will charged as per applicable government regulations',
+    salesPersonName: ''
+  });
 
   // Calculate total in selected currency (not base INR price)
   const subtotal = cart.reduce((sum, item) => {
@@ -111,6 +123,11 @@ export default function EnhancedCart() {
     setUserInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
     setShowError(false);
   };
+
+  // Update delivery location when address changes
+  useEffect(() => {
+    updateDeliveryLocation(selectedAddress);
+  }, [selectedAddress]);
 
   // Fetch all available drivers for a product
   const fetchDriversForProduct = async (product: CartItem) => {
@@ -257,24 +274,68 @@ export default function EnhancedCart() {
       console.error('Error adding logo:', error);
     }
 
-    // Add address lines on the right side
+    // Add company address on the right side aligned with table end (column 9)
+    let currentRow = 1;
     addressInfo.lines.forEach((line, index) => {
-      const row = worksheet.getRow(index + 1);
-      row.getCell(10).value = line; // Start from column 10 (right side)
-      row.getCell(10).font = { bold: true, size: 9 };
-      row.getCell(10).alignment = { horizontal: 'right' };
+      const row = worksheet.getRow(currentRow);
+      row.getCell(9).value = line;
+      row.getCell(9).font = { bold: true, size: index === 0 ? 11 : 9 };
+      row.getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
+      currentRow++;
     });
+    
+    // Add contact details, date, and invoice below the address
+    const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    
+    // Add a blank row for spacing
+    currentRow++;
+    
+    // Contact No
+    worksheet.getRow(currentRow).getCell(9).value = `Contact No: ${userInfo.mobile || ''}`;
+    worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
+    worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
+    currentRow++;
+    
+    // Date
+    worksheet.getRow(currentRow).getCell(9).value = `Date: ${currentDate}`;
+    worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
+    worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
+    currentRow++;
+    
+    // Invoice No
+    worksheet.getRow(currentRow).getCell(9).value = `Invoice No: ${userInfo.invoiceNo || ''}`;
+    worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
+    worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
 
-    // Add project info below logo (left side)
-    const projectInfoRow = addressInfo.lines.length + 2;
-    worksheet.getRow(projectInfoRow).getCell(1).value = `Project Name - ${userInfo.project}`;
-    worksheet.getRow(projectInfoRow).getCell(1).font = { bold: true, size: 10 };
+    // Create bordered summary box below logo - Left side only
+    const summaryStartRow = addressInfo.lines.length + 2;
+    const summaryEndRow = summaryStartRow + 2; // 3 rows for the box
     
-    worksheet.getRow(projectInfoRow + 1).getCell(1).value = `Email: ${userInfo.email}`;
-    worksheet.getRow(projectInfoRow + 1).getCell(1).font = { size: 9 };
+    // Left section (columns 1-7): Attn, Company, Subject
+    worksheet.getRow(summaryStartRow).getCell(1).value = 'Attn:';
+    worksheet.getRow(summaryStartRow).getCell(1).font = { bold: true, size: 10 };
+    worksheet.getRow(summaryStartRow).getCell(2).value = userInfo.project || '';
+    worksheet.getRow(summaryStartRow).getCell(2).font = { bold: true, size: 10 };
     
-    worksheet.getRow(projectInfoRow + 2).getCell(1).value = `Mobile: ${userInfo.mobile}`;
-    worksheet.getRow(projectInfoRow + 2).getCell(1).font = { size: 9 };
+    worksheet.getRow(summaryStartRow + 1).getCell(1).value = 'Company:';
+    worksheet.getRow(summaryStartRow + 1).getCell(1).font = { bold: true, size: 10 };
+    worksheet.getRow(summaryStartRow + 1).getCell(2).value = userInfo.company || '';
+    worksheet.getRow(summaryStartRow + 1).getCell(2).font = { bold: true, size: 10 };
+    
+    worksheet.getRow(summaryStartRow + 2).getCell(1).value = 'Subject:';
+    worksheet.getRow(summaryStartRow + 2).getCell(1).font = { bold: true, size: 10 };
+    worksheet.getRow(summaryStartRow + 2).getCell(2).value = userInfo.subject || '';
+    worksheet.getRow(summaryStartRow + 2).getCell(2).font = { bold: true, size: 10 };
+    
+    // Set row heights for summary box (no borders)
+    for (let row = summaryStartRow; row <= summaryEndRow; row++) {
+      worksheet.getRow(row).height = 20;
+      // Set alignment for all cells in the row
+      for (let col = 1; col <= 7; col++) {
+        const cell = worksheet.getRow(row).getCell(col);
+        cell.alignment = { vertical: 'middle' };
+      }
+    }
 
     const excelCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
     const startRow = addressInfo.lines.length + 6; // Adjusted for new header layout
@@ -282,35 +343,38 @@ export default function EnhancedCart() {
     // Add column headers (optimized for PDF conversion)
     const headerRow = worksheet.getRow(startRow);
     const columns = [
-      'SI No','Image','Model Number','Description','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
+      'SI No','Type','Description','Image','Code','Description',`QTY`,`Unit Rate (${excelCurrency})`,`Total (${excelCurrency})`
     ];
     columns.forEach((col, index) => {
-      headerRow.getCell(index + 1).value = col;
-      headerRow.getCell(index + 1).font = { bold: true };
-      headerRow.getCell(index + 1).fill = {
+      const cell = headerRow.getCell(index + 1);
+      cell.value = col;
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: 'FF0046FF' }
       };
-      headerRow.getCell(index + 1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      // Add borders to header cells
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
     });
     headerRow.height = 20;
 
     // Set column widths
-    worksheet.getColumn(1).width = 6;  // SI No
-    worksheet.getColumn(2).width = 12; // Image
-    worksheet.getColumn(3).width = 18; // Model Number
-    worksheet.getColumn(4).width = 30; // Description
-    worksheet.getColumn(5).width = 15; // Category
-    worksheet.getColumn(6).width = 15; // Application
-    worksheet.getColumn(7).width = 12; // Input Voltage
-    worksheet.getColumn(8).width = 8;  // Watt
-    worksheet.getColumn(9).width = 10; // Lumen
-    worksheet.getColumn(10).width = 10; // Beam Angle
-    worksheet.getColumn(11).width = 10; // IP Rating
-    worksheet.getColumn(12).width = 12; // Price
-    worksheet.getColumn(13).width = 8;  // Quantity
-    worksheet.getColumn(14).width = 12; // Total
+    worksheet.getColumn(1).width = 8;  // SI No
+    worksheet.getColumn(2).width = 12; // Type (blank)
+    worksheet.getColumn(3).width = 25; // Description (Category)
+    worksheet.getColumn(4).width = 15; // Image
+    worksheet.getColumn(5).width = 20; // Code (Model Number)
+    worksheet.getColumn(6).width = 25; // Description (blank)
+    worksheet.getColumn(7).width = 10; // QTY
+    worksheet.getColumn(8).width = 15; // Unit Rate
+    worksheet.getColumn(9).width = 15; // Total
 
     // Helper function to get image URL
     const getPrimaryImageUrl = (item: CartItem): string | null => {
@@ -372,14 +436,12 @@ export default function EnhancedCart() {
       // Set row height for images
       row.height = 60;
       
-      // Add data
+      // Add data in new column order
       row.getCell(1).value = serialNumber; // SI No
-      row.getCell(2).value = ''; // Image placeholder
-      // Model Number
-      row.getCell(3).value = item.isDriver ? `   > ${item.sku ?? 'N/A'}` : (item.sku ?? 'N/A');
-
+      row.getCell(2).value = item.isDriver ? (item.sku ?? 'N/A') : ''; // Type (Model Number for drivers, blank for products)
+      
       if (item.isDriver) {
-        // DRIVER: single merged cell for all specs (Description through IP Rating => columns 4..11)
+        // DRIVER: single merged cell for all specs (Description through Description => columns 3..6)
         const parts: string[] = [];
         if (item.wattageRange) {
           parts.push(`Power: ${item.wattageRange.min}W`);
@@ -391,28 +453,36 @@ export default function EnhancedCart() {
         if ((item as any).type) parts.push(`Type: ${(item as any).type}`);
         const specText = parts.join(' | ');
 
-        // Put all specs into Description column and merge C4..C11
-        row.getCell(4).value = specText;
-        // Clear other cells in 5..11 just in case
-        for (let c = 5; c <= 11; c++) row.getCell(c).value = '';
-        // Merge Description through IP Rating
-        worksheet.mergeCells(rowIndex, 4, rowIndex, 11);
+        // Put all specs into Description column and merge columns 3-6
+        row.getCell(3).value = specText;
+        // Clear other cells in 4..6 just in case
+        for (let c = 4; c <= 6; c++) row.getCell(c).value = '';
+        // Merge Description through Description (second)
+        worksheet.mergeCells(rowIndex, 3, rowIndex, 6);
       } else {
         // LED product: fill normal columns
-        row.getCell(4).value = ''; // Description - blank for products
-        row.getCell(5).value = item.category ?? '-'; // Category
-        row.getCell(6).value = item.application ?? '-'; // Application
-        row.getCell(7).value = item.inputVoltage ?? '-'; // Input Voltage
-        row.getCell(8).value = item.watt ? `${item.watt}W` : '-'; // Watt
-        row.getCell(9).value = item.lumen ?? '-'; // Lumen
-        row.getCell(10).value = item.beamAngle ?? '-'; // Beam Angle
-        row.getCell(11).value = item.ipRating && (item.ipRating as any)?.trim ? ((item.ipRating as any).trim() !== '' ? (item.ipRating as any) : 'N/A') : (item.ipRating ?? 'N/A'); // IP Rating
+        row.getCell(3).value = item.category ?? '-'; // Description (Category)
+        row.getCell(4).value = ''; // Image placeholder
+        row.getCell(5).value = item.sku ?? 'N/A'; // Code (Model Number)
+        row.getCell(6).value = ''; // Description (blank)
       }
+      
+      row.getCell(7).value = item.quantity ?? 1; // QTY
+      row.getCell(8).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Unit Rate
+      row.getCell(9).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Total
 
-      // Common pricing fields
-      row.getCell(12).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Price
-      row.getCell(13).value = item.quantity ?? 1; // Quantity
-      row.getCell(14).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // Total
+      // Add borders to all cells in the row
+      for (let col = 1; col <= 9; col++) {
+        const cell = row.getCell(col);
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.font = { bold: true, size: 9 };
+      }
 
       // Add image
       const imageUrl = getPrimaryImageUrl(item);
@@ -425,9 +495,18 @@ export default function EnhancedCart() {
               extension: 'jpeg',
             });
             
+            // Center the image in the cell
+            const imgWidth = 70;
+            const imgHeight = 50;
+            const colWidth = worksheet.getColumn(4).width || 15;
+            const cellWidthPx = colWidth * 7; // Approximate conversion
+            const offsetX = (cellWidthPx - imgWidth) / 2;
+            const offsetY = (row.height - imgHeight) / 2;
+            
             worksheet.addImage(imageId, {
-              tl: { col: 1, row: rowIndex - 1 },
-              ext: { width: 70, height: 50 }
+              tl: { col: 3, row: rowIndex - 1 },
+              ext: { width: imgWidth, height: imgHeight },
+              editAs: 'oneCell'
             });
           } catch (error) {
             console.error('Error adding image:', error);
@@ -446,15 +525,67 @@ export default function EnhancedCart() {
     const totalRow = worksheet.getRow(totalRowIndex);
     
     // Merge cells for total label
-    worksheet.mergeCells(totalRowIndex, 12, totalRowIndex, 13);
-    totalRow.getCell(12).value = `Total Amount (${excelCurrency}):`;
-    totalRow.getCell(12).font = { bold: true, size: 14 };
-    totalRow.getCell(12).alignment = { horizontal: 'right', vertical: 'middle' };
+    worksheet.mergeCells(totalRowIndex, 7, totalRowIndex, 8);
+    totalRow.getCell(7).value = `Total Amount (${excelCurrency}):`;
+    totalRow.getCell(7).font = { bold: true, size: 14 };
+    totalRow.getCell(7).alignment = { horizontal: 'right', vertical: 'middle' };
+    totalRow.getCell(7).border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
     
     // Total value
-    totalRow.getCell(14).value = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    totalRow.getCell(14).font = { bold: true, size: 14 };
-    totalRow.getCell(14).alignment = { horizontal: 'left', vertical: 'middle' };
+    totalRow.getCell(9).value = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    totalRow.getCell(9).font = { bold: true, size: 14 };
+    totalRow.getCell(9).alignment = { horizontal: 'left', vertical: 'middle' };
+    totalRow.getCell(9).border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
+
+    // Add Terms and Conditions
+    const termsStartRow = totalRowIndex + 3;
+    worksheet.getRow(termsStartRow).getCell(1).value = 'Terms and Conditions:';
+    worksheet.getRow(termsStartRow).getCell(1).font = { bold: true, size: 11, underline: true };
+    // Merge cells for header
+    worksheet.mergeCells(termsStartRow, 1, termsStartRow, 9);
+    
+    const terms = [
+      `1. The prices quoted on ${termsAndConditions.deliveryLocation}.`,
+      `2. Delivery: Within ${termsAndConditions.deliveryTime} from the date of PO and advance payment.`,
+      `3. Payment Terms: ${termsAndConditions.paymentTerms}.`,
+      `4. The quoted products are ${termsAndConditions.productMake}`,
+      `5. Validity of offer: ${termsAndConditions.validityDays}`,
+      `6. ${termsAndConditions.vatNote}`
+    ];
+    
+    terms.forEach((term, index) => {
+      const rowNum = termsStartRow + index + 1;
+      const row = worksheet.getRow(rowNum);
+      row.getCell(1).value = term;
+      row.getCell(1).font = { bold: true, size: 9 };
+      row.getCell(1).alignment = { wrapText: true, vertical: 'middle' };
+      // Merge 3 cells for each term line (columns 1-3)
+      worksheet.mergeCells(rowNum, 1, rowNum, 3);
+      row.height = 25; // Set row height for better readability
+    });
+    
+    // Add closing
+    const closingRow = termsStartRow + terms.length + 2;
+    worksheet.getRow(closingRow).getCell(1).value = 'Thanking You';
+    worksheet.getRow(closingRow).getCell(1).font = { bold: true, size: 10 };
+    
+    worksheet.getRow(closingRow + 2).getCell(1).value = 'Yours Sincerely';
+    worksheet.getRow(closingRow + 2).getCell(1).font = { bold: true, size: 10 };
+    
+    if (termsAndConditions.salesPersonName) {
+      worksheet.getRow(closingRow + 4).getCell(1).value = termsAndConditions.salesPersonName;
+      worksheet.getRow(closingRow + 4).getCell(1).font = { bold: true, size: 10 };
+    }
 
     // Set print options
     worksheet.pageSetup = {
@@ -487,6 +618,20 @@ export default function EnhancedCart() {
   };
 
   // Get address based on user selection
+  // Update delivery location based on selected address
+  const updateDeliveryLocation = (address: 'bahrain' | 'uae' | 'bangalore' | 'delhi') => {
+    const locationMap = {
+      'bahrain': 'DDP Bahrain',
+      'uae': 'DDP Dubai, UAE',
+      'bangalore': 'DDP Bangalore, India',
+      'delhi': 'DDP Delhi, India'
+    };
+    setTermsAndConditions(prev => ({
+      ...prev,
+      deliveryLocation: locationMap[address]
+    }));
+  };
+  
   const getAddressInfo = () => {
     switch (selectedAddress) {
       case 'uae':
@@ -551,32 +696,104 @@ export default function EnhancedCart() {
     const marginRight = 20;
     const rightX = pageWidth - marginRight;
 
-    doc.addImage('/logo.jpg', 'JPEG', 14, 1, 80, 90);
+    doc.addImage('/logo.jpg', 'JPEG', 14, 10, 80, 90);
 
     // Get dynamic address based on currency
     const addressInfo = getAddressInfo();
     
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    
-    // Add address lines dynamically
-    let yPosition = 20;
-    addressInfo.lines.forEach((line) => {
-      doc.text(line, rightX, yPosition, { align: 'right' });
-      yPosition += 12;
-    });
-
+    // Add company name (first line) - BOLD and LARGER
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text(`Project Name - ${userInfo.project}`, 14, 100);
+    doc.setFontSize(12);
+    let yPosition = 25;
+    doc.text(addressInfo.lines[0], rightX, yPosition, { align: 'right' });
+    yPosition += 15;
+    
+    // Add remaining address lines - slightly larger font
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text(`Email: ${userInfo.email}`, 14, 112);
-    doc.text(`Mobile: ${userInfo.mobile}`, 14, 124);
+    doc.setFontSize(9);
+    for (let i = 1; i < addressInfo.lines.length; i++) {
+      doc.text(addressInfo.lines[i], rightX, yPosition, { align: 'right' });
+      yPosition += 12;
+    }
+
+    // Add two boxes side by side (appearing as one)
+    const boxX = 14;
+    const boxY = 105;
+    const totalWidth = pageWidth - 28;
+    const leftBoxWidth = totalWidth / 2;
+    const rightBoxWidth = totalWidth / 2;
+    const boxHeight = 50;
+    const rowHeight = boxHeight / 3; // 3 rows
+    
+    doc.setLineWidth(1);
+    doc.setDrawColor(0, 0, 0);
+    
+    // Draw outer border
+    doc.rect(boxX, boxY, totalWidth, boxHeight);
+    
+    // Draw vertical line separating left and right sections
+    doc.line(boxX + leftBoxWidth, boxY, boxX + leftBoxWidth, boxY + boxHeight);
+    
+    // Draw horizontal lines for rows (2 lines to create 3 rows)
+    doc.line(boxX, boxY + rowHeight, boxX + totalWidth, boxY + rowHeight);
+    doc.line(boxX, boxY + (rowHeight * 2), boxX + totalWidth, boxY + (rowHeight * 2));
+    
+    // Left box content
+    const leftX = boxX + 8;
+    let leftY = boxY + 12;
+    const lineHeight = rowHeight;
+    const labelWidth = 50;
+    
+    doc.setFontSize(9);
+    
+    // Attn
+    doc.setFont('helvetica', 'bold');
+    doc.text('Attn:', leftX, leftY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(userInfo.project || '', leftX + labelWidth, leftY);
+    leftY += lineHeight;
+    
+    // Company
+    doc.setFont('helvetica', 'bold');
+    doc.text('Company:', leftX, leftY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(userInfo.company || '', leftX + labelWidth, leftY);
+    leftY += lineHeight;
+    
+    // Subject
+    doc.setFont('helvetica', 'bold');
+    doc.text('Subject:', leftX, leftY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(userInfo.subject || '', leftX + labelWidth, leftY);
+    
+    // Right box content
+    const rightColX = boxX + leftBoxWidth + 8;
+    let rightY = boxY + 12;
+    
+    // Contact No
+    doc.setFont('helvetica', 'bold');
+    doc.text('Contact No:', rightColX, rightY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(userInfo.mobile || '', rightColX + labelWidth, rightY);
+    rightY += lineHeight;
+    
+    // Date
+    doc.setFont('helvetica', 'bold');
+    doc.text('Date:', rightColX, rightY);
+    doc.setFont('helvetica', 'normal');
+    const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    doc.text(currentDate, rightColX + labelWidth, rightY);
+    rightY += lineHeight;
+    
+    // Invoice No
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice No:', rightColX, rightY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(userInfo.invoiceNo || '', rightColX + labelWidth, rightY);
 
     const pdfCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
     const columns = [
-      'Image','Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${pdfCurrency})`,'Quantity',`Total (${pdfCurrency})`
+      'SI No','Image','Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${pdfCurrency})`,'Quantity',`Total (${pdfCurrency})`
     ];
 
     const getPrimaryImageUrl = (item: CartItem): string | null => {
@@ -653,7 +870,7 @@ export default function EnhancedCart() {
       })
     );
 
-    const rows = organizedCart.map(item => {
+    const rows = organizedCart.map((item, index) => {
       if (item.isDriver) {
         // Driver row - all specs in one large merged cell
         // Build complete driver specification string
@@ -680,6 +897,7 @@ export default function EnhancedCart() {
         const allSpecs = driverSpecs.join(' | ');
         
         return [
+          index + 1, // SI No
           '', // No image for driver
           `   > ${item.sku ?? 'N/A'}`, // Indented driver SKU
           { content: allSpecs, colSpan: 7, styles: { halign: 'left' as const } }, // Merged cell with all specs
@@ -690,6 +908,7 @@ export default function EnhancedCart() {
       } else {
         // LED Product row - normal format
         return [
+          index + 1, // SI No
           '',
           item.sku ?? 'N/A',
           item.category ?? '-',
@@ -710,12 +929,31 @@ export default function EnhancedCart() {
     autoTable(doc, {
       head: [columns],
       body: rows,
-      startY: 136,
-      styles: { fontSize: 7, cellPadding, fontStyle: 'normal', valign: 'middle' },
-      headStyles: { fillColor: [0, 70, 255], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      startY: 165,
+      styles: { 
+        fontSize: 8, 
+        cellPadding, 
+        fontStyle: 'bold', 
+        valign: 'middle',
+        lineColor: [0, 0, 0], // Black border lines
+        lineWidth: 1, // Bold border line thickness
+        textColor: [0, 0, 0] // Black text for better visibility
+      },
+      headStyles: { 
+        fillColor: [0, 70, 255], 
+        textColor: 255, 
+        fontStyle: 'bold', 
+        fontSize: 8,
+        lineColor: [0, 0, 0],
+        lineWidth: 1
+      },
       alternateRowStyles: { fillColor: [245, 245, 245] },
       margin: { left: 14, right: 14, top: 20 },
-      columnStyles: { 0: { cellWidth: 50 } },
+      columnStyles: { 
+        0: { cellWidth: 15 }, // SI No column
+        1: { cellWidth: 50 }  // Image column
+      },
+      theme: 'grid', // Use grid theme to show all borders
       didParseCell: (data: any) => {
         if (data.section === 'body') {
           const idx = data.row.index;
@@ -724,8 +962,9 @@ export default function EnhancedCart() {
           // For driver rows, use lighter background and smaller height
           if (item?.isDriver) {
             data.cell.styles.fillColor = [250, 250, 250]; // Very light gray
-            data.cell.styles.textColor = [60, 60, 60]; // Dark gray text
-            data.cell.styles.fontSize = 6.5;
+            data.cell.styles.textColor = [0, 0, 0]; // Black text for better visibility
+            data.cell.styles.fontSize = 7.5;
+            data.cell.styles.fontStyle = 'bold';
             data.cell.styles.minCellHeight = 30; // Smaller height for drivers
           } else {
             const imgInnerH = (rowHeights[idx] || 46);
@@ -735,38 +974,43 @@ export default function EnhancedCart() {
         }
       },
       didDrawCell: (data: any) => {
-        if (data.section === 'body' && data.column.index === 0) {
+        if (data.section === 'body') {
           const idx = data.row.index;
           const item = organizedCart[idx];
           
-          // Skip image rendering for driver rows
-          if (item?.isDriver) {
-            return;
-          }
-          
-          // For LED products, render image as normal
-          const dataUrl = imageDataUrls[idx];
-          const innerW = data.cell.width - (cellPadding.left + cellPadding.right);
-          const innerH = (data.cell.height || 0) - (cellPadding.top + cellPadding.bottom);
-          const imgW = Math.max(1, Math.min(targetImgWidth, innerW));
-          const rawH = Math.max(46, (rowHeights[idx] || 46));
-          const imgH = Math.min(rawH, innerH);
-          const x = data.cell.x + cellPadding.left + (innerW - imgW) / 2;
-          const y = data.cell.y + cellPadding.top + (innerH - imgH) / 2;
-          if (dataUrl) {
-            try { doc.addImage(dataUrl, 'JPEG', x, y, imgW, imgH); } catch {}
-          } else {
-            try {
-              (doc as any).setFillColor(240);
-              doc.rect(x, y, imgW, imgH, 'F');
-              (doc as any).setTextColor(120);
-              doc.setFontSize(6);
-              const label = 'No Image';
-              const tw = doc.getTextWidth(label);
-              const tx = x + (imgW - tw) / 2;
-              const ty = y + imgH / 2 + 2;
-              doc.text(label, tx, ty);
-            } catch {}
+          // Render images for product rows (Image column is now index 1)
+          if (data.column.index === 1) {
+            const item = organizedCart[idx];
+            
+            // Skip image rendering for driver rows
+            if (item?.isDriver) {
+              return;
+            }
+            
+            // For LED products, render image as normal
+            const dataUrl = imageDataUrls[idx];
+            const innerW = data.cell.width - (cellPadding.left + cellPadding.right);
+            const innerH = (data.cell.height || 0) - (cellPadding.top + cellPadding.bottom);
+            const imgW = Math.max(1, Math.min(targetImgWidth, innerW));
+            const rawH = Math.max(46, (rowHeights[idx] || 46));
+            const imgH = Math.min(rawH, innerH);
+            const x = data.cell.x + cellPadding.left + (innerW - imgW) / 2;
+            const y = data.cell.y + cellPadding.top + (innerH - imgH) / 2;
+            if (dataUrl) {
+              try { doc.addImage(dataUrl, 'JPEG', x, y, imgW, imgH); } catch {}
+            } else {
+              try {
+                (doc as any).setFillColor(240);
+                doc.rect(x, y, imgW, imgH, 'F');
+                (doc as any).setTextColor(120);
+                doc.setFontSize(6);
+                const label = 'No Image';
+                const tw = doc.getTextWidth(label);
+                const tx = x + (imgW - tw) / 2;
+                const ty = y + imgH / 2 + 2;
+                doc.text(label, tx, ty);
+              } catch {}
+            }
           }
         }
       },
@@ -779,6 +1023,66 @@ export default function EnhancedCart() {
     const formattedTotal = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
     doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
+
+    // Add Terms and Conditions in a bordered box
+    const pageHeight = doc.internal.pageSize.height;
+    let termsY = finalY + 40;
+    
+    // Check if we need a new page for terms
+    if (termsY > pageHeight - 200) {
+      doc.addPage();
+      termsY = 40;
+    }
+    
+    // Calculate box dimensions
+    const termsBoxX = 14;
+    const termsBoxY = termsY;
+    const termsBoxWidth = pageWidth - 28; // Full width with margins
+    let termsContentY = termsBoxY + 15;
+    
+    // Add Terms header
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Terms and Conditions:', termsBoxX + 8, termsContentY);
+    
+    termsContentY += 15;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    
+    const terms = [
+      `1. The prices quoted on ${termsAndConditions.deliveryLocation}.`,
+      `2. Delivery: Within ${termsAndConditions.deliveryTime} from the date of PO and advance payment.`,
+      `3. Payment Terms: ${termsAndConditions.paymentTerms}.`,
+      `4. The quoted products are ${termsAndConditions.productMake}`,
+      `5. Validity of offer: ${termsAndConditions.validityDays}`,
+      `6. ${termsAndConditions.vatNote}`
+    ];
+    
+    terms.forEach((term) => {
+      const lines = doc.splitTextToSize(term, termsBoxWidth - 20);
+      doc.text(lines, termsBoxX + 8, termsContentY);
+      termsContentY += lines.length * 12;
+    });
+    
+    // Add closing
+    termsContentY += 15;
+    doc.setFontSize(9);
+    doc.text('Thanking You', termsBoxX + 8, termsContentY);
+    
+    termsContentY += 20;
+    doc.text('Yours Sincerely', termsBoxX + 8, termsContentY);
+    
+    if (termsAndConditions.salesPersonName) {
+      termsContentY += 20;
+      doc.setFont('helvetica', 'bold');
+      doc.text(termsAndConditions.salesPersonName, termsBoxX + 8, termsContentY);
+    }
+    
+    // Draw box around entire terms section
+    const termsBoxHeight = termsContentY - termsBoxY + 15;
+    doc.setLineWidth(1.5);
+    doc.setDrawColor(0, 0, 0); // Blue border
+    doc.rect(termsBoxX, termsBoxY, termsBoxWidth, termsBoxHeight);
 
     doc.save(`${userInfo.project}_quotation.pdf`);
     setShowSuccess(true);
@@ -1177,14 +1481,77 @@ export default function EnhancedCart() {
                         isDarkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
                         <Briefcase className="w-3.5 h-3.5" />
-                        Project
+                        Attn (Name)
                       </label>
                       <input
                         type="text"
                         name="project"
                         value={userInfo.project}
                         onChange={handleChange}
-                        placeholder="Project name"
+                        placeholder="Contact person name"
+                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        <Briefcase className="w-3.5 h-3.5" />
+                        Company
+                      </label>
+                      <input
+                        type="text"
+                        name="company"
+                        value={userInfo.company}
+                        onChange={handleChange}
+                        placeholder="Company name"
+                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        <FileText className="w-3.5 h-3.5" />
+                        Subject
+                      </label>
+                      <input
+                        type="text"
+                        name="subject"
+                        value={userInfo.subject}
+                        onChange={handleChange}
+                        placeholder="e.g., Quotation"
+                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        <FileText className="w-3.5 h-3.5" />
+                        Invoice No
+                      </label>
+                      <input
+                        type="text"
+                        name="invoiceNo"
+                        value={userInfo.invoiceNo}
+                        onChange={handleChange}
+                        placeholder="e.g., QT-12345678"
                         className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
                           isDarkMode 
                             ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
@@ -1314,22 +1681,36 @@ export default function EnhancedCart() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
                   <button
-                    onClick={exportPDF}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-semibold text-sm transition-all"
+                    onClick={() => setShowTermsModal(true)}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-all ${
+                      isDarkMode 
+                        ? 'bg-gray-700 hover:bg-gray-600 text-white border border-white/20' 
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
+                    }`}
                   >
-                    <FileText className="w-4 h-4" />
-                    PDF
+                    <Settings className="w-4 h-4" />
+                    Edit Terms & Conditions
                   </button>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={exportPDF}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-semibold text-sm transition-all"
+                    >
+                      <FileText className="w-4 h-4" />
+                      PDF
+                    </button>
 
-                  <button
-                    onClick={exportExcel}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-md font-semibold text-sm transition-all"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    Excel
-                  </button>
+                    <button
+                      onClick={exportExcel}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-md font-semibold text-sm transition-all"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Excel
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1867,6 +2248,220 @@ export default function EnhancedCart() {
                   })()}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms and Conditions Modal */}
+      {showTermsModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`max-w-3xl w-full rounded-xl max-h-[90vh] overflow-hidden ${
+            isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-lg'
+          }`}>
+            {/* Header */}
+            <div className={`p-4 border-b ${
+              isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-white'
+            }`}>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <Settings className="w-5 h-5 text-blue-500" />
+                    Edit Terms & Conditions
+                  </h3>
+                  <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Customize terms for your territory
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="space-y-4">
+                {/* Delivery Location */}
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    1. Delivery Location
+                  </label>
+                  <input
+                    type="text"
+                    value={termsAndConditions.deliveryLocation}
+                    onChange={(e) => setTermsAndConditions(prev => ({ ...prev, deliveryLocation: e.target.value }))}
+                    placeholder="e.g., DDP Bahrain"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                      isDarkMode 
+                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500' 
+                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+
+                {/* Delivery Time */}
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    2. Delivery Time
+                  </label>
+                  <input
+                    type="text"
+                    value={termsAndConditions.deliveryTime}
+                    onChange={(e) => setTermsAndConditions(prev => ({ ...prev, deliveryTime: e.target.value }))}
+                    placeholder="e.g., 8-10 Weeks"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                      isDarkMode 
+                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500' 
+                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+
+                {/* Payment Terms */}
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    3. Payment Terms
+                  </label>
+                  <input
+                    type="text"
+                    value={termsAndConditions.paymentTerms}
+                    onChange={(e) => setTermsAndConditions(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                    placeholder="e.g., 50% advance and balance 50% on delivery"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                      isDarkMode 
+                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500' 
+                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+
+                {/* Product Make */}
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    4. Product Make
+                  </label>
+                  <input
+                    type="text"
+                    value={termsAndConditions.productMake}
+                    onChange={(e) => setTermsAndConditions(prev => ({ ...prev, productMake: e.target.value }))}
+                    placeholder="e.g., Qlite UK make"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                      isDarkMode 
+                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500' 
+                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+
+                {/* Validity Days */}
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    5. Validity of Offer
+                  </label>
+                  <input
+                    type="text"
+                    value={termsAndConditions.validityDays}
+                    onChange={(e) => setTermsAndConditions(prev => ({ ...prev, validityDays: e.target.value }))}
+                    placeholder="e.g., 45 days"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                      isDarkMode 
+                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500' 
+                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+
+                {/* VAT Note */}
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    6. VAT Note
+                  </label>
+                  <input
+                    type="text"
+                    value={termsAndConditions.vatNote}
+                    onChange={(e) => setTermsAndConditions(prev => ({ ...prev, vatNote: e.target.value }))}
+                    placeholder="e.g., VAT will charged as per applicable government regulations"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                      isDarkMode 
+                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500' 
+                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+
+                {/* Sales Person Name */}
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Sales Person Name
+                  </label>
+                  <input
+                    type="text"
+                    value={termsAndConditions.salesPersonName}
+                    onChange={(e) => setTermsAndConditions(prev => ({ ...prev, salesPersonName: e.target.value }))}
+                    placeholder="Enter your name (will appear in closing)"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                      isDarkMode 
+                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500' 
+                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                    }`}
+                  />
+                  <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>
+                    Your name will appear after "Yours Sincerely" in the quotation
+                  </p>
+                </div>
+
+                {/* Preview */}
+                <div className={`mt-6 p-4 rounded-lg border ${
+                  isDarkMode ? 'bg-gray-800/50 border-white/10' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <h4 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Preview:
+                  </h4>
+                  <div className={`text-xs space-y-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <p>1. The prices quoted on {termsAndConditions.deliveryLocation}.</p>
+                    <p>2. Delivery: Within {termsAndConditions.deliveryTime} from the date of PO and advance payment.</p>
+                    <p>3. Payment Terms: {termsAndConditions.paymentTerms}.</p>
+                    <p>4. The quoted products are {termsAndConditions.productMake}</p>
+                    <p>5. Validity of offer: {termsAndConditions.validityDays}</p>
+                    <p>6. {termsAndConditions.vatNote}</p>
+                    <p className="mt-3">Thanking You</p>
+                    <p className="mt-2">Yours Sincerely</p>
+                    {termsAndConditions.salesPersonName && (
+                      <p className="mt-2 font-semibold">{termsAndConditions.salesPersonName}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={`p-4 border-t ${
+              isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-white'
+            }`}>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    isDarkMode 
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-all"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>

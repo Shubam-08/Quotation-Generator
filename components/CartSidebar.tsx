@@ -385,11 +385,27 @@ const exportPDF = async () => {
     head: [columns],
     body: rows,
     startY: 136,
-    styles: { fontSize: 7, cellPadding, fontStyle: 'normal', valign: 'middle' },
-    headStyles: { fillColor: [0, 70, 255], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+    styles: { 
+      fontSize: 8, 
+      cellPadding, 
+      fontStyle: 'bold', 
+      valign: 'middle',
+      lineColor: [0, 0, 0], // Black border lines
+      lineWidth: 1, // Bold border line thickness
+      textColor: [0, 0, 0] // Black text for better visibility
+    },
+    headStyles: { 
+      fillColor: [0, 70, 255], 
+      textColor: 255, 
+      fontStyle: 'bold', 
+      fontSize: 8,
+      lineColor: [0, 0, 0],
+      lineWidth: 1
+    },
     alternateRowStyles: { fillColor: [245, 245, 245] },
     margin: { left: 14, right: 14, top: 20 },
     columnStyles: { 0: { cellWidth: 50 } },
+    theme: 'grid', // Use grid theme to show all borders
     didParseCell: (data: any) => {
       if (data.section === 'body') {
         const idx = data.row.index;
