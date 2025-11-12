@@ -310,6 +310,60 @@ export default function ProductsPage() {
           </div>
         </div>
 
+        {/* Continuous Scrolling Banner */}
+        <div className={`mb-6 overflow-hidden rounded-lg ${
+          isDarkMode 
+            ? 'bg-gradient-to-r from-yellow-500/10 via-yellow-400/10 to-yellow-500/10 border border-yellow-400/30' 
+            : 'bg-gradient-to-r from-yellow-50 via-yellow-100 to-yellow-50 border border-yellow-300'
+        }`}>
+          <div className="relative flex overflow-x-hidden py-3">
+            <div className="flex whitespace-nowrap animate-scroll">
+              <span className={`text-sm font-semibold mx-8 ${
+                isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
+              }`}>
+                ⚠️ Products with unlisted or zero prices are available on request
+              </span>
+              <span className={`text-sm font-semibold mx-8 ${
+                isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
+              }`}>
+                For customized quotations or bulk inquiries, please contact our sales team
+              </span>
+              <span className={`text-sm font-semibold mx-8 ${
+                isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
+              }`}>
+                New products are added regularly - stay tuned for updates!
+              </span>
+              <span className={`text-sm font-semibold mx-8 ${
+                isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
+              }`}>
+                Confirm product availability before finalizing any quotation
+              </span>
+            </div>
+            <div className="absolute top-0 flex whitespace-nowrap py-3 animate-scroll2">
+              <span className={`text-sm font-semibold mx-8 ${
+                isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
+              }`}>
+                ⚠️ Products with unlisted or zero prices are available on request
+              </span>
+              <span className={`text-sm font-semibold mx-8 ${
+                isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
+              }`}>
+                 For customized quotations or bulk inquiries, please contact our sales team
+              </span>
+              <span className={`text-sm font-semibold mx-8 ${
+                isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
+              }`}>
+                New products are added regularly - stay tuned for updates!
+              </span>
+              <span className={`text-sm font-semibold mx-8 ${
+                isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
+              }`}>
+                Confirm product availability before finalizing any quotation
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className={`rounded-xl mb-6 overflow-hidden transition-colors ${
           isDarkMode 

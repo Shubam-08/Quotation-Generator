@@ -409,6 +409,7 @@ export default function DriversManagement() {
                   className="hidden"
                 />
               </label>
+               {/*}
               {drivers.length > 0 && (
                 <button
                   onClick={handleDeleteAll}
@@ -419,6 +420,7 @@ export default function DriversManagement() {
                   Delete All ({drivers.length})
                 </button>
               )}
+              */}
               <button
                 onClick={() => openModal()}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"

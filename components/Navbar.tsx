@@ -50,13 +50,13 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                <Link
+                {/*<Link
                   href="/change-password"
                   className="flex items-center gap-2 text-white hover:text-yellow-400 px-1 py-1 rounded-sm text-xs font-small transition-colors"
                 >
                   <KeyRound size={10} />
                   Change Password
-                </Link>  
+                </Link>  */}
 
                 <div className="flex items-center gap-3 border-l border-white/10 pl-4">
                   <div className="flex items-center gap-2 text-sm">

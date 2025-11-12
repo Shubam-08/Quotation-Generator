@@ -295,6 +295,11 @@ export default function EnhancedCart() {
     worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
     worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
     currentRow++;
+
+     // Invoice No
+    worksheet.getRow(currentRow).getCell(9).value = `Invoice No: ${userInfo.invoiceNo || ''}`;
+    worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
+    worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
     
     // Date
     worksheet.getRow(currentRow).getCell(9).value = `Date: ${currentDate}`;
@@ -302,10 +307,7 @@ export default function EnhancedCart() {
     worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
     currentRow++;
     
-    // Invoice No
-    worksheet.getRow(currentRow).getCell(9).value = `Invoice No: ${userInfo.invoiceNo || ''}`;
-    worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
-    worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
+   
 
     // Create bordered summary box below logo - Left side only
     const summaryStartRow = addressInfo.lines.length + 2;

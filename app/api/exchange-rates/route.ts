@@ -21,7 +21,7 @@ const FALLBACK_RATES = {
   QAR: 3.64,     // 1 USD = 3.64 QAR
   AED: 3.67,     // 1 USD = 3.67 AED
   SAR: 3.75,     // 1 USD = 3.75 SAR
-  BHD: 0.376,    // 1 USD = 0.376 BHD
+  BHD: 0.38,    // 1 USD = 0.376 BHD
   OMR: 0.385,    // 1 USD = 0.385 OMR
 };
 

@@ -13,7 +13,7 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/admin", label: "Products", icon: Package },
+    { href: "/admin", label: "Led Lights", icon: Package },
     { href: "/admin/drivers", label: "Drivers", icon: Zap },
   ];
 

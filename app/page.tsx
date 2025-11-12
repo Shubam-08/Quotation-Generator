@@ -171,7 +171,7 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
-
+                  
             {/* Step 2 */}
             <div className="relative text-center group">
               <div className="relative inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-yellow-400 to-yellow-500 text-black rounded-2xl text-3xl font-bold mx-auto mb-6 shadow-lg shadow-yellow-400/50 group-hover:scale-110 transition-transform">
