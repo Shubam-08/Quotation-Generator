@@ -32,7 +32,7 @@ function extractGoogleDriveFileId(url: string): string | null {
 
 export async function POST(req: Request) {
   try {
-    const { url } = await req.json();
+    const { url, returnDataUrl } = await req.json();
     if (!url) return NextResponse.json({ error: "url is required" }, { status: 400 });
 
     let target: URL;
@@ -57,6 +57,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ 
         error: "Could not extract Google Drive file ID. Please use a valid Google Drive sharing link." 
       }, { status: 422 });
+    }
+
+    // If returnDataUrl is requested, fetch the image and convert to base64
+    if (returnDataUrl) {
+      try {
+        const imageRes = await fetch(url);
+        if (!imageRes.ok) {
+          return NextResponse.json({ error: `Failed to fetch image (${imageRes.status})` }, { status: 400 });
+        }
+        
+        const arrayBuffer = await imageRes.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64 = buffer.toString('base64');
+        const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
+        const dataUrl = `data:${contentType};base64,${base64}`;
+        
+        return NextResponse.json({ dataUrl });
+      } catch (fetchError: any) {
+        return NextResponse.json({ error: `Failed to fetch image: ${fetchError.message}` }, { status: 500 });
+      }
     }
 
     // Fetch the page and try to parse out a direct image URL (og:image / twitter:image)

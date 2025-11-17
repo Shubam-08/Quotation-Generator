@@ -915,6 +915,30 @@ export default function EnhancedCart() {
 
     const toDataUrl = async (url: string): Promise<string> => {
       const u = await resolveImageUrl(url);
+      
+      // For external images (Cloudinary, etc.), use server-side proxy to avoid CORS
+      if (u.includes('cloudinary.com') || u.includes('res.cloudinary')) {
+        try {
+          const res = await fetch('/api/resolve-image', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ url: u, returnDataUrl: true }) 
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.dataUrl) {
+              return data.dataUrl;
+            }
+          }
+          throw new Error('Proxy failed to return dataUrl');
+        } catch (error) {
+          console.error('Proxy fetch failed:', error);
+          throw error;
+        }
+      }
+      
+      // For other URLs, try direct CORS fetch
       const res = await fetch(u, { mode: 'cors' });
       const blob = await res.blob();
       return await new Promise<string>((resolve, reject) => {
