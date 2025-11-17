@@ -126,8 +126,13 @@ export const CurrencyProvider = ({ children }: { children: React.ReactNode }) =>
   };
 
   const formatPrice = (priceInUSD: number): string => {
-    const convertedPrice = convertPrice(priceInUSD);
-    const formatted = convertedPrice.toLocaleString('en-US', {
+    // For USD, use the exact price without conversion to avoid floating-point precision issues
+    const convertedPrice = currency === 'USD' ? priceInUSD : convertPrice(priceInUSD);
+    
+    // Round to 2 decimal places to fix floating-point precision issues
+    const roundedPrice = Math.round(convertedPrice * 100) / 100;
+    
+    const formatted = roundedPrice.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });

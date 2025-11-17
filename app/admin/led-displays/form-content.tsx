@@ -1,0 +1,594 @@
+// Comprehensive LED Display Form Content
+export const renderFormFields = (formData: any, setFormData: any, isDarkMode: boolean = false) => {
+  // Dynamic class names based on dark mode
+  const labelClass = `block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`;
+  const labelSmallClass = `block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`;
+  const inputClass = `w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 ${
+    isDarkMode 
+      ? 'bg-gray-800 border border-white/20 text-white focus:border-yellow-400 focus:ring-yellow-400/20' 
+      : 'bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-200'
+  }`;
+  const sectionHeaderClass = `text-lg font-bold mb-3 pb-2 border-b ${isDarkMode ? 'text-white border-white/10' : 'text-gray-900 border-gray-200'}`;
+  const descriptionClass = `text-sm mb-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`;
+  const variantBoxClass = `flex items-center gap-3 p-3 rounded-lg border ${isDarkMode ? 'bg-gray-800/50 border-white/10' : 'bg-gray-50 border-gray-200'}`;
+  
+  return (
+  <>
+    {/* Basic Information */}
+    <div>
+      <h3 className={sectionHeaderClass}>Basic Information</h3>
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className={labelClass}>Image URL</label>
+          <input
+            type="text"
+            placeholder="https://..."
+            value={formData.images?.[0] || ""}
+            onChange={(e) => setFormData({
+              ...formData,
+              images: e.target.value ? [e.target.value] : [],
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Category</label>
+          <input
+            type="text"
+            value={formData.category || ""}
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Application</label>
+          <input
+            type="text"
+            placeholder="e.g., Indoor/Outdoor"
+            value={formData.application || ""}
+            onChange={(e) => setFormData({ ...formData, application: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>IP Rating</label>
+          <input
+            type="text"
+            placeholder="e.g., IP65"
+            value={formData.ipRating || ""}
+            onChange={(e) => setFormData({ ...formData, ipRating: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Pixel Pitch</label>
+          <input
+            type="text"
+            placeholder="e.g., P2.5"
+            value={formData.pixelPitch || ""}
+            onChange={(e) => setFormData({ ...formData, pixelPitch: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Total Resolution</label>
+          <input
+            type="text"
+            placeholder="e.g., 1920x1080"
+            value={formData.totalResolution || ""}
+            onChange={(e) => setFormData({ ...formData, totalResolution: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Square Feet</label>
+          <input
+            type="number"
+            step="0.01"
+            placeholder="e.g., 100"
+            value={formData.sqft || ""}
+            onChange={(e) => setFormData({ ...formData, sqft: parseFloat(e.target.value) })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Price (USD)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.price ?? ""}
+            onChange={(e) => setFormData({ ...formData, price: e.target.value === "" ? undefined : Number(e.target.value) })}
+            className={inputClass}
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Cabinet Material Variants */}
+    <div>
+      <h3 className={sectionHeaderClass}>Cabinet Material Variants</h3>
+      <p className={descriptionClass}>Add multiple cabinet material options with their respective prices. This allows the same display specification to have different prices based on cabinet material.</p>
+      
+      <div className="space-y-3">
+        {(formData.cabinetMaterialVariants || []).map((variant: any, index: number) => (
+          <div key={index} className={variantBoxClass}>
+            <div className="flex-1">
+              <label className={labelSmallClass}>Material</label>
+              <select
+                value={variant.material || ""}
+                onChange={(e) => {
+                  const updated = [...(formData.cabinetMaterialVariants || [])];
+                  updated[index] = { ...updated[index], material: e.target.value };
+                  setFormData({ ...formData, cabinetMaterialVariants: updated });
+                }}
+                className={inputClass}
+              >
+                <option value="" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Select Material</option>
+                <option value="Die Cast Aluminium" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Die Cast Aluminium</option>
+                <option value="Aluminium" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Aluminium</option>
+                <option value="Mild Steel" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Mild Steel</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className={labelSmallClass}>Price (USD per sq.m)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="e.g., 150"
+                value={variant.price ?? ""}
+                onChange={(e) => {
+                  const updated = [...(formData.cabinetMaterialVariants || [])];
+                  updated[index] = { ...updated[index], price: e.target.value === "" ? undefined : Number(e.target.value) };
+                  setFormData({ ...formData, cabinetMaterialVariants: updated });
+                }}
+                className={inputClass}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const updated = (formData.cabinetMaterialVariants || []).filter((_: any, i: number) => i !== index);
+                setFormData({ ...formData, cabinetMaterialVariants: updated });
+              }}
+              className="mt-5 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        
+        <button
+          type="button"
+          onClick={() => {
+            const updated = [...(formData.cabinetMaterialVariants || []), { material: "", price: "" }];
+            setFormData({ ...formData, cabinetMaterialVariants: updated });
+          }}
+          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-semibold transition-colors"
+        >
+          + Add Material Variant
+        </button>
+        
+        {formData.cabinetMaterialVariants && formData.cabinetMaterialVariants.length > 0 && (
+          <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            💡 Tip: Make sure to select a material and enter a price for each variant before saving. Empty variants will be automatically removed.
+          </p>
+        )}
+      </div>
+    </div>
+
+    {/* Module Specifications */}
+    <div>
+      <h3 className={sectionHeaderClass}>Module Specifications</h3>
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className={labelClass}>1. Pixel Pitch</label>
+          <input
+            type="text"
+            placeholder="e.g., P2.5"
+            value={formData.moduleSpecs?.pixelPitch || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              moduleSpecs: { ...formData.moduleSpecs, pixelPitch: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>2. Pixel Configuration</label>
+          <input
+            type="text"
+            placeholder="e.g., SMD2121"
+            value={formData.moduleSpecs?.pixelConfiguration || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              moduleSpecs: { ...formData.moduleSpecs, pixelConfiguration: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>3. Module Resolution</label>
+          <input
+            type="text"
+            placeholder="e.g., 64x64"
+            value={formData.moduleSpecs?.moduleResolution || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              moduleSpecs: { ...formData.moduleSpecs, moduleResolution: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>4. Module Size (mm)</label>
+          <input
+            type="text"
+            placeholder="e.g., 320x160"
+            value={formData.moduleSpecs?.moduleSize || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              moduleSpecs: { ...formData.moduleSpecs, moduleSize: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>5. Module Weight (kg)</label>
+          <input
+            type="number"
+            step="0.01"
+            placeholder="e.g., 0.5"
+            value={formData.moduleSpecs?.moduleWeight || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              moduleSpecs: { ...formData.moduleSpecs, moduleWeight: parseFloat(e.target.value) }
+            })}
+            className={inputClass}
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Cabinet Specifications */}
+    <div>
+      <h3 className={sectionHeaderClass}>Cabinet Specifications</h3>
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className={labelClass}>1. Cabinet Size (W*H)</label>
+          <input
+            type="text"
+            placeholder="e.g., 640x480mm"
+            value={formData.cabinetSpecs?.cabinetSize || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              cabinetSpecs: { ...formData.cabinetSpecs, cabinetSize: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>2. Cabinet Resolution</label>
+          <input
+            type="text"
+            placeholder="e.g., 128x96"
+            value={formData.cabinetSpecs?.cabinetResolution || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              cabinetSpecs: { ...formData.cabinetSpecs, cabinetResolution: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>3. Module Quantity</label>
+          <input
+            type="number"
+            placeholder="e.g., 6"
+            value={formData.cabinetSpecs?.moduleQuantity || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              cabinetSpecs: { ...formData.cabinetSpecs, moduleQuantity: parseInt(e.target.value) }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>4. Pixel Density</label>
+          <input
+            type="text"
+            placeholder="e.g., 160000/sqm"
+            value={formData.cabinetSpecs?.pixelDensity || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              cabinetSpecs: { ...formData.cabinetSpecs, pixelDensity: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>5. Cabinet Weight (kg)</label>
+          <input
+            type="number"
+            step="0.01"
+            placeholder="e.g., 15"
+            value={formData.cabinetSpecs?.cabinetWeight || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              cabinetSpecs: { ...formData.cabinetSpecs, cabinetWeight: parseFloat(e.target.value) }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>6. Cabinet Area (sqm)</label>
+          <input
+            type="number"
+            step="0.01"
+            placeholder="e.g., 0.3072"
+            value={formData.cabinetSpecs?.cabinetArea || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              cabinetSpecs: { ...formData.cabinetSpecs, cabinetArea: parseFloat(e.target.value) }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>7. Material</label>
+          <input
+            type="text"
+            placeholder="e.g., Die-cast Aluminum"
+            value={formData.cabinetSpecs?.material || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              cabinetSpecs: { ...formData.cabinetSpecs, material: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>8. Maintenance</label>
+          <input
+            type="text"
+            placeholder="e.g., Front/Rear"
+            value={formData.cabinetSpecs?.maintenance || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              cabinetSpecs: { ...formData.cabinetSpecs, maintenance: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Screen Parameters */}
+    <div>
+      <h3 className={sectionHeaderClass}>Screen Parameters</h3>
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className={labelClass}>1. Brightness Control</label>
+          <input
+            type="text"
+            placeholder="e.g., Manual/Auto"
+            value={formData.screenParams?.brightnessControl || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, brightnessControl: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>2. White Balance Brightness</label>
+          <input
+            type="text"
+            placeholder="e.g., 5000 nits"
+            value={formData.screenParams?.whiteBalanceBrightness || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, whiteBalanceBrightness: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>3. Color Temperature</label>
+          <input
+            type="text"
+            placeholder="e.g., 6500K"
+            value={formData.screenParams?.colorTemperature || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, colorTemperature: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>4. Best Viewing Distance</label>
+          <input
+            type="text"
+            placeholder="e.g., 2-50m"
+            value={formData.screenParams?.bestViewingDistance || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, bestViewingDistance: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>5. Brightness Uniformity</label>
+          <input
+            type="text"
+            placeholder="e.g., ≥97%"
+            value={formData.screenParams?.brightnessUniformity || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, brightnessUniformity: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>6. Color Uniformity</label>
+          <input
+            type="text"
+            placeholder="e.g., ≥98%"
+            value={formData.screenParams?.colorUniformity || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, colorUniformity: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>7. Protective Grade</label>
+          <input
+            type="text"
+            placeholder="e.g., IP65"
+            value={formData.screenParams?.protectiveGrade || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, protectiveGrade: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>8. View Angle</label>
+          <input
+            type="text"
+            placeholder="e.g., H:160° V:140°"
+            value={formData.screenParams?.viewAngle || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, viewAngle: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>9. Defects Rate</label>
+          <input
+            type="text"
+            placeholder="e.g., <0.0001%"
+            value={formData.screenParams?.defectsRate || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, defectsRate: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>10. Frame Frequency</label>
+          <input
+            type="text"
+            placeholder="e.g., 60Hz"
+            value={formData.screenParams?.frameFrequency || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, frameFrequency: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>11. Refresh Rate</label>
+          <input
+            type="text"
+            placeholder="e.g., 3840Hz"
+            value={formData.screenParams?.refreshRate || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, refreshRate: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>12. Input Voltage</label>
+          <input
+            type="text"
+            placeholder="e.g., 110-240V AC"
+            value={formData.screenParams?.inputVoltage || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, inputVoltage: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>13. Max Power Consumption</label>
+          <input
+            type="text"
+            placeholder="e.g., 800W/sqm"
+            value={formData.screenParams?.maxPowerConsumption || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, maxPowerConsumption: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>14. Avg Power Consumption</label>
+          <input
+            type="text"
+            placeholder="e.g., 300W/sqm"
+            value={formData.screenParams?.avgPowerConsumption || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, avgPowerConsumption: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>15. Life Span</label>
+          <input
+            type="text"
+            placeholder="e.g., 100000 hours"
+            value={formData.screenParams?.lifeSpan || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, lifeSpan: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>16. Temperature-Operating</label>
+          <input
+            type="text"
+            placeholder="e.g., -20°C to 50°C"
+            value={formData.screenParams?.temperatureOperating || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, temperatureOperating: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>17. Humidity-Operating</label>
+          <input
+            type="text"
+            placeholder="e.g., 10%-90%"
+            value={formData.screenParams?.humidityOperating || ""}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              screenParams: { ...formData.screenParams, humidityOperating: e.target.value }
+            })}
+            className={inputClass}
+          />
+        </div>
+      </div>
+    </div>
+  </>
+  );
+};

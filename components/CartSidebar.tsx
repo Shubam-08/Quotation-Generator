@@ -404,7 +404,10 @@ const exportPDF = async () => {
     },
     alternateRowStyles: { fillColor: [245, 245, 245] },
     margin: { left: 14, right: 14, top: 20 },
-    columnStyles: { 0: { cellWidth: 50 } },
+    columnStyles: { 
+      0: { cellWidth: 50 },  // Image column
+      8: { cellWidth: 'auto', minCellWidth: 45 }  // IP Rating column - ensure enough width for text like "IP67 front / IP65 rear"
+    },
     theme: 'grid', // Use grid theme to show all borders
     didParseCell: (data: CellHookData) => {
       if (data.section === 'body') {

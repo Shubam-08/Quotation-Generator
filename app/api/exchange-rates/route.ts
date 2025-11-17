@@ -68,12 +68,8 @@ export async function GET() {
   try {
     const now = Date.now();
 
-    // TEMPORARY: Force cache refresh to apply new fallback rates
-    // Remove this block after rates are updated
-    const forceRefresh = true;
-    
     // Check if we have cached rates and they're still valid
-    if (cachedRates && now < cachedRates.nextUpdate && !forceRefresh) {
+    if (cachedRates && now < cachedRates.nextUpdate) {
       return NextResponse.json({
         rates: cachedRates.rates,
         lastUpdated: cachedRates.lastUpdated,
@@ -102,13 +98,16 @@ export async function GET() {
     console.error('Error in exchange rates API:', error);
     
     // Return fallback rates if everything fails
-    return NextResponse.json({
-      rates: FALLBACK_RATES,
-      lastUpdated: Date.now(),
-      nextUpdate: Date.now() + CACHE_DURATION,
-      cached: false,
-      fallback: true,
-    });
+    return NextResponse.json(
+      {
+        rates: FALLBACK_RATES,
+        lastUpdated: Date.now(),
+        nextUpdate: Date.now() + CACHE_DURATION,
+        cached: false,
+        fallback: true,
+      },
+      { status: 200 } // Ensure 200 status even on fallback
+    );
   }
 }
 

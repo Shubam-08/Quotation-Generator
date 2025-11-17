@@ -21,6 +21,16 @@ type Product = {
   ipRating?: string | string[]; // Support both single string and array for backward compatibility
   images?: string[];
   productImages?: string[];
+  // LED display specific fields (optional, passed through from products page)
+  pixelPitch?: string;
+  totalResolution?: string;
+  sqft?: number;
+  moduleSpecs?: any;
+  cabinetSpecs?: any;
+  screenParams?: any;
+  cabinetRequired?: number;
+  requiredLength?: string;
+  requiredWidth?: string;
 };
 
 type Driver = {
@@ -57,6 +67,7 @@ type CartContextType = {
   increaseQuantity: (cartItemId: string) => void;
   decreaseQuantity: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
+  updateCartItem: (cartItemId: string, updates: Partial<CartItem>) => void;
   clearCart: () => void;
 };
 
@@ -95,8 +106,18 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     // Get lumen for unique identification
     const productLumen = product.lumen || 'default';
     
-    // Create unique cart item ID based on product ID + IP rating + voltage + watt + beam angle + lumen
-    const cartItemId = `${product._id}_${productIpRating || 'default'}_${productVoltage}_${productWatt}_${productBeamAngle}_${productLumen}`;
+    // For LED displays, include dimensions in the unique ID to allow multiple sizes of same product
+    const dimensionKey = (product.requiredLength && product.requiredWidth) 
+      ? `_${product.requiredLength}x${product.requiredWidth}` 
+      : '';
+    
+    // For LED displays, include cabinet material in the unique ID
+    const materialKey = (product as any).selectedCabinetMaterial 
+      ? `_${(product as any).selectedCabinetMaterial.replace(/\s+/g, '')}` 
+      : '';
+    
+    // Create unique cart item ID based on product ID + IP rating + voltage + watt + beam angle + lumen + dimensions + material
+    const cartItemId = `${product._id}_${productIpRating || 'default'}_${productVoltage}_${productWatt}_${productBeamAngle}_${productLumen}${dimensionKey}${materialKey}`;
     
     // Check if this specific combination already exists
     const exists = cart.find(item => item.cartItemId === cartItemId);
@@ -113,11 +134,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
     const validQuantity = Math.max(1, Math.floor(quantity)); // Ensure positive integer
 
-    const cartItem = {
+    const cartItem: CartItem = {
+      ...(product as any),
       _id: product._id,
       sku: product.sku,
       name: product.sku, // for display on sidebar
-      description: product.description || '', // Add description field
+      description: product.description || '',
       price: product.price ?? 0,
       watt: product.watt ?? 0,
       inputVoltage: product.inputVoltage || '-',
@@ -202,6 +224,14 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     );
   };
 
+  const updateCartItem = (cartItemId: string, updates: Partial<CartItem>) => {
+    setCart(prev =>
+      prev.map(item =>
+        item.cartItemId === cartItemId ? { ...item, ...updates } : item
+      )
+    );
+  };
+
   const updateQuantity = (cartItemId: string, quantity: number) => {
     const validQuantity = Math.max(1, Math.floor(quantity)); // Ensure positive integer
     setCart(prev =>
@@ -215,7 +245,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, addDriverToCart, removeFromCart, increaseQuantity, decreaseQuantity, updateQuantity, clearCart }}
+      value={{ cart, addToCart, addDriverToCart, removeFromCart, increaseQuantity, decreaseQuantity, updateQuantity, updateCartItem, clearCart }}
     >
       {children}
     </CartContext.Provider>

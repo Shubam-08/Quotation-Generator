@@ -7,7 +7,7 @@ import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import CurrencySelector from '@/components/CurrencySelector';
 import CurrencyInfo from '@/components/CurrencyInfo';
-import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Sparkles, Sun, Moon, FileText, Download, File, Award, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
+import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Sparkles, Sun, Moon, FileText, Download, File, Award, ChevronLeft, ChevronRight, Plus, Minus, Settings } from 'lucide-react';
 import CartButton from '@/components/CartButton';
 import { getApplicationFromIpRating } from '@/lib/ipRatingUtils';
 
@@ -20,6 +20,11 @@ type VoltageVariant = {
   voltage: string;
   watt: number;
   lumen?: string;
+  price: number;
+};
+
+type CabinetMaterialVariant = {
+  material: string;
   price: number;
 };
 
@@ -37,9 +42,14 @@ type Product = {
   dimension?: string;
   cutOut?: string;
   price: number;
+  // LED display specific
+  pixelPitch?: string;
+  totalResolution?: string;
+  sqft?: number;
   ipRating?: string[];
   ipRatings?: IpRatingPrice[];
   voltageVariants?: VoltageVariant[];
+  cabinetMaterialVariants?: CabinetMaterialVariant[];
   images?: string[];
   productImages?: string[];
   datasheets?: string[];
@@ -47,6 +57,15 @@ type Product = {
   certifications?: string[];
   bisApproval?: string[];
   isoCertificate?: string[];
+  cabinetSpecs?: {
+    cabinetSize?: string; // W*H in mm, e.g. "960x960"
+    cabinetArea?: number; // in sqm, if provided
+    material?: string; // Cabinet material from Cabinet Specifications
+  };
+  cabinetRequired?: number;
+  requiredLength?: string;
+  requiredWidth?: string;
+  selectedCabinetMaterial?: string;
 };
 
 type Filters = {
@@ -77,11 +96,49 @@ const lumenRanges = [
   { label: '2000+ Lm', min: 2000, max: Infinity },
 ];
 
+const FEET_TO_METER = 0.3048;
+
+const computeCabinetCount = (product: Product, lengthFeetStr?: string, widthFeetStr?: string): number | null => {
+  const lengthFeet = parseFloat(lengthFeetStr || '');
+  const widthFeet = parseFloat(widthFeetStr || '');
+
+  if (!isFinite(lengthFeet) || !isFinite(widthFeet) || lengthFeet <= 0 || widthFeet <= 0) return null;
+
+  const areaSqm = lengthFeet * widthFeet * FEET_TO_METER * FEET_TO_METER;
+
+  let cabinetAreaSqm = product.cabinetSpecs?.cabinetArea && product.cabinetSpecs.cabinetArea > 0
+    ? product.cabinetSpecs.cabinetArea
+    : undefined;
+
+  if (!cabinetAreaSqm && product.cabinetSpecs?.cabinetSize) {
+    const parts = product.cabinetSpecs.cabinetSize
+      .split(/x|×|\*/i)
+      .map(p => parseFloat(p.trim()))
+      .filter(n => !isNaN(n) && n > 0);
+
+    if (parts.length >= 2) {
+      const widthM = parts[0] / 1000;
+      const heightM = parts[1] / 1000;
+      cabinetAreaSqm = widthM * heightM;
+    }
+  }
+
+  if (!cabinetAreaSqm || cabinetAreaSqm <= 0) return null;
+
+  const rawCount = areaSqm / cabinetAreaSqm;
+  if (!isFinite(rawCount) || rawCount <= 0) return null;
+
+  return Math.ceil(rawCount);
+};
+
 export default function ProductsPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const { addToCart, cart, increaseQuantity, decreaseQuantity, removeFromCart } = useCart();
+  const { addToCart, cart, increaseQuantity, decreaseQuantity, removeFromCart, updateCartItem } = useCart();
   const { formatPrice } = useCurrency();
+
+  // Product type state
+  const [productType, setProductType] = useState<'led-lights' | 'led-displays' | 'lighting-controls'>('led-lights');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +148,12 @@ export default function ProductsPage() {
   const [selectedVoltageVariants, setSelectedVoltageVariants] = useState<Record<string, number>>({});
   const [selectedBeamAngles, setSelectedBeamAngles] = useState<Record<string, string>>({});
   const [selectedLumens, setSelectedLumens] = useState<Record<string, string>>({});
+  const [selectedCabinetMaterials, setSelectedCabinetMaterials] = useState<Record<string, number>>({});
+  // For LED displays: user-entered required square feet (no calculations yet)
+  const [requiredSqft, setRequiredSqft] = useState<Record<string, string>>({});
+  const [requiredLength, setRequiredLength] = useState<Record<string, string>>({});
+  const [requiredWidth, setRequiredWidth] = useState<Record<string, string>>({});
+  const [cabinetCounts, setCabinetCounts] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -112,12 +175,54 @@ export default function ProductsPage() {
     order: 'asc',
   });
 
+  // Type-specific filters for LED Displays
+  const [displayFilters, setDisplayFilters] = useState({
+    pixelPitch: '',
+    application: '',
+    ipRating: '',
+  });
+
+  // Type-specific filters for Lighting Controls
+  const [controlFilters, setControlFilters] = useState({
+    controlType: '',
+    protocol: '',
+    application: '',
+  });
+
+  // Load Length/Width/Cabinet from cart items on mount for LED displays
+  useEffect(() => {
+    if (productType !== 'led-displays') return;
+    cart.forEach(item => {
+      // Only process non-driver items (products)
+      if (item.isDriver) return;
+      
+      const productItem = item as any; // Type assertion since we know it's a product
+      if (productItem.requiredLength) {
+        setRequiredLength(prev => ({ ...prev, [item._id]: productItem.requiredLength || '' }));
+      }
+      if (productItem.requiredWidth) {
+        setRequiredWidth(prev => ({ ...prev, [item._id]: productItem.requiredWidth || '' }));
+      }
+      if (productItem.cabinetRequired) {
+        setCabinetCounts(prev => ({ ...prev, [item._id]: String(productItem.cabinetRequired) }));
+      }
+    });
+  }, [cart, productType]);
+
   const [filterOptions, setFilterOptions] = useState({
     skus: [] as string[],
     categories: [] as string[],
     applications: [] as string[],
     inputVoltages: [] as string[],
     beamAngles: [] as string[],
+    // LED Display options
+    pixelPitches: [] as string[],
+    displayApplications: [] as string[],
+    ipRatings: [] as string[],
+    // Lighting Control options
+    controlTypes: [] as string[],
+    protocols: [] as string[],
+    controlApplications: [] as string[],
   });
 
   const fetchProducts = useCallback(async () => {
@@ -139,7 +244,30 @@ export default function ProductsPage() {
         }
       });
 
-      const res = await fetch(`/api/products?${params.toString()}`);
+      // Add LED Display specific filters
+      if (productType === 'led-displays') {
+        Object.entries(displayFilters).forEach(([key, value]) => {
+          if (value) {
+            params.append(key, value);
+          }
+        });
+      }
+
+      // Add Lighting Control specific filters
+      if (productType === 'lighting-controls') {
+        Object.entries(controlFilters).forEach(([key, value]) => {
+          if (value) {
+            params.append(key, value);
+          }
+        });
+      }
+
+      // Select API endpoint based on product type
+      const endpoint = productType === 'led-lights' ? '/api/products' 
+                     : productType === 'led-displays' ? '/api/led-displays'
+                     : '/api/lighting-controls';
+
+      const res = await fetch(`${endpoint}?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch products');
 
       const data = await res.json();
@@ -152,21 +280,27 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, productType, displayFilters, controlFilters]);
 
   const fetchFilterOptions = async () => {
     try {
-      const res = await fetch('/api/products');
+      // Select API endpoint based on product type
+      const endpoint = productType === 'led-lights' ? '/api/products' 
+                     : productType === 'led-displays' ? '/api/led-displays'
+                     : '/api/lighting-controls';
+
+      const res = await fetch(endpoint);
       const data = await res.json();
 
       if (!data.error) {
-        const products = data as Product[];
+        const products = data as any[];
         
         // Use categoryFilter if available, otherwise fallback to extracting from category
         const categoryFilters = products
           .map(p => {
             if (p.categoryFilter) return p.categoryFilter;
             // Fallback: extract last two words from category
+            if (!p.category) return null;
             const words = p.category.trim().split(/\s+/);
             return words.length === 1 ? words[0] : words.slice(-2).join(' ');
           })
@@ -192,20 +326,57 @@ export default function ProductsPage() {
           return a.localeCompare(b); // both non-numeric, sort alphabetically
         };
         
-        setFilterOptions({
-          skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
-          categories: [...new Set(categoryFilters)].sort() as string[],
-          applications: [...new Set(products.map(p => p.application).filter((v): v is string => Boolean(v)))].sort() as string[],
-          inputVoltages: [...new Set(products.map(p => p.inputVoltage).filter((v): v is string => Boolean(v)))].sort(numericSortWithNALast) as string[],
-          beamAngles: [...new Set(products.map(p => p.beamAngle).filter((v): v is string => Boolean(v)))].sort(numericSort) as string[],
-        });
+        // Build filter options based on product type
+        if (productType === 'led-lights') {
+          setFilterOptions({
+            skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
+            categories: [...new Set(categoryFilters)].sort() as string[],
+            applications: [...new Set(products.map(p => p.application).filter((v): v is string => Boolean(v)))].sort() as string[],
+            inputVoltages: [...new Set(products.map(p => p.inputVoltage).filter((v): v is string => Boolean(v)))].sort(numericSortWithNALast) as string[],
+            beamAngles: [...new Set(products.map(p => p.beamAngle).filter((v): v is string => Boolean(v)))].sort(numericSort) as string[],
+            pixelPitches: [],
+            displayApplications: [],
+            ipRatings: [],
+            controlTypes: [],
+            protocols: [],
+            controlApplications: [],
+          });
+        } else if (productType === 'led-displays') {
+          setFilterOptions({
+            skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
+            categories: [...new Set(categoryFilters)].sort() as string[],
+            applications: [],
+            inputVoltages: [],
+            beamAngles: [],
+            pixelPitches: [...new Set(products.map(p => p.pixelPitch).filter((v): v is string => Boolean(v)))].sort(numericSort) as string[],
+            displayApplications: [...new Set(products.map(p => p.application).filter((v): v is string => Boolean(v)))].sort() as string[],
+            ipRatings: [...new Set(products.map(p => p.ipRating).filter((v): v is string => Boolean(v)))].sort() as string[],
+            controlTypes: [],
+            protocols: [],
+            controlApplications: [],
+          });
+        } else if (productType === 'lighting-controls') {
+          setFilterOptions({
+            skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
+            categories: [...new Set(categoryFilters)].sort() as string[],
+            applications: [],
+            inputVoltages: [],
+            beamAngles: [],
+            pixelPitches: [],
+            displayApplications: [],
+            ipRatings: [],
+            controlTypes: [...new Set(products.map(p => p.controlType).filter((v): v is string => Boolean(v)))].sort() as string[],
+            protocols: [...new Set(products.map(p => p.protocol).filter((v): v is string => Boolean(v)))].sort() as string[],
+            controlApplications: [...new Set(products.map(p => p.application).filter((v): v is string => Boolean(v)))].sort() as string[],
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to fetch filter options:', err);
     }
   };
 
-  useEffect(() => { fetchFilterOptions(); }, []);
+  useEffect(() => { fetchFilterOptions(); }, [productType]);
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
@@ -233,10 +404,22 @@ export default function ProductsPage() {
       sortBy: 'sku',
       order: 'asc',
     });
+    setDisplayFilters({
+      pixelPitch: '',
+      application: '',
+      ipRating: '',
+    });
+    setControlFilters({
+      controlType: '',
+      protocol: '',
+      application: '',
+    });
     setCurrentPage(1); // Reset to first page when filters are cleared
   };
 
-  const activeFilterCount = Object.values(filters).filter(v => v && v !== 'sku' && v !== 'asc').length;
+  const activeFilterCount = Object.values(filters).filter(v => v && v !== 'sku' && v !== 'asc').length
+    + Object.values(displayFilters).filter(v => v).length
+    + Object.values(controlFilters).filter(v => v).length;
 
   // Handle file download with authentication check
   const handleFileDownload = (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
@@ -269,10 +452,10 @@ export default function ProductsPage() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className={`text-3xl md:text-4xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Product Quotation</h1>
-                <div className="inline-flex items-center gap-2 bg-yellow-400/10 backdrop-blur-sm border border-yellow-400/20 text-yellow-400 px-3 py-1 rounded-full text-xs font-semibold">
+               {/* <div className="inline-flex items-center gap-2 bg-yellow-400/10 backdrop-blur-sm border border-yellow-400/20 text-yellow-400 px-3 py-1 rounded-full text-xs font-semibold">
                   <Sparkles className="w-3 h-3" />
                   <span>Build Your Quote</span>
-                </div>
+                </div> */}
               </div>
               <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Browse and select products for your quotation</p>
             </div>
@@ -308,9 +491,73 @@ export default function ProductsPage() {
               )}
             </div>
           </div>
+
+          {/* Product Type Tabs */}
+          <div className="flex gap-2 mt-6">
+            <button
+              onClick={() => {
+                setProductType('led-lights');
+                setCurrentPage(1);
+                setDisplayFilters({ pixelPitch: '', application: '', ipRating: '' });
+                setControlFilters({ controlType: '', protocol: '', application: '' });
+              }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all ${
+                productType === 'led-lights'
+                  ? isDarkMode
+                    ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
+                    : 'bg-yellow-400 text-black shadow-lg'
+                  : isDarkMode
+                    ? 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10'
+                    : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              LED Lights
+            </button>
+            <button
+              onClick={() => {
+                setProductType('led-displays');
+                setCurrentPage(1);
+                setDisplayFilters({ pixelPitch: '', application: '', ipRating: '' });
+                setControlFilters({ controlType: '', protocol: '', application: '' });
+              }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all ${
+                productType === 'led-displays'
+                  ? isDarkMode
+                    ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
+                    : 'bg-yellow-400 text-black shadow-lg'
+                  : isDarkMode
+                    ? 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10'
+                    : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              LED Displays
+            </button>
+            <button
+              onClick={() => {
+                setProductType('lighting-controls');
+                setCurrentPage(1);
+                setDisplayFilters({ pixelPitch: '', application: '', ipRating: '' });
+                setControlFilters({ controlType: '', protocol: '', application: '' });
+              }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all ${
+                productType === 'lighting-controls'
+                  ? isDarkMode
+                    ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
+                    : 'bg-yellow-400 text-black shadow-lg'
+                  : isDarkMode
+                    ? 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10'
+                    : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+           Lighting Controls
+            </button>
+          </div>       
         </div>
 
-        {/* Continuous Scrolling Banner */}
+        {/* Continuous  Banner */}
         <div className={`mb-6 overflow-hidden rounded-lg ${
           isDarkMode 
             ? 'bg-gradient-to-r from-yellow-500/10 via-yellow-400/10 to-yellow-500/10 border border-yellow-400/30' 
@@ -344,7 +591,7 @@ export default function ProductsPage() {
                 isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
               }`}>
                 ⚠️ Products with unlisted or zero prices are available on request
-              </span>
+              </span>   
               <span className={`text-sm font-semibold mx-8 ${
                 isDarkMode ? 'text-yellow-400' : 'text-yellow-700'
               }`}>
@@ -406,7 +653,7 @@ export default function ProductsPage() {
           {showFilters && (
             <div className={`p-6 ${isDarkMode ? 'border-t border-white/10' : 'border-t border-gray-200'}`}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {/* Search */}
+                {/* Search - Common for all types */}
                 <div>
                   <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
@@ -427,7 +674,7 @@ export default function ProductsPage() {
                   />
                 </div>
 
-                {/* Category */}
+                {/* Category - Common for all types */}
                 <div>
                   <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
@@ -446,100 +693,229 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
-                {/* Application */}
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Application</label>
-                  <select 
-                    value={filters.application} 
-                    onChange={e => handleFilterChange('application', e.target.value)} 
-                    className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                      isDarkMode 
-                        ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                    }`}
-                  >
-                    <option value="">All Applications</option>
-                    {filterOptions.applications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
+                {/* LED Lights Filters */}
+                {productType === 'led-lights' && (
+                  <>
+                    {/* Application */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Application</label>
+                      <select 
+                        value={filters.application} 
+                        onChange={e => handleFilterChange('application', e.target.value)} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Applications</option>
+                        {filterOptions.applications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
 
-                {/* Wattage */}
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Wattage</label>
-                  <select 
-                    value={filters.watt} 
-                    onChange={e => handleFilterChange('watt', e.target.value)} 
-                    className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                      isDarkMode 
-                        ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                    }`}
-                  >
-                    <option value="">All Wattages</option>
-                    {wattRanges.map(r => <option key={r.label} value={`${r.min}-${r.max}`}>{r.label}</option>)}
-                  </select>
-                </div>
+                    {/* Wattage */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Wattage</label>
+                      <select 
+                        value={filters.watt} 
+                        onChange={e => handleFilterChange('watt', e.target.value)} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Wattages</option>
+                        {wattRanges.map(r => <option key={r.label} value={`${r.min}-${r.max}`}>{r.label}</option>)}
+                      </select>
+                    </div>
 
-                {/* Lumen */}
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Lumen Output</label>
-                  <select 
-                    value={filters.lumen} 
-                    onChange={e => handleFilterChange('lumen', e.target.value)} 
-                    className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                      isDarkMode 
-                        ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                    }`}
-                  >
-                    <option value="">All Lumens</option>
-                    {lumenRanges.map(r => <option key={r.label} value={`${r.min}-${r.max}`}>{r.label}</option>)}
-                  </select>
-                </div>
+                    {/* Lumen */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Lumen Output</label>
+                      <select 
+                        value={filters.lumen} 
+                        onChange={e => handleFilterChange('lumen', e.target.value)} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Lumens</option>
+                        {lumenRanges.map(r => <option key={r.label} value={`${r.min}-${r.max}`}>{r.label}</option>)}
+                      </select>
+                    </div>
 
-                {/* Input Voltage */}
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Input Voltage</label>
-                  <select 
-                    value={filters.inputVoltage} 
-                    onChange={e => handleFilterChange('inputVoltage', e.target.value)} 
-                    className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                      isDarkMode 
-                        ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                    }`}
-                  >
-                    <option value="">All Voltages</option>
-                    {filterOptions.inputVoltages.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
+                    {/* Input Voltage */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Input Voltage</label>
+                      <select 
+                        value={filters.inputVoltage} 
+                        onChange={e => handleFilterChange('inputVoltage', e.target.value)} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Voltages</option>
+                        {filterOptions.inputVoltages.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
 
-                {/* Beam Angle */}
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Beam Angle</label>
-                  <select 
-                    value={filters.beamAngle} 
-                    onChange={e => handleFilterChange('beamAngle', e.target.value)} 
-                    className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                      isDarkMode 
-                        ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                    }`}
-                  >
-                    <option value="">All Beam Angles</option>
-                    {filterOptions.beamAngles.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
+                    {/* Beam Angle */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Beam Angle</label>
+                      <select 
+                        value={filters.beamAngle} 
+                        onChange={e => handleFilterChange('beamAngle', e.target.value)} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Beam Angles</option>
+                        {filterOptions.beamAngles.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                {/* LED Displays Filters */}
+                {productType === 'led-displays' && (
+                  <>
+                    {/* Pixel Pitch */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Pixel Pitch</label>
+                      <select 
+                        value={displayFilters.pixelPitch} 
+                        onChange={e => setDisplayFilters(prev => ({ ...prev, pixelPitch: e.target.value }))} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Pixel Pitches</option>
+                        {filterOptions.pixelPitches.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Application */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Application</label>
+                      <select 
+                        value={displayFilters.application} 
+                        onChange={e => setDisplayFilters(prev => ({ ...prev, application: e.target.value }))} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Applications</option>
+                        {filterOptions.displayApplications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+
+                    {/* IP Rating */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>IP Rating</label>
+                      <select 
+                        value={displayFilters.ipRating} 
+                        onChange={e => setDisplayFilters(prev => ({ ...prev, ipRating: e.target.value }))} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All IP Ratings</option>
+                        {filterOptions.ipRatings.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                {/* Lighting Controls Filters */}
+                {productType === 'lighting-controls' && (
+                  <>
+                    {/* Control Type */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Control Type</label>
+                      <select 
+                        value={controlFilters.controlType} 
+                        onChange={e => setControlFilters(prev => ({ ...prev, controlType: e.target.value }))} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Control Types</option>
+                        {filterOptions.controlTypes.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Protocol */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Protocol</label>
+                      <select 
+                        value={controlFilters.protocol} 
+                        onChange={e => setControlFilters(prev => ({ ...prev, protocol: e.target.value }))} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Protocols</option>
+                        {filterOptions.protocols.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Application */}
+                    <div>
+                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Application</label>
+                      <select 
+                        value={controlFilters.application} 
+                        onChange={e => setControlFilters(prev => ({ ...prev, application: e.target.value }))} 
+                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
+                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                        }`}
+                      >
+                        <option value="">All Applications</option>
+                        {filterOptions.controlApplications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -562,7 +938,7 @@ export default function ProductsPage() {
                 <div className={`w-12 h-12 border-4 rounded-full animate-spin mb-4 ${
                   isDarkMode ? 'border-white/10 border-t-yellow-400' : 'border-gray-200 border-t-yellow-400'
                 }`}></div>
-                <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading products...</p>
+                <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Fetching the best quotes for you…...</p>
               </div>
             )}
             
@@ -590,7 +966,8 @@ export default function ProductsPage() {
                       <th className={`px-4 py-3 text-center text-xs font-bold uppercase tracking-wider ${
                         isDarkMode ? 'text-gray-400' : 'text-gray-600'
                       }`}>Image</th>
-                      {[
+                      {/* Dynamic columns based on product type */}
+                      {productType === 'led-lights' && [
                         { label: 'Model', key: 'sku' },
                         { label: 'Category', key: 'category' },
                         { label: 'Application', key: 'application' },
@@ -599,6 +976,47 @@ export default function ProductsPage() {
                         { label: 'Lumen', key: 'lumen' },
                         { label: 'Beam Angle', key: 'beamAngle' },
                         { label: 'IP Rating', key: 'ipRating' },
+                        { label: 'Price', key: 'price' },
+                        { label: 'Files', key: 'files' },
+                        { label: 'Action', key: 'action' }
+                      ].map(col => (
+                        <th 
+                          key={col.key} 
+                          className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-wider ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          } ${col.key !== 'action' && col.key !== 'files' ? `cursor-pointer ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-100'}` : ''}`}
+                          onClick={() => col.key !== 'action' && col.key !== 'files' && handleSortChange(col.key)}
+                        >
+                          {col.label}
+                        </th>
+                      ))}
+                      {productType === 'led-displays' && [
+                        { label: 'Category', key: 'category' },
+                        { label: 'Application', key: 'application' },
+                        { label: 'IP Rating', key: 'ipRating' },
+                        { label: 'Pixel Pitch', key: 'pixelPitch' },
+                        { label: 'Cabinet Material', key: 'cabinetMaterial' },
+                        { label: 'Price/sq.m', key: 'price' },
+                        { label: 'Screen Inputs (L × W)', key: 'sqft' },
+                        { label: 'Cabinet Required', key: 'cabinets' },
+                        { label: 'Action', key: 'action' }
+                      ].map(col => (
+                        <th 
+                          key={col.key} 
+                          className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-wider ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          } ${col.key !== 'action' && col.key !== 'files' ? `cursor-pointer ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-100'}` : ''}`}
+                          onClick={() => col.key !== 'action' && col.key !== 'files' && handleSortChange(col.key)}
+                        >
+                          {col.label}
+                        </th>
+                      ))}
+                      {productType === 'lighting-controls' && [
+                        { label: 'Model', key: 'sku' },
+                        { label: 'Category', key: 'category' },
+                        { label: 'Control Type', key: 'controlType' },
+                        { label: 'Protocol', key: 'protocol' },
+                        { label: 'Application', key: 'application' },
                         { label: 'Price', key: 'price' },
                         { label: 'Files', key: 'files' },
                         { label: 'Action', key: 'action' }
@@ -634,16 +1052,18 @@ export default function ProductsPage() {
                         // Still track IP rating for display
                         if (p.ipRatings && p.ipRatings.length > 0) {
                           currentIpRating = selectedIpRatings[p._id] || p.ipRatings[0].rating;
-                        } else if (p.ipRating && p.ipRating.length > 0) {
-                          currentIpRating = p.ipRating.length > 1 ? (selectedIpRatings[p._id] || p.ipRating[0]) : p.ipRating[0];
+                        } else if (p.ipRating) {
+                          // Handle both string and array
+                          currentIpRating = typeof p.ipRating === 'string' ? p.ipRating : (Array.isArray(p.ipRating) && p.ipRating.length > 0 ? (selectedIpRatings[p._id] || p.ipRating[0]) : undefined);
                         }
                       } else if (p.ipRatings && p.ipRatings.length > 0) {
                         const selectedRating = selectedIpRatings[p._id] || p.ipRatings[0].rating;
                         const ipData = p.ipRatings.find(ip => ip.rating === selectedRating);
                         currentIpRating = selectedRating;
                         currentPrice = ipData?.price || 0;
-                      } else if (p.ipRating && p.ipRating.length > 0) {
-                        currentIpRating = p.ipRating.length > 1 ? (selectedIpRatings[p._id] || p.ipRating[0]) : p.ipRating[0];
+                      } else if (p.ipRating) {
+                        // Handle both string and array
+                        currentIpRating = typeof p.ipRating === 'string' ? p.ipRating : (Array.isArray(p.ipRating) && p.ipRating.length > 0 ? (selectedIpRatings[p._id] || p.ipRating[0]) : undefined);
                         currentPrice = p.price;
                       } else {
                         currentIpRating = undefined;
@@ -662,9 +1082,307 @@ export default function ProductsPage() {
                       const currentVoltage = currentVoltageVariant?.voltage || p.inputVoltage || 'default';
                       const currentWatt = currentVoltageVariant?.watt || p.watt || 'default';
                       
-                      const cartItemId = `${p._id}_${currentIpRating || 'default'}_${currentVoltage}_${currentWatt}_${currentBeamAngle || 'default'}_${currentLumen || 'default'}`;
+                      // For LED displays, include dimensions and cabinet material in cart ID
+                      let dimensionKey = '';
+                      let materialKey = '';
+                      let currentCabinetMaterial: string | undefined;
+                      
+                      if (productType === 'led-displays') {
+                        // Get selected cabinet material variant or fallback to cabinetSpecs.material
+                        if (p.cabinetMaterialVariants && p.cabinetMaterialVariants.length > 0) {
+                          const selectedIdx = selectedCabinetMaterials[p._id] ?? 0;
+                          const variant = p.cabinetMaterialVariants[selectedIdx];
+                          currentCabinetMaterial = variant.material;
+                          currentPrice = variant.price; // Override price with cabinet material variant price
+                        } else if (p.cabinetSpecs?.material) {
+                          // Fallback to material from Cabinet Specifications
+                          currentCabinetMaterial = p.cabinetSpecs.material;
+                        }
+                        
+                        dimensionKey = (requiredLength[p._id] && requiredWidth[p._id])
+                          ? `_${requiredLength[p._id]}x${requiredWidth[p._id]}`
+                          : '';
+                        materialKey = currentCabinetMaterial ? `_${currentCabinetMaterial.replace(/\s+/g, '')}` : '';
+                      }
+                      
+                      const cartItemId = `${p._id}_${currentIpRating || 'default'}_${currentVoltage}_${currentWatt}_${currentBeamAngle || 'default'}_${currentLumen || 'default'}${dimensionKey}${materialKey}`;
                       const isInCart = cart.some(item => item.cartItemId === cartItemId);
 
+                      // Custom layout for LED Displays
+                      if (productType === 'led-displays') {
+                        const singleIpRating = typeof p.ipRating === 'string' ? p.ipRating : (Array.isArray(p.ipRating) && p.ipRating.length > 0 ? p.ipRating[0] : p.ipRating);
+                        
+                        return (
+                          <tr key={p._id} className={`transition-colors ${
+                            isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+                          }`}>
+                            <td className="px-4 py-4 text-center">
+                              {(p.productImages?.length || p.images?.length) ? (
+                                <img
+                                  src={p.productImages?.[0] || p.images?.[0]}
+                                  alt={p.sku}
+                                  className={`w-28 h-28 object-cover rounded-xl border-2 mx-auto ${
+                                    isDarkMode ? 'border-white/10' : 'border-gray-200'
+                                  }`}
+                                />
+                              ) : (
+                                <div className={`w-16 h-16 rounded-lg flex items-center justify-center mx-auto ${
+                                  isDarkMode ? 'bg-gray-800' : 'bg-gray-100'
+                                }`}>
+                                  <Package className={`w-6 h-6 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="inline-block bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-3 py-1 rounded-full text-xs font-semibold">
+                                {p.category}
+                              </span>
+                            </td>
+                            <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {p.application || '-'}
+                            </td>
+                            <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {singleIpRating || '-'}
+                            </td>
+                            <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {p.pixelPitch || '-'}
+                            </td>
+                            <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {p.cabinetMaterialVariants && p.cabinetMaterialVariants.length > 0 ? (
+                                <select
+                                  value={selectedCabinetMaterials[p._id] ?? 0}
+                                  onChange={(e) => {
+                                    setSelectedCabinetMaterials(prev => ({
+                                      ...prev,
+                                      [p._id]: parseInt(e.target.value, 10)
+                                    }));
+                                  }}
+                                  className={`w-full px-3 py-2 rounded-md text-xs outline-none border ${
+                                    isDarkMode
+                                      ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                      : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                  }`}
+                                >
+                                  {p.cabinetMaterialVariants.map((variant, idx) => (
+                                    <option key={idx} value={idx}>
+                                      {variant.material}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : p.cabinetSpecs?.material ? (
+                                <span className="text-sm">{p.cabinetSpecs.material}</span>
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                            <td className={`px-4 py-4 text-sm font-bold text-yellow-400`}>
+                              {(() => {
+                                // Use cabinet material variant price if available
+                                if (p.cabinetMaterialVariants && p.cabinetMaterialVariants.length > 0) {
+                                  const selectedIdx = selectedCabinetMaterials[p._id] ?? 0;
+                                  const variant = p.cabinetMaterialVariants[selectedIdx];
+                                  return formatPrice(variant?.price || p.price);
+                                }
+                                return formatPrice(p.price);
+                              })()}
+                            </td>
+                            <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              <div className="flex flex-col gap-2">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-semibold">Required size <span className="text-[10px] text-gray-500">( Enter in feet)</span></span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={requiredLength[p._id] ?? ''}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setRequiredLength(prev => ({
+                                          ...prev,
+                                          [p._id]: value,
+                                        }));
+                                        setRequiredSqft(prev => ({
+                                          ...prev,
+                                          [p._id]: `${value}x${requiredWidth[p._id] ?? ''}`,
+                                        }));
+                                        const auto = computeCabinetCount(p, value, requiredWidth[p._id]);
+                                        setCabinetCounts(prev => ({
+                                          ...prev,
+                                          [p._id]: auto !== null ? String(auto) : prev[p._id] ?? '',
+                                        }));
+                                      }}
+                                      className={`w-20 px-2 py-1 rounded-md text-xs outline-none border ${
+                                        isDarkMode
+                                          ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                          : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                      }`}
+                                      placeholder="Length (ft)"
+                                    />
+                                    <span className="text-xs">×</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={requiredWidth[p._id] ?? ''}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setRequiredWidth(prev => ({
+                                          ...prev,
+                                          [p._id]: value,
+                                        }));
+                                        setRequiredSqft(prev => ({
+                                          ...prev,
+                                          [p._id]: `${requiredLength[p._id] ?? ''}x${value}`,
+                                        }));
+                                        const auto = computeCabinetCount(p, requiredLength[p._id], value);
+                                        setCabinetCounts(prev => ({
+                                          ...prev,
+                                          [p._id]: auto !== null ? String(auto) : prev[p._id] ?? '',
+                                        }));
+                                      }}
+                                      className={`w-20 px-2 py-1 rounded-md text-xs outline-none border ${
+                                        isDarkMode
+                                          ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                          : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                      }`}
+                                      placeholder="Width (ft)"
+                                    />
+                                  </div>
+                                  {(() => {
+                                    const lenFt = parseFloat(requiredLength[p._id] ?? '');
+                                    const widFt = parseFloat(requiredWidth[p._id] ?? '');
+                                    const hasLen = !isNaN(lenFt);
+                                    const hasWid = !isNaN(widFt);
+                                    const toM = (ft: number) => (ft * FEET_TO_METER);
+                                    const fmt = (m: number) => m.toFixed(2);
+                                    if (hasLen && hasWid) {
+                                      return (
+                                        <span className="text-[10px] text-gray-500 mt-1">
+                                          ≈ W{fmt(toM(lenFt))}m × H{fmt(toM(widFt))}m
+                                        </span>
+                                      );
+                                    }
+                                    if (hasLen || hasWid) {
+                                      return (
+                                        <span className="text-[10px] text-gray-500 mt-1">
+                                          {hasLen ? `W${fmt(toM(lenFt))}m` : ''}
+                                          {hasLen && hasWid ? ' · ' : ''}
+                                          {hasWid ? `H${fmt(toM(widFt))}m` : ''}
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              </div>
+                            </td>
+                            <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              <div className="flex flex-col gap-1">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={cabinetCounts[p._id] ?? ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setCabinetCounts(prev => ({
+                                      ...prev,
+                                      [p._id]: value,
+                                    }));
+                                  }}
+                                  className={`w-20 px-2 py-1 rounded-md text-xs outline-none border ${
+                                    isDarkMode
+                                      ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                      : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                  }`}
+                                  placeholder="Cabinets"
+                                />
+                                {(() => {
+                                  const auto = computeCabinetCount(p, requiredLength[p._id], requiredWidth[p._id]);
+                                  return auto !== null ? (
+                                    <span className="text-[10px] text-gray-400">
+                                      Auto: {auto} cabinets
+                                    </span>
+                                  ) : null;
+                                })()}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              {/* For LED displays, always show Update button since dimensions can change */}
+                              {isInCart ? (
+                                <button 
+                                  onClick={() => {
+                                    if (addingProductId !== cartItemId) {
+                                      setAddingProductId(cartItemId);
+                                      updateCartItem(cartItemId, {
+                                        cabinetRequired: cabinetCounts[p._id]
+                                          ? parseInt(cabinetCounts[p._id], 10) || undefined
+                                          : undefined,
+                                        requiredLength: requiredLength[p._id] || undefined,
+                                        requiredWidth: requiredWidth[p._id] || undefined,
+                                      });
+                                      setTimeout(() => setAddingProductId(null), 500);
+                                    }
+                                  }}
+                                  disabled={addingProductId === cartItemId}
+                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                    addingProductId === cartItemId
+                                    ? 'bg-blue-500 text-white cursor-wait'
+                                    : 'bg-green-500 hover:bg-green-600 text-white hover:scale-105'
+                                  }`}
+                                >
+                                  <Settings className="w-4 h-4" />
+                                  {addingProductId === cartItemId ? 'Updating...' : 'Update'}
+                                </button>
+                              ) : (
+                                // Show Add to Cart button when item is not in cart
+                                <button 
+                                  onClick={() => {
+                                    if (addingProductId !== cartItemId) {
+                                      setAddingProductId(cartItemId);
+                                      // Get selected beam angle if multiple exist
+                                      const beamAnglesForCart = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
+                                      const selectedBeamAngleForCart = beamAnglesForCart.length > 1 ? (selectedBeamAngles[p._id] || beamAnglesForCart[0]) : p.beamAngle;
+                                      
+                                      const productToAdd = {
+                                        ...p,
+                                        ipRating: currentIpRating,
+                                        inputVoltage: currentVoltage !== 'default' ? currentVoltage : p.inputVoltage,
+                                        watt: currentWatt !== 'default' ? currentWatt : p.watt,
+                                        beamAngle: selectedBeamAngleForCart,
+                                        lumen: currentLumen,
+                                        price: currentPrice,
+                                        selectedCabinetMaterial: currentCabinetMaterial,
+                                        cabinetRequired: cabinetCounts[p._id]
+                                          ? parseInt(cabinetCounts[p._id], 10) || undefined
+                                          : undefined,
+                                        requiredLength: requiredLength[p._id] || undefined,
+                                        requiredWidth: requiredWidth[p._id] || undefined,
+                                      };
+                                      
+                                      addToCart(productToAdd);
+                                      setTimeout(() => setAddingProductId(null), 500);
+                                    }
+                                  }}
+                                  disabled={addingProductId === cartItemId}
+                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                    addingProductId === cartItemId
+                                    ? 'bg-blue-500 text-white cursor-wait'
+                                    : 'bg-yellow-400 hover:bg-yellow-500 text-black hover:scale-105'
+                                  }`}
+                                >
+                                  <ShoppingCart className="w-4 h-4" />
+                                  {addingProductId === cartItemId ? 'Adding...' : 'Add to Cart'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      // Default layout for LED Lights and Lighting Controls
                       return (
                         <tr key={p._id} className={`transition-colors ${
                           isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'
@@ -696,13 +1414,13 @@ export default function ProductsPage() {
                           <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                             {(() => {
                               // Get currently selected IP rating for this product
-                              const currentIpRating = selectedIpRatings[p._id] || 
+                              const currentIpRatingForApp = selectedIpRatings[p._id] || 
                                 (p.ipRatings && p.ipRatings.length > 0 ? p.ipRatings[0].rating : 
                                 (p.ipRating && p.ipRating.length > 0 ? p.ipRating[0] : null));
                               
                               // Calculate application based on selected IP rating
-                              const dynamicApplication = currentIpRating 
-                                ? getApplicationFromIpRating(currentIpRating)
+                              const dynamicApplication = currentIpRatingForApp 
+                                ? getApplicationFromIpRating(currentIpRatingForApp)
                                 : (p.application || 'Indoor');
                               
                               return dynamicApplication;
@@ -857,21 +1575,24 @@ export default function ProductsPage() {
                                 </select>
                               )
                             ) : p.ipRating && p.ipRating.length > 0 ? (
-                              p.ipRating.length === 1 ? (
-                                <span className="inline-block bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-3 py-1 rounded-full text-xs font-semibold">
-                                  {p.ipRating[0]}
-                                </span>
-                              ) : (
-                                <select
-                                  value={selectedIpRatings[p._id] || p.ipRating[0]}
-                                  onChange={(e) => setSelectedIpRatings(prev => ({ ...prev, [p._id]: e.target.value }))}
-                                  className="bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer outline-none"
-                                >
-                                  {p.ipRating.map((rating) => (
-                                    <option key={rating} value={rating}>{rating}</option>
-                                  ))}
-                                </select>
-                              )
+                              (() => {
+                                const ipRatingsArray = Array.isArray(p.ipRating) ? p.ipRating : [p.ipRating];
+                                return ipRatingsArray.length === 1 ? (
+                                  <span className="inline-block bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-3 py-1 rounded-full text-xs font-semibold">
+                                    {ipRatingsArray[0]}
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={selectedIpRatings[p._id] || ipRatingsArray[0]}
+                                    onChange={(e) => setSelectedIpRatings(prev => ({ ...prev, [p._id]: e.target.value }))}
+                                    className="bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer outline-none"
+                                  >
+                                    {ipRatingsArray.map((rating) => (
+                                      <option key={rating} value={rating}>{rating}</option>
+                                    ))}
+                                  </select>
+                                );
+                              })()
                             ) : (
                               <span className="text-gray-500">N/A</span>
                             )}

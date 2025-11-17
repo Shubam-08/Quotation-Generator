@@ -100,7 +100,7 @@ export default function Footer() {
     <li>
       <h4 className="text-yellow-400 font-semibold text-sm mb-2">India Office</h4>
       <a 
-        href="mailto:revant@qliteglobal.com" 
+        href="mailto:ankit.mittal@qliteglobal.com" 
         className="text-gray-400 hover:text-yellow-400 transition-colors text-sm flex items-start gap-2 group"
       >
         <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -122,7 +122,7 @@ export default function Footer() {
     <li>
       <h4 className="text-yellow-400 font-semibold text-sm mb-2">Gulf Office</h4>
       <a 
-        href="mailto:ankit.mittal@qliteglobal.com" 
+        href="mailto:revant@qliteglobal.com" 
         className="text-gray-400 hover:text-yellow-400 transition-colors text-sm flex items-start gap-2 group"
       >
         <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -186,7 +186,7 @@ export default function Footer() {
         <div className="border-t border-white/10 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-400 text-center md:text-left">
-              © {new Date().getFullYear()} <span className="text-white font-semibold">QLite Global</span>. All rights reserved.
+              © {new Date().getFullYear()} <span className="text-white font-semibold">Qlite Global</span>. All rights reserved.
             </div>
             
             <div className="flex items-center gap-6 text-sm">

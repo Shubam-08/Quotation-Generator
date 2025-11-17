@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate SEO Images - QLite Global</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        .canvas-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            max-width: 100%;
+            height: auto;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            background: white;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .preview {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+        .instructions ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        .instructions li {
+            margin: 5px 0;
+            color: #1976d2;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 SEO Image Generator</h1>
+        <p class="subtitle">Generate favicon and OpenGraph images for QLite Global</p>
+
+        <div class="instructions">
+            <strong>📋 Instructions:</strong>
+            <ol>
+                <li>Upload your logo (logoqliteweb.png or logo.jpg from /public folder)</li>
+                <li>Generate the OpenGraph image (1200x630)</li>
+                <li>Download and save as <code>og-image.png</code> in /public folder</li>
+                <li>For favicon, use an online converter like <a href="https://favicon.io/favicon-converter/" target="_blank">favicon.io</a></li>
+            </ol>
+        </div>
+
+        <!-- OpenGraph Image Generator -->
+        <div class="section">
+            <h2>📱 OpenGraph Image (1200x630)</h2>
+            <div class="controls">
+                <input type="file" id="logoInput" accept="image/*">
+                <button id="generateOG" disabled>Generate OpenGraph Image</button>
+            </div>
+            <div class="canvas-container">
+                <canvas id="ogCanvas" width="1200" height="630"></canvas>
+            </div>
+            <div class="preview">
+                <button id="downloadOG" disabled>⬇️ Download og-image.png</button>
+                <div id="ogStatus"></div>
+            </div>
+        </div>
+
+        <!-- Favicon Instructions -->
+        <div class="section">
+            <h2>🔖 Favicon Generation</h2>
+            <p style="margin-bottom: 15px; color: #666;">
+                For the best favicon, use an online converter:
+            </p>
+            <ol style="margin-left: 20px; color: #666;">
+                <li>Go to <a href="https://favicon.io/favicon-converter/" target="_blank" style="color: #667eea;">favicon.io/favicon-converter</a></li>
+                <li>Upload your logo (logoqliteweb.png)</li>
+                <li>Download the generated favicon.ico</li>
+                <li>Place it in /public/favicon.ico</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let uploadedImage = null;
+
+        const logoInput = document.getElementById('logoInput');
+        const generateOGBtn = document.getElementById('generateOG');
+        const downloadOGBtn = document.getElementById('downloadOG');
+        const ogCanvas = document.getElementById('ogCanvas');
+        const ogCtx = ogCanvas.getContext('2d');
+        const ogStatus = document.getElementById('ogStatus');
+
+        // Handle logo upload
+        logoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        uploadedImage = img;
+                        generateOGBtn.disabled = false;
+                        showStatus(ogStatus, 'Logo loaded! Click "Generate OpenGraph Image"', 'success');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Generate OpenGraph Image
+        generateOGBtn.addEventListener('click', () => {
+            if (!uploadedImage) return;
+
+            // Clear canvas
+            ogCtx.fillStyle = '#ffffff';
+            ogCtx.fillRect(0, 0, 1200, 630);
+
+            // Add gradient background
+            const gradient = ogCtx.createLinearGradient(0, 0, 1200, 630);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            ogCtx.fillStyle = gradient;
+            ogCtx.fillRect(0, 0, 1200, 630);
+
+            // Calculate logo dimensions (max 400x400, maintain aspect ratio)
+            const maxLogoSize = 400;
+            let logoWidth = uploadedImage.width;
+            let logoHeight = uploadedImage.height;
+            const aspectRatio = logoWidth / logoHeight;
+
+            if (logoWidth > maxLogoSize || logoHeight > maxLogoSize) {
+                if (aspectRatio > 1) {
+                    logoWidth = maxLogoSize;
+                    logoHeight = maxLogoSize / aspectRatio;
+                } else {
+                    logoHeight = maxLogoSize;
+                    logoWidth = maxLogoSize * aspectRatio;
+                }
+            }
+
+            // Draw logo (centered, upper portion)
+            const logoX = (1200 - logoWidth) / 2;
+            const logoY = 100;
+            ogCtx.drawImage(uploadedImage, logoX, logoY, logoWidth, logoHeight);
+
+            // Add text
+            ogCtx.fillStyle = '#ffffff';
+            ogCtx.textAlign = 'center';
+            
+            // Title
+            ogCtx.font = 'bold 60px Arial, sans-serif';
+            ogCtx.fillText('QLite Global', 600, logoY + logoHeight + 80);
+            
+            // Subtitle
+            ogCtx.font = '36px Arial, sans-serif';
+            ogCtx.fillText('Automatic Quotation Generator', 600, logoY + logoHeight + 140);
+
+            downloadOGBtn.disabled = false;
+            showStatus(ogStatus, '✅ OpenGraph image generated! Click download button.', 'success');
+        });
+
+        // Download OpenGraph Image
+        downloadOGBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'og-image.png';
+            link.href = ogCanvas.toDataURL('image/png');
+            link.click();
+            showStatus(ogStatus, '✅ Downloaded! Save this as og-image.png in /public folder', 'success');
+        });
+
+        function showStatus(element, message, type) {
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>

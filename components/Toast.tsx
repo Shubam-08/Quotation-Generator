@@ -1005,7 +1005,8 @@ export default function EnhancedCart() {
       margin: { left: 14, right: 14, top: 20 },
       columnStyles: { 
         0: { cellWidth: 15 }, // SI No column
-        1: { cellWidth: 50 }  // Image column
+        1: { cellWidth: 50 },  // Image column
+        9: { cellWidth: 'auto', minCellWidth: 45 }  // IP Rating column - ensure enough width for text like "IP67 front / IP65 rear"
       },
       theme: 'grid', // Use grid theme to show all borders
       didParseCell: (data: any) => {
@@ -1701,7 +1702,7 @@ export default function EnhancedCart() {
                       }`}>
                         <div className="flex items-center justify-between">
                           <span className={`text-sm font-semibold ${isDarkMode ? 'text-green-300' : 'text-green-700'}`}>
-                            ✨ Total Savings
+                             Total Savings
                           </span>
                           <span className={`text-lg font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                             -{currencyInfo.symbol} {discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1870,7 +1871,7 @@ export default function EnhancedCart() {
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Mail className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                      <a href="mailto:revant@qliteglobal.com" className={`hover:text-yellow-400 transition-colors ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <a href="mailto:ankit.mittal@qliteglobal.com" className={`hover:text-yellow-400 transition-colors ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         ankit.mittal@qliteglobal.com
                       </a>
                     </div>

@@ -3,7 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Zap, LayoutDashboard } from "lucide-react";
+import { Package, Zap, LayoutDashboard, Monitor, Settings } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -13,7 +13,9 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/admin", label: "Led Lights", icon: Package },
+    { href: "/admin", label: "LED Lights", icon: Package },
+    { href: "/admin/led-displays", label: "LED Displays", icon: Monitor },
+    { href: "/admin/lighting-controls", label: "Lighting Controls", icon: Settings },
     { href: "/admin/drivers", label: "Drivers", icon: Zap },
   ];
 

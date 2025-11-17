@@ -116,7 +116,7 @@ export default function ProductChatbot() {
           onClick={() => setIsOpen(true)}
           className="fixed bottom-6 left-6 bg-yellow-400 hover:bg-yellow-500 text-black p-4 rounded-full shadow-2xl transition-all hover:scale-110 z-50 flex items-center gap-2 group"
         >
-          <MessageCircle className="w-6 h-6" />
+          <MessageCircle className="w-5 h-5" />
           <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap font-semibold">
             Ask about products
           </span>

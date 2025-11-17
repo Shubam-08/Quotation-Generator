@@ -13,6 +13,7 @@ import {
   Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search, Settings
 } from 'lucide-react';
 import Link from 'next/link';
+import { renderFormFields as renderLedDisplayFormFields } from '@/app/admin/led-displays/form-content';
 
 interface Product {
   _id: string;
@@ -30,6 +31,16 @@ interface Product {
   price?: number;
   images?: string[];
   productImages?: string[];
+  // LED display specific fields (optional, passed through from products page)
+  pixelPitch?: string;
+  totalResolution?: string;
+  sqft?: number;
+  moduleSpecs?: any;
+  cabinetSpecs?: any;
+  screenParams?: any;
+  cabinetRequired?: number;
+  requiredLength?: string;
+  requiredWidth?: string;
 }
 
 interface Driver {
@@ -64,8 +75,13 @@ type CartItem = Product & {
   series?: string;
 };
 
+const isDisplayItem = (item: CartItem) => {
+  const category = item.category?.toLowerCase() || '';
+  return category.includes('display') || !!item.pixelPitch || typeof item.sqft === 'number';
+};
+
 export default function EnhancedCart() {
-  const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity, updateQuantity, addDriverToCart } = useCart() as {
+  const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity, updateQuantity, addDriverToCart, updateCartItem } = useCart() as {
     cart: CartItem[];
     removeFromCart: (id: string) => void;
     clearCart: () => void;
@@ -73,6 +89,7 @@ export default function EnhancedCart() {
     decreaseQuantity: (id: string) => void;
     updateQuantity: (id: string, quantity: number) => void;
     addDriverToCart: (driver: Driver, parentProductId: string, quantity?: number) => void;
+    updateCartItem: (cartItemId: string, updates: Partial<CartItem>) => void;
   };
   const { formatPrice, convertPrice, currencyInfo } = useCurrency();
   const { data: session } = useSession();
@@ -93,6 +110,8 @@ export default function EnhancedCart() {
   const [selectedProductForDriver, setSelectedProductForDriver] = useState<CartItem | null>(null);
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
   const [loadingDrivers, setLoadingDrivers] = useState(false);
+  const [editingDisplay, setEditingDisplay] = useState<CartItem | null>(null);
+  const [displayFormData, setDisplayFormData] = useState<any | null>(null);
   
   // Driver search state
   const [driverSearchTerm, setDriverSearchTerm] = useState('');
@@ -128,6 +147,33 @@ export default function EnhancedCart() {
   useEffect(() => {
     updateDeliveryLocation(selectedAddress);
   }, [selectedAddress]);
+
+  const handleCloseDisplayEdit = () => {
+    setEditingDisplay(null);
+    setDisplayFormData(null);
+  };
+
+  const handleSaveDisplayEdit = () => {
+    if (!editingDisplay || !displayFormData) return;
+
+    const updates: Partial<CartItem> = {
+      category: displayFormData.category,
+      application: displayFormData.application,
+      ipRating: displayFormData.ipRating,
+      pixelPitch: displayFormData.pixelPitch,
+      totalResolution: displayFormData.totalResolution,
+      sqft: displayFormData.sqft,
+      price: displayFormData.price,
+      images: displayFormData.images,
+      productImages: displayFormData.productImages,
+      moduleSpecs: displayFormData.moduleSpecs,
+      cabinetSpecs: displayFormData.cabinetSpecs,
+      screenParams: displayFormData.screenParams,
+    };
+
+    updateCartItem(editingDisplay.cartItemId, updates);
+    handleCloseDisplayEdit();
+  };
 
   // Fetch all available drivers for a product
   const fetchDriversForProduct = async (product: CartItem) => {
@@ -394,6 +440,7 @@ export default function EnhancedCart() {
             const data = await res.json();
             if (data?.url) return data.url as string;
           }
+
         }
       } catch {}
       return url;
@@ -743,7 +790,7 @@ export default function EnhancedCart() {
     
     if (!canDownload) { setShowError(true); return; }
 
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const marginRight = 20;
     const rightX = pageWidth - marginRight;
@@ -922,60 +969,416 @@ export default function EnhancedCart() {
       })
     );
 
-    const rows = organizedCart.map((item, index) => {
-      if (item.isDriver) {
-        // Driver row - all specs in one large merged cell
-        // Build complete driver specification string
-        const driverSpecs = [];
-        if (item.wattageRange) {
-          // Just show the min value as the single wattage
-          driverSpecs.push(`Power: ${item.wattageRange.min}W`);
-        }
-        if (item.outputVoltage) {
-          driverSpecs.push(`Output: ${item.outputVoltage}`);
-        }
-        if (item.outputCurrent) {
-          driverSpecs.push(`Current: ${item.outputCurrent}`);
-        }
-        if (item.inputVoltage) {
-          driverSpecs.push(`Input: ${item.inputVoltage}`);
-        }
-        if (item.ipRating) {
-          driverSpecs.push(`IP: ${item.ipRating}`);
-        }
-        if (item.type) {
-          driverSpecs.push(`Type: ${item.type}`);
-        }
-        const allSpecs = driverSpecs.join(' | ');
-        
-        return [
-          index + 1, // SI No
-          '', // No image for driver
-          `   > ${item.sku ?? 'N/A'}`, // Indented driver SKU
-          { content: allSpecs, colSpan: 7, styles: { halign: 'left' as const } }, // Merged cell with all specs
-          convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-          item.quantity ?? 1,
-          (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    // Check if cart contains LED Displays
+    const hasDisplays = organizedCart.some(item => !item.isDriver && isDisplayItem(item));
+    const hasLights = organizedCart.some(item => !item.isDriver && !isDisplayItem(item));
+
+    // If we have LED Displays, we need to render them differently
+    if (hasDisplays && !hasLights) {
+      // ALL LED DISPLAYS - Use vertical layout for each display
+      let currentY = 170; // start below the header box (which ends at ~155)
+      const pageHeight = doc.internal.pageSize.height;
+      
+      for (let i = 0; i < organizedCart.length; i++) {
+        const item = organizedCart[i];
+        if (item.isDriver) continue; // Skip drivers for now
+
+        const boxX = 14;
+        const boxWidth = pageWidth - 28;
+        const leftColWidth = boxWidth * 0.75; // 75% for specs
+        const rightColWidth = boxWidth * 0.25; // 25% for image
+
+        const asAny = item as any;
+
+        // Define all fields for LED Display including Module, Cabinet and Screen specs,
+        // grouped into sections matching the admin panel order
+        type DisplayField = { label: string; value: string; isSection?: boolean; rightLabel?: string; rightValue?: string };
+
+        // Helper function to pair items into two columns
+        const pairItems = (items: DisplayField[]): DisplayField[] => {
+          const paired: DisplayField[] = [];
+          const leftCount = Math.ceil(items.length / 2);
+          for (let idx = 0; idx < leftCount; idx++) {
+            const left = items[idx];
+            const right = items[leftCount + idx];
+            paired.push({
+              label: left.label,
+              value: left.value,
+              rightLabel: right?.label,
+              rightValue: right?.value,
+            });
+          }
+          return paired;
+        };
+
+        // Basic Information items (10 items -> 5 left, 5 right)
+        const basicInfoItems: DisplayField[] = [
+          { label: 'SI No', value: (i + 1).toString() },
+          { label: 'Model Number', value: item.sku ?? 'N/A' },
+          { label: 'Category', value: item.category ?? 'N/A' },
+          { label: 'Application', value: item.application ?? 'N/A' },
+          { label: 'IP Rating', value: typeof asAny.ipRating === 'string' ? asAny.ipRating : (Array.isArray(asAny.ipRating) ? asAny.ipRating.join(', ') : 'N/A') },
+          { label: 'Pixel Pitch', value: asAny.pixelPitch ?? 'N/A' },
+          { label: 'Total Resolution', value: asAny.totalResolution ?? 'N/A' },
+          { label: 'Square Feet', value: (asAny.sqft ?? 'N/A').toString() },
+          { label: 'Price (USD)', value: asAny.price != null ? asAny.price.toString() : 'N/A' },
         ];
-      } else {
-        // LED Product row - normal format
-        return [
-          index + 1, // SI No
-          '',
-          item.sku ?? 'N/A',
-          item.category ?? '-',
-          item.application ?? '-',
-          item.inputVoltage ?? '-',
-          item.watt ?? '-',
-          item.lumen ?? '-',
-          item.beamAngle ?? '-',
-          item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A',
-          convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-          item.quantity ?? 1,
-          (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+        // Module Specifications items (5 items -> 3 left, 2 right)
+        const moduleSpecItems: DisplayField[] = [
+          { label: '1. Pixel Pitch', value: asAny.moduleSpecs?.pixelPitch ?? 'N/A' },
+          { label: '2. Pixel Configuration', value: asAny.moduleSpecs?.pixelConfiguration ?? 'N/A' },
+          { label: '3. Module Resolution', value: asAny.moduleSpecs?.moduleResolution ?? 'N/A' },
+          { label: '4. Module Size (mm)', value: asAny.moduleSpecs?.moduleSize ?? 'N/A' },
+          { label: '5. Module Weight (kg)', value: asAny.moduleSpecs?.moduleWeight != null ? asAny.moduleSpecs.moduleWeight.toString() : 'N/A' },
         ];
+
+        // Cabinet Specifications items (8 items -> 4 left, 4 right)
+        const cabinetSpecItems: DisplayField[] = [
+          { label: '1. Cabinet Size (W*H)', value: asAny.cabinetSpecs?.cabinetSize ?? 'N/A' },
+          { label: '2. Cabinet Resolution', value: asAny.cabinetSpecs?.cabinetResolution ?? 'N/A' },
+          { label: '3. Module Quantity', value: asAny.cabinetSpecs?.moduleQuantity != null ? asAny.cabinetSpecs.moduleQuantity.toString() : 'N/A' },
+          { label: '4. Pixel Density', value: asAny.cabinetSpecs?.pixelDensity ?? 'N/A' },
+          { label: '5. Cabinet Weight (kg)', value: asAny.cabinetSpecs?.cabinetWeight != null ? asAny.cabinetSpecs.cabinetWeight.toString() : 'N/A' },
+          { label: '6. Cabinet Area (sqm)', value: asAny.cabinetSpecs?.cabinetArea != null ? asAny.cabinetSpecs.cabinetArea.toString() : 'N/A' },
+          { label: '7. Material', value: asAny.cabinetSpecs?.material ?? 'N/A' },
+          { label: '8. Maintenance', value: asAny.cabinetSpecs?.maintenance ?? 'N/A' },
+        ];
+
+        // Screen Parameters items (17 items -> 9 left, 8 right)
+        const screenParamItems: DisplayField[] = [
+          { label: '1. Brightness Control', value: asAny.screenParams?.brightnessControl ?? 'N/A' },
+          { label: '2. White Balance Brightness', value: asAny.screenParams?.whiteBalanceBrightness ?? 'N/A' },
+          { label: '3. Color Temperature', value: asAny.screenParams?.colorTemperature ?? 'N/A' },
+          { label: '4. Best Viewing Distance', value: asAny.screenParams?.bestViewingDistance ?? 'N/A' },
+          { label: '5. Brightness Uniformity', value: asAny.screenParams?.brightnessUniformity ?? 'N/A' },
+          { label: '6. Color Uniformity', value: asAny.screenParams?.colorUniformity ?? 'N/A' },
+          { label: '7. Protective Grade', value: asAny.screenParams?.protectiveGrade ?? 'N/A' },
+          { label: '8. View Angle', value: asAny.screenParams?.viewAngle ?? 'N/A' },
+          { label: '9. Defects Rate', value: asAny.screenParams?.defectsRate ?? 'N/A' },
+          { label: '10. Frame Frequency', value: asAny.screenParams?.frameFrequency ?? 'N/A' },
+          { label: '11. Refresh Rate', value: asAny.screenParams?.refreshRate ?? 'N/A' },
+          { label: '12. Input Voltage', value: asAny.screenParams?.inputVoltage ?? 'N/A' },
+          { label: '13. Max Power Consumption', value: asAny.screenParams?.maxPowerConsumption ?? 'N/A' },
+          { label: '14. Avg Power Consumption', value: asAny.screenParams?.avgPowerConsumption ?? 'N/A' },
+          { label: '15. Life Span', value: asAny.screenParams?.lifeSpan ?? 'N/A' },
+          { label: '16. Temperature-Operating', value: asAny.screenParams?.temperatureOperating ?? 'N/A' },
+          { label: '17. Humidity-Operating', value: asAny.screenParams?.humidityOperating ?? 'N/A' },
+        ];
+
+        const displayFields: DisplayField[] = [
+          // Basic Information
+          { label: 'Basic Information', value: '', isSection: true },
+          ...pairItems(basicInfoItems),
+
+          // Module Specifications
+          { label: 'Module Specifications', value: '', isSection: true },
+          ...pairItems(moduleSpecItems),
+
+          // Cabinet Specifications
+          { label: 'Cabinet Specifications', value: '', isSection: true },
+          ...pairItems(cabinetSpecItems),
+
+          // Screen Parameters (9 left, 8 right)
+          { label: 'Screen Parameters', value: '', isSection: true },
+          ...pairItems(screenParamItems),
+
+        ];
+
+        const rowHeight = 16; // fixed safe height
+        const bottomMargin = 40;
+
+        let startIndex = 0;
+        let isFirstSlice = true;
+
+        while (startIndex < displayFields.length) {
+          const remainingRows = displayFields.length - startIndex;
+          const availableHeight = pageHeight - bottomMargin - currentY;
+          let rowsThisPage = Math.floor(availableHeight / rowHeight);
+
+          if (rowsThisPage <= 0) {
+            // No space left on this page, go to next page
+            doc.addPage();
+            currentY = 40;
+            continue;
+          }
+
+          if (rowsThisPage > remainingRows) {
+            rowsThisPage = remainingRows;
+          }
+
+          const slice = displayFields.slice(startIndex, startIndex + rowsThisPage);
+          const sliceHeight = slice.length * rowHeight;
+
+          // Draw outer box for this slice
+          doc.setLineWidth(1.5);
+          doc.setDrawColor(0, 0, 0);
+          doc.rect(boxX, currentY, boxWidth, sliceHeight);
+
+          // Draw vertical line separating specs from image
+          const specsRightX = boxX + leftColWidth;
+          doc.line(specsRightX, currentY, specsRightX, currentY + sliceHeight);
+
+          // Inner vertical line to split into two columns (but skip section header rows)
+          const innerColX = boxX + leftColWidth / 2;
+          let prevY = currentY;
+          for (let r = 0; r < slice.length; r++) {
+            const field = slice[r];
+            const rowY = currentY + (r * rowHeight);
+            const nextRowY = currentY + ((r + 1) * rowHeight);
+            
+            // Draw inner vertical line only for non-section rows
+            if (!field.isSection) {
+              doc.line(innerColX, rowY, innerColX, nextRowY);
+            }
+          }
+
+          // Draw horizontal lines for each row in this slice (spec side only)
+          for (let r = 1; r < slice.length; r++) {
+            doc.line(boxX, currentY + (r * rowHeight), boxX + leftColWidth, currentY + (r * rowHeight));
+          }
+
+          // Fill in labels and values (supporting optional right-side label/value)
+          doc.setFontSize(7);
+          const leftLabelX = boxX + 3;
+          const leftValueX = boxX + 105;
+          const rightLabelX = innerColX + 3;
+          const rightValueX = innerColX + 105;
+          const leftMaxWidth = (innerColX - boxX) - 105 - 5;
+          const rightMaxWidth = (specsRightX - innerColX) - 105 - 5;
+
+          for (let f = 0; f < slice.length; f++) {
+            const field = slice[f];
+            const fieldY = currentY + (f * rowHeight) + rowHeight * 0.7;
+
+            if (field.isSection) {
+              // Section header - centered and bold
+              doc.setFont('helvetica', 'bold');
+              const sectionCenterX = boxX + (leftColWidth / 2);
+              doc.text(field.label, sectionCenterX, fieldY, { align: 'center' });
+            } else {
+              // Left Label
+              doc.setFont('helvetica', 'bold');
+              doc.text(field.label + ':', leftLabelX, fieldY);
+
+              // Left Value
+              doc.setFont('helvetica', 'normal');
+              const wrappedLeft = doc.splitTextToSize(field.value, leftMaxWidth);
+              doc.text(wrappedLeft[0] || field.value, leftValueX, fieldY);
+
+              // Right side (for paired rows)
+              if (field.rightLabel) {
+                // Right label
+                doc.setFont('helvetica', 'bold');
+                doc.text(field.rightLabel + ':', rightLabelX, fieldY);
+
+                // Right value
+                doc.setFont('helvetica', 'normal');
+                const wrappedRight = doc.splitTextToSize(field.rightValue || 'N/A', rightMaxWidth);
+                doc.text(wrappedRight[0] || field.rightValue || 'N/A', rightValueX, fieldY);
+              }
+            }
+          }
+
+          // Add image only on the first slice for this item
+          if (isFirstSlice) {
+            const imageUrl = getPrimaryImageUrl(item);
+            const imgX = boxX + leftColWidth + 10;
+            const imgY = currentY + 10;
+            const imgMaxWidth = rightColWidth - 20;
+            const imgMaxHeight = sliceHeight - 20;
+
+            if (imageUrl) {
+              const dataUrl = imageDataUrls[i];
+              if (dataUrl) {
+                try {
+                  const img = new Image();
+                  await new Promise((resolve) => {
+                    img.onload = resolve;
+                    img.src = dataUrl;
+                  });
+
+                  const aspectRatio = img.width / img.height;
+                  let imgWidth = imgMaxWidth;
+                  let imgHeight = imgWidth / aspectRatio;
+
+                  if (imgHeight > imgMaxHeight) {
+                    imgHeight = imgMaxHeight;
+                    imgWidth = imgHeight * aspectRatio;
+                  }
+
+                  const imgCenterX = imgX + (imgMaxWidth - imgWidth) / 2;
+                  const imgCenterY = imgY + (imgMaxHeight - imgHeight) / 2;
+
+                  doc.addImage(dataUrl, 'JPEG', imgCenterX, imgCenterY, imgWidth, imgHeight);
+                } catch (error) {
+                  console.error('Error adding image:', error);
+                  doc.setFontSize(10);
+                  doc.setFont('helvetica', 'normal');
+                  doc.setTextColor(150);
+                  doc.text('No Image', imgX + imgMaxWidth / 2, imgY + imgMaxHeight / 2, { align: 'center' });
+                  doc.setTextColor(0);
+                }
+              } else {
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(150);
+                doc.text('No Image', imgX + imgMaxWidth / 2, imgY + imgMaxHeight / 2, { align: 'center' });
+                doc.setTextColor(0);
+              }
+            } else {
+              doc.setFontSize(10);
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(150);
+              doc.text('No Image', imgX + imgMaxWidth / 2, imgY + imgMaxHeight / 2, { align: 'center' });
+              doc.setTextColor(0);
+            }
+          }
+
+          isFirstSlice = false;
+          startIndex += rowsThisPage;
+          currentY += sliceHeight + 10; // small gap before next slice
+        }
+
+        // Draw commercial details in a separate box (left spec area)
+        {
+          const FEET_TO_METER = 0.3048;
+          const commLabel = 'Required Size';
+          const lenFt = parseFloat(asAny.requiredLength ?? '');
+          const widFt = parseFloat(asAny.requiredWidth ?? '');
+          const toM = (ft: number) => (ft * FEET_TO_METER);
+          const fmt = (m: number) => m.toFixed(2);
+          const hasLen = !isNaN(lenFt);
+          const hasWid = !isNaN(widFt);
+          const sizeText = hasLen && hasWid
+            ? `W${fmt(toM(lenFt))}m × H${fmt(toM(widFt))}m`
+            : 'N/A';
+
+          const cabinetQty = asAny.cabinetRequired != null ? String(asAny.cabinetRequired) : 'N/A';
+          const qty = (item.quantity ?? 1);
+          // Price per sqm is stored in USD in item.price; compute area-based price
+          const areaSqm = hasLen && hasWid ? (toM(lenFt) * toM(widFt)) : 0;
+          const unitPriceUSD = (item.price ?? 0) * areaSqm;
+          const unitPriceConverted = convertPrice(unitPriceUSD);
+          const unitPriceText = unitPriceConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const qtyText = String(qty);
+          const totalText = (unitPriceConverted * qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+          const rows: Array<{ label: string; value: string }> = [
+            { label: `${commLabel} (m)`, value: sizeText },
+            { label: 'Cabinet Required (qty)', value: cabinetQty },
+            { label: `Unit Price (${pdfCurrency})`, value: unitPriceText },
+            { label: 'Quantity', value: qtyText },
+            { label: `Total (${pdfCurrency})`, value: totalText },
+          ];
+
+          const commRowH = 16;
+          const commHeight = rows.length * commRowH;
+
+          // Page break if needed
+          if (currentY + commHeight + 10 > pageHeight - bottomMargin) {
+            doc.addPage();
+            currentY = 40;
+          }
+
+          // Box and content
+          const commX = boxX;
+          const commW = leftColWidth; // only spec area, not image
+          doc.setLineWidth(1.2);
+          doc.setDrawColor(0, 0, 0);
+          doc.rect(commX, currentY, commW, commHeight);
+
+          // Horizontal separators
+          for (let r = 1; r < rows.length; r++) {
+            doc.line(commX, currentY + r * commRowH, commX + commW, currentY + r * commRowH);
+          }
+
+          // Labels/values
+          doc.setFontSize(8);
+          const labX = commX + 5;
+          const valX = commX + 120;
+          const maxValW = commW - (valX - commX) - 6;
+          for (let r = 0; r < rows.length; r++) {
+            const y = currentY + r * commRowH + commRowH * 0.7;
+            doc.setFont('helvetica', 'bold');
+            doc.text(rows[r].label + ':', labX, y);
+            doc.setFont('helvetica', 'normal');
+            const wrapped = doc.splitTextToSize(rows[r].value, maxValW);
+            doc.text(wrapped[0] || rows[r].value, valX, y);
+          }
+
+          currentY += commHeight + 12;
+        }
       }
-    });
+      
+      // Add total at the end
+      const finalY = currentY;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      const formattedTotal = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
+      doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
+      
+      // Skip the autoTable section and go directly to terms
+      const termsStartY = finalY + 50;
+      addTermsAndConditions(doc, termsStartY, pageWidth, rightX);
+      
+    } else {
+      // ORIGINAL FORMAT FOR LED LIGHTS (and mixed carts)
+      const rows = organizedCart.map((item, index) => {
+        if (item.isDriver) {
+          // Driver row - all specs in one large merged cell
+          // Build complete driver specification string
+          const driverSpecs = [];
+          if (item.wattageRange) {
+            // Just show the min value as the single wattage
+            driverSpecs.push(`Power: ${item.wattageRange.min}W`);
+          }
+          if (item.outputVoltage) {
+            driverSpecs.push(`Output: ${item.outputVoltage}`);
+          }
+          if (item.outputCurrent) {
+            driverSpecs.push(`Current: ${item.outputCurrent}`);
+          }
+          if (item.inputVoltage) {
+            driverSpecs.push(`Input: ${item.inputVoltage}`);
+          }
+          if (item.ipRating) {
+            driverSpecs.push(`IP: ${item.ipRating}`);
+          }
+          if (item.type) {
+            driverSpecs.push(`Type: ${item.type}`);
+          }
+          const allSpecs = driverSpecs.join(' | ');
+          
+          return [
+            index + 1, // SI No
+            '', // No image for driver
+            `   > ${item.sku ?? 'N/A'}`, // Indented driver SKU
+            { content: allSpecs, colSpan: 7, styles: { halign: 'left' as const } }, // Merged cell with all specs
+            convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            item.quantity ?? 1,
+            (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          ];
+        } else {
+          // LED Product row - normal format
+          return [
+            index + 1, // SI No
+            '',
+            item.sku ?? 'N/A',
+            item.category ?? '-',
+            item.application ?? '-',
+            item.inputVoltage ?? '-',
+            item.watt ?? '-',
+            item.lumen ?? '-',
+            item.beamAngle ?? '-',
+            item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A',
+            convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            item.quantity ?? 1,
+            (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          ];
+        }
+      });
 
     const cellPadding = { top: 6, right: 2, bottom: 6, left: 2 } as const;
     autoTable(doc, {
@@ -1003,7 +1406,8 @@ export default function EnhancedCart() {
       margin: { left: 14, right: 14, top: 20 },
       columnStyles: { 
         0: { cellWidth: 15 }, // SI No column
-        1: { cellWidth: 50 }  // Image column
+        1: { cellWidth: 50 },  // Image column
+        9: { cellWidth: 'auto', minCellWidth: 45 }  // IP Rating column - ensure enough width for text like "IP67 front / IP65 rear"
       },
       theme: 'grid', // Use grid theme to show all borders
       didParseCell: (data: CellHookData) => {
@@ -1068,73 +1472,81 @@ export default function EnhancedCart() {
       },
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY || 140;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    // Total is already in converted currency, no need to convert again
-    const formattedTotal = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
-    doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
-
-    // Add Terms and Conditions in a bordered box
-    const pageHeight = doc.internal.pageSize.height;
-    let termsY = finalY + 40;
-    
-    // Check if we need a new page for terms
-    if (termsY > pageHeight - 200) {
-      doc.addPage();
-      termsY = 40;
-    }
-    
-    // Calculate box dimensions
-    const termsBoxX = 14;
-    const termsBoxY = termsY;
-    const termsBoxWidth = pageWidth - 28; // Full width with margins
-    let termsContentY = termsBoxY + 15;
-    
-    // Add Terms header
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Terms and Conditions:', termsBoxX + 8, termsContentY);
-    
-    termsContentY += 15;
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    
-    const terms = [
-      `1. The prices quoted on ${termsAndConditions.deliveryLocation}.`,
-      `2. Delivery: Within ${termsAndConditions.deliveryTime} from the date of PO and advance payment.`,
-      `3. Payment Terms: ${termsAndConditions.paymentTerms}.`,
-      `4. The quoted products are ${termsAndConditions.productMake}`,
-      `5. Validity of offer: ${termsAndConditions.validityDays}`,
-      `6. ${termsAndConditions.vatNote}`
-    ];
-    
-    terms.forEach((term) => {
-      const lines = doc.splitTextToSize(term, termsBoxWidth - 20);
-      doc.text(lines, termsBoxX + 8, termsContentY);
-      termsContentY += lines.length * 12;
-    });
-    
-    // Add closing
-    termsContentY += 15;
-    doc.setFontSize(9);
-    doc.text('Thanking You', termsBoxX + 8, termsContentY);
-    
-    termsContentY += 20;
-    doc.text('Yours Sincerely', termsBoxX + 8, termsContentY);
-    
-    if (termsAndConditions.salesPersonName) {
-      termsContentY += 20;
+      const finalY = (doc as any).lastAutoTable.finalY || 140;
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text(termsAndConditions.salesPersonName, termsBoxX + 8, termsContentY);
+      // Total is already in converted currency, no need to convert again
+      const formattedTotal = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
+      doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
+
+      // Add terms and conditions
+      const termsStartY = finalY + 50;
+      addTermsAndConditions(doc, termsStartY, pageWidth, rightX);
     }
+
+    // Helper function to add terms and conditions
+    function addTermsAndConditions(doc: any, startY: number, pageWidth: number, rightX: number) {
+      // Add Terms and Conditions in a bordered box
+      const pageHeight = doc.internal.pageSize.height;
+      let termsY = startY;
+      
+      // Check if we need a new page for terms
+      if (termsY > pageHeight - 200) {
+        doc.addPage();
+        termsY = 40;
+      }
+      
+      // Calculate box dimensions
+      const termsBoxX = 14;
+      const termsBoxY = termsY;
+      const termsBoxWidth = pageWidth - 28; // Full width with margins
+      let termsContentY = termsBoxY + 15;
+      
+      // Add Terms header
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Terms and Conditions:', termsBoxX + 8, termsContentY);
+      
+      termsContentY += 15;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      
+      const terms = [
+        `1. The prices quoted on ${termsAndConditions.deliveryLocation}.`,
+        `2. Delivery: Within ${termsAndConditions.deliveryTime} from the date of PO and advance payment.`,
+        `3. Payment Terms: ${termsAndConditions.paymentTerms}.`,
+        `4. The quoted products are ${termsAndConditions.productMake}`,
+        `5. Validity of offer: ${termsAndConditions.validityDays}`,
+        `6. ${termsAndConditions.vatNote}`
+      ];
+      
+      terms.forEach((term) => {
+        const lines = doc.splitTextToSize(term, termsBoxWidth - 20);
+        doc.text(lines, termsBoxX + 8, termsContentY);
+        termsContentY += lines.length * 12;
+      });
+      
+      // Add closing
+      termsContentY += 15;
+      doc.setFontSize(9);
+      doc.text('Thanking You', termsBoxX + 8, termsContentY);
+      
+      termsContentY += 20;
+      doc.text('Yours Sincerely', termsBoxX + 8, termsContentY);
+      
+      if (termsAndConditions.salesPersonName) {
+        termsContentY += 20;
+        doc.setFont('helvetica', 'bold');
+        doc.text(termsAndConditions.salesPersonName, termsBoxX + 8, termsContentY);
+      }
     
-    // Draw box around entire terms section
-    const termsBoxHeight = termsContentY - termsBoxY + 15;
-    doc.setLineWidth(1.5);
-    doc.setDrawColor(0, 0, 0); // Blue border
-    doc.rect(termsBoxX, termsBoxY, termsBoxWidth, termsBoxHeight);
+      // Draw box around entire terms section
+      const termsBoxHeight = termsContentY - termsBoxY + 15;
+      doc.setLineWidth(1.5);
+      doc.setDrawColor(0, 0, 0); // Blue border
+      doc.rect(termsBoxX, termsBoxY, termsBoxWidth, termsBoxHeight);
+    }
 
     doc.save(`${userInfo.project}_quotation.pdf`);
     setShowSuccess(true);
@@ -1299,155 +1711,268 @@ export default function EnhancedCart() {
               </div>
 
               {/* Products Grid */}
-              <div className="grid grid-cols-2 gap-2">
-              {cart.map((item) => (
-                <div
-                  key={item.cartItemId}
-                  className={`rounded-lg p-2.5 transition-all ${
-                    isDarkMode 
-                      ? 'bg-white border border-gray-200 hover:border-yellow-400/50' 
-                      : 'bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-yellow-400/50'
-                  }`}
-                >
-                  <div className="flex flex-col gap-1.5">
-                    {/* Product Image */}
-                    <div className="w-20 h-20 mx-auto rounded-md overflow-hidden bg-gray-100 border border-gray-200">
-                      {(item.productImages?.length || item.images?.length) ? (
-                        <img 
-                          src={item.productImages?.[0] || item.images?.[0]} 
-                          alt={item.sku} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-6 h-6 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Product Details */}
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start gap-1 mb-1">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-xs mb-0.5 truncate text-gray-900">
-                            {item.sku}
-                          </h3>
-                          <p className="text-[10px] text-gray-600">
-                            {item.category}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => removeFromCart(item.cartItemId)}
-                          className="p-1.5 rounded-md transition-all flex-shrink-0 hover:bg-red-100 text-red-600"
-                          title="Remove"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Product Specs */}
-                      <div className="flex flex-wrap gap-1 mb-1.5">
-                        {item.inputVoltage && item.inputVoltage !== '-' && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700">
-                            {item.inputVoltage}
-                          </span>
-                        )}
-                        {item.watt && item.watt !== '-' && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700">
-                            {item.watt}W
-                          </span>
-                        )}
-                        {item.lumen && item.lumen !== '-' && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700">
-                            {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen}lm`}
-                          </span>
-                        )}
-                        {item.beamAngle && item.beamAngle !== '-' && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-50 text-orange-700">
-                            {item.beamAngle}
-                          </span>
-                        )}
-                        {item.ipRating && item.ipRating !== 'N/A' && (
-                          <span className="inline-block bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                            {item.ipRating}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Quantity and Price */}
-                      <div className="flex items-center justify-between gap-1.5">
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200">
-                          <button
-                            onClick={() => decreaseQuantity(item.cartItemId)}
-                            className="w-6 h-6 rounded flex items-center justify-center transition-all hover:bg-gray-200 text-gray-900"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value) || 1;
-                              updateQuantity(item.cartItemId, value);
-                            }}
-                            onFocus={() => setEditingQuantity(item.cartItemId)}
-                            onBlur={() => setEditingQuantity(null)}
-                            className="w-10 text-center font-bold text-xs outline-none bg-transparent text-gray-900"
-                          />
-                          <button
-                            onClick={() => increaseQuantity(item.cartItemId)}
-                            className="w-6 h-6 rounded flex items-center justify-center transition-all hover:bg-gray-200 text-gray-900"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-
-                        <div className="text-right">
-                          <p className="text-[10px] text-gray-500">
-                            {formatPrice(item.price ?? 0)} × {item.quantity}
-                          </p>
-                          <p className="text-sm font-bold text-yellow-600">
-                            {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Add Driver Button */}
-                      {!item.isDriver && (
-                        <button
-                          onClick={() => fetchDriversForProduct(item)}
-                          className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all text-xs font-semibold"
-                        >
-                          <Zap className="w-3 h-3" />
-                          Add Driver
-                        </button>
-                      )}
-
-                      {/* Associated Drivers */}
-                      {!item.isDriver && getDriversForProduct(item.cartItemId).length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <p className="text-[10px] font-semibold text-gray-600 mb-1">Drivers:</p>
-                          {getDriversForProduct(item.cartItemId).map((driver) => (
-                            <div key={driver.cartItemId} className="flex items-center justify-between gap-1 mb-1 p-1.5 bg-blue-50 rounded">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[10px] font-semibold text-blue-900 truncate">{driver.name}</p>
-                                <p className="text-[9px] text-blue-700">Qty: {driver.quantity}</p>
+              <div className="grid grid-cols-2 gap-3">
+              {cart.map((item) => {
+                const isDisplay = isDisplayItem(item);
+                return (
+                  <div
+                    key={item.cartItemId}
+                    className={`${isDisplay ? 'col-span-2' : ''}`}
+                  >
+                    <div
+                      className={`rounded-xl p-3 transition-all duration-300 hover:-translate-y-1 ${
+                        isDarkMode 
+                          ? 'bg-white border border-gray-200 hover:border-yellow-400 shadow-md hover:shadow-xl' 
+                          : 'bg-white border border-gray-200 shadow-md hover:shadow-xl hover:border-yellow-400'
+                      }`}
+                    >
+                      {isDisplay ? (
+                        <div className="flex flex-col gap-3">
+                          <div className="w-full h-56 rounded-lg overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 shadow-sm">
+                            {(item.productImages?.length || item.images?.length) ? (
+                              <img 
+                                src={item.productImages?.[0] || item.images?.[0]} 
+                                alt={item.sku} 
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package className="w-8 h-8 text-gray-400" />
                               </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {(item.requiredLength || item.requiredWidth) && (
+                              <div className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded">
+                                Screen Size: <span className="text-blue-900">
+                                  W{(() => {
+                                    const ft = parseFloat(item.requiredLength || '0');
+                                    return (ft * 0.3048).toFixed(2);
+                                  })()}m × H{(() => {
+                                    const ft = parseFloat(item.requiredWidth || '0');
+                                    return (ft * 0.3048).toFixed(2);
+                                  })()}m
+                                </span>
+                              </div>
+                            )}
+                            {typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0 && (
+                              <div className="text-xs font-semibold text-gray-800">
+                                Cabinet Required: <span className="text-gray-900">{item.cabinetRequired}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <h3 className="font-bold text-sm mb-1 text-gray-900">{item.sku}</h3>
+                              <p className="text-xs text-gray-600 mb-1">{item.category}</p>
+                              <div className="flex flex-wrap gap-1.5 text-[11px] text-gray-700">
+                                {item.application && <span>Application: {item.application}</span>}
+                                {item.ipRating && item.ipRating !== 'N/A' && (
+                                  <span>IP: {
+                                    typeof item.ipRating === 'string' 
+                                      ? item.ipRating 
+                                      : Array.isArray(item.ipRating) 
+                                        ? (item.ipRating as string[]).join(', ')
+                                        : String(item.ipRating)
+                                  }</span>
+                                )}
+                                {item.pixelPitch && <span>Pixel Pitch: {item.pixelPitch}</span>}
+                                {item.totalResolution && <span>Resolution: {item.totalResolution}</span>}
+                                {typeof item.sqft === 'number' && <span>Sq.ft: {item.sqft}</span>}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removeFromCart(item.cartItemId)}
+                              className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-50 text-red-600 hover:text-red-700"
+                              title="Remove"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 mt-1">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 shadow-sm">
                               <button
-                                onClick={() => removeFromCart(driver.cartItemId)}
-                                className="p-1 rounded hover:bg-red-100 text-red-600"
+                                onClick={() => decreaseQuantity(item.cartItemId)}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
                               >
-                                <X className="w-3 h-3" />
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 1;
+                                  updateQuantity(item.cartItemId, value);
+                                }}
+                                onFocus={() => setEditingQuantity(item.cartItemId)}
+                                onBlur={() => setEditingQuantity(null)}
+                                className="w-10 text-center font-bold text-xs outline-none bg-transparent text-gray-900"
+                              />
+                              <button
+                                onClick={() => increaseQuantity(item.cartItemId)}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
+                              >
+                                <Plus className="w-3 h-3" />
                               </button>
                             </div>
-                          ))}
+                            <div className="text-right">
+                              <p className="text-[10px] text-gray-500">
+                                {formatPrice(item.price ?? 0)} × {item.quantity}
+                              </p>
+                              <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex justify-end mt-1">
+                            <button
+                              onClick={() => {
+                                setEditingDisplay(item);
+                                setDisplayFormData({
+                                  ...item,
+                                  moduleSpecs: item.moduleSpecs || {},
+                                  cabinetSpecs: item.cabinetSpecs || {},
+                                  screenParams: item.screenParams || {},
+                                });
+                              }}
+                              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 text-gray-800 hover:bg-gray-100"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          <div className="w-20 h-20 mx-auto rounded-lg overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 shadow-sm">
+                            {(item.productImages?.length || item.images?.length) ? (
+                              <img 
+                                src={item.productImages?.[0] || item.images?.[0]} 
+                                alt={item.sku} 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package className="w-6 h-6 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start gap-1 mb-1.5">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-xs mb-0.5 truncate text-gray-900">
+                                  {item.sku}
+                                </h3>
+                                <p className="text-[10px] text-gray-600">
+                                  {item.category}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => removeFromCart(item.cartItemId)}
+                                className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-50 text-red-600 hover:text-red-700"
+                                title="Remove"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              {item.inputVoltage && item.inputVoltage !== '-' && (
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
+                                  {item.inputVoltage}
+                                </span>
+                              )}
+                              {item.watt && item.watt !== '-' && (
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  {item.watt}W
+                                </span>
+                              )}
+                              {item.lumen && item.lumen !== '-' && (
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen}lm`}
+                                </span>
+                              )}
+                              {item.beamAngle && item.beamAngle !== '-' && (
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                  {item.beamAngle}
+                                </span>
+                              )}
+                              {item.ipRating && item.ipRating !== 'N/A' && (
+                                <span className="inline-block bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-yellow-200">
+                                  {item.ipRating}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 shadow-sm">
+                                <button
+                                  onClick={() => decreaseQuantity(item.cartItemId)}
+                                  className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const value = parseInt(e.target.value) || 1;
+                                    updateQuantity(item.cartItemId, value);
+                                  }}
+                                  onFocus={() => setEditingQuantity(item.cartItemId)}
+                                  onBlur={() => setEditingQuantity(null)}
+                                  className="w-10 text-center font-bold text-xs outline-none bg-transparent text-gray-900"
+                                />
+                                <button
+                                  onClick={() => increaseQuantity(item.cartItemId)}
+                                  className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[10px] text-gray-500">
+                                  {formatPrice(item.price ?? 0)} × {item.quantity}
+                                </p>
+                                <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                  {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
+                                </p>
+                              </div>
+                            </div>
+                            {!item.isDriver && !isDisplay && (
+                              <button
+                                onClick={() => fetchDriversForProduct(item)}
+                                className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 border border-blue-200 transition-all text-xs font-bold shadow-sm hover:shadow"
+                              >
+                                <Zap className="w-3.5 h-3.5" />
+                                Add Driver
+                              </button>
+                            )}
+                            {!item.isDriver && !isDisplay && getDriversForProduct(item.cartItemId).length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-gray-200">
+                                <p className="text-[10px] font-bold text-gray-700 mb-1.5">🔌 Drivers:</p>
+                                {getDriversForProduct(item.cartItemId).map((driver) => (
+                                  <div key={driver.cartItemId} className="flex items-center justify-between gap-1 mb-1.5 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[10px] font-bold text-blue-900 truncate">{driver.name}</p>
+                                      <p className="text-[9px] text-blue-700">Qty: {driver.quantity}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => removeFromCart(driver.cartItemId)}
+                                      className="p-1 rounded-md hover:bg-red-100 text-red-600 transition-all"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               </div>
 
               {/* Clear Cart Button - Mobile */}
@@ -1885,6 +2410,134 @@ export default function EnhancedCart() {
               </p>
             </div>
           </div>
+          </div>
+        </div>
+      )}
+
+      {/* Driver Selection Modal */}
+      {/* LED Display Edit Modal */}
+      {editingDisplay && displayFormData && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-5xl max-h-[90vh] rounded-xl overflow-hidden flex flex-col ${
+            isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-2xl'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${
+              isDarkMode ? 'border-white/10' : 'border-gray-200'
+            }`}>
+              <div>
+                <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Edit LED Display Specifications
+                </h3>
+                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  SKU: {editingDisplay.sku}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseDisplayEdit}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Content */}
+            <div className="px-6 py-4 overflow-y-auto flex-1 min-h-0">
+              {renderLedDisplayFormFields(displayFormData, setDisplayFormData, isDarkMode)}
+              
+              {/* Price Calculation Preview */}
+              <div className={`mt-6 p-4 rounded-lg border ${
+                isDarkMode ? 'bg-blue-900/20 border-blue-500/30' : 'bg-blue-50 border-blue-200'
+              }`}>
+                <h4 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
+                  Price Calculation Preview
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {(() => {
+                    const FEET_TO_METER = 0.3048;
+                    const lenFt = parseFloat((editingDisplay as any)?.requiredLength ?? '0');
+                    const widFt = parseFloat((editingDisplay as any)?.requiredWidth ?? '0');
+                    const hasLen = !isNaN(lenFt) && lenFt > 0;
+                    const hasWid = !isNaN(widFt) && widFt > 0;
+                    const lenM = hasLen ? lenFt * FEET_TO_METER : 0;
+                    const widM = hasWid ? widFt * FEET_TO_METER : 0;
+                    const areaSqm = hasLen && hasWid ? lenM * widM : 0;
+                    const pricePerSqm = displayFormData.price ?? 0;
+                    const unitPriceUSD = areaSqm * pricePerSqm;
+                    const unitPriceConverted = convertPrice(unitPriceUSD);
+                    const qty = editingDisplay?.quantity ?? 1;
+                    const totalConverted = unitPriceConverted * qty;
+                    const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.code;
+
+                    return (
+                      <>
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <span className="font-semibold">Required Size (ft):</span>
+                          <div className="mt-1">{hasLen && hasWid ? `W${lenFt}ft × H${widFt}ft` : 'N/A'}</div>
+                        </div>
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <span className="font-semibold">Required Size (m):</span>
+                          <div className="mt-1">{hasLen && hasWid ? `W${lenM.toFixed(2)}m × H${widM.toFixed(2)}m` : 'N/A'}</div>
+                        </div>
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <span className="font-semibold">Area (sqm):</span>
+                          <div className="mt-1">{areaSqm > 0 ? areaSqm.toFixed(2) : 'N/A'}</div>
+                        </div>
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <span className="font-semibold">Price per sqm (USD):</span>
+                          <div className="mt-1">${pricePerSqm.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </div>
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <span className="font-semibold">Cabinet Required:</span>
+                          <div className="mt-1">{(editingDisplay as any)?.cabinetRequired ?? 'N/A'}</div>
+                        </div>
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <span className="font-semibold">Quantity:</span>
+                          <div className="mt-1">{qty}</div>
+                        </div>
+                        <div className={`col-span-2 pt-2 border-t ${isDarkMode ? 'border-blue-500/30' : 'border-blue-200'}`}>
+                          <div className={`font-bold ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
+                            Unit Price ({currencyDisplay}): {currencyInfo.symbol}{unitPriceConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div className={`font-bold mt-1 ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
+                            Total ({currencyDisplay}): {currencyInfo.symbol}{totalConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                <p className={`text-[10px] mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Formula: Area (sqm) = W(m) × H(m) | Unit Price = Area × Price per sqm | Total = Unit Price × Quantity
+                </p>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className={`flex justify-end gap-3 px-6 py-4 border-t flex-shrink-0 ${
+              isDarkMode ? 'border-white/10 bg-gray-900/80' : 'border-gray-200 bg-gray-50'
+            }`}>
+              <button
+                type="button"
+                onClick={handleCloseDisplayEdit}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold ${
+                  isDarkMode
+                    ? 'bg-transparent border border-white/20 text-gray-200 hover:bg-white/10'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDisplayEdit}
+                className="px-4 py-2 rounded-lg text-xs font-semibold bg-yellow-400 hover:bg-yellow-500 text-black shadow-sm hover:shadow"
+              >
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}
