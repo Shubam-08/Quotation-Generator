@@ -128,7 +128,7 @@ const computeCabinetCount = (product: Product, lengthFeetStr?: string, widthFeet
   const rawCount = areaSqm / cabinetAreaSqm;
   if (!isFinite(rawCount) || rawCount <= 0) return null;
 
-  return Math.ceil(rawCount);
+  return Math.round(rawCount);
 };
 
 export default function ProductsPage() {
@@ -996,7 +996,6 @@ export default function ProductsPage() {
                         { label: 'IP Rating', key: 'ipRating' },
                         { label: 'Pixel Pitch', key: 'pixelPitch' },
                         { label: 'Cabinet Material', key: 'cabinetMaterial' },
-                        { label: 'Price/sq.m', key: 'price' },
                         { label: 'Screen Inputs (L × W)', key: 'sqft' },
                         { label: 'Cabinet Required', key: 'cabinets' },
                         { label: 'Action', key: 'action' }
@@ -1175,17 +1174,7 @@ export default function ProductsPage() {
                                 '-'
                               )}
                             </td>
-                            <td className={`px-4 py-4 text-sm font-bold text-yellow-400`}>
-                              {(() => {
-                                // Use cabinet material variant price if available
-                                if (p.cabinetMaterialVariants && p.cabinetMaterialVariants.length > 0) {
-                                  const selectedIdx = selectedCabinetMaterials[p._id] ?? 0;
-                                  const variant = p.cabinetMaterialVariants[selectedIdx];
-                                  return formatPrice(variant?.price || p.price);
-                                }
-                                return formatPrice(p.price);
-                              })()}
-                            </td>
+                            {/* Price column hidden for LED displays as requested */}
                             <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                               <div className="flex flex-col gap-2">
                                 <div className="flex flex-col gap-1">
@@ -1199,6 +1188,7 @@ export default function ProductsPage() {
                                       type="number"
                                       min={0}
                                       value={requiredLength[p._id] ?? ''}
+                                      onWheel={(e) => e.currentTarget.blur()}
                                       onChange={(e) => {
                                         const value = e.target.value;
                                         setRequiredLength(prev => ({
@@ -1215,7 +1205,7 @@ export default function ProductsPage() {
                                           [p._id]: auto !== null ? String(auto) : prev[p._id] ?? '',
                                         }));
                                       }}
-                                      className={`w-20 px-2 py-1 rounded-md text-xs outline-none border ${
+                                      className={`w-20 px-2 py-1 rounded-md text-xs outline-none border [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                                         isDarkMode
                                           ? 'bg-black border-white/20 text-white focus:border-yellow-400'
                                           : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
@@ -1227,6 +1217,7 @@ export default function ProductsPage() {
                                       type="number"
                                       min={0}
                                       value={requiredWidth[p._id] ?? ''}
+                                      onWheel={(e) => e.currentTarget.blur()}
                                       onChange={(e) => {
                                         const value = e.target.value;
                                         setRequiredWidth(prev => ({
@@ -1243,7 +1234,7 @@ export default function ProductsPage() {
                                           [p._id]: auto !== null ? String(auto) : prev[p._id] ?? '',
                                         }));
                                       }}
-                                      className={`w-20 px-2 py-1 rounded-md text-xs outline-none border ${
+                                      className={`w-20 px-2 py-1 rounded-md text-xs outline-none border [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                                         isDarkMode
                                           ? 'bg-black border-white/20 text-white focus:border-yellow-400'
                                           : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
@@ -1285,6 +1276,7 @@ export default function ProductsPage() {
                                   type="number"
                                   min={0}
                                   value={cabinetCounts[p._id] ?? ''}
+                                  onWheel={(e) => e.currentTarget.blur()}
                                   onChange={(e) => {
                                     const value = e.target.value;
                                     setCabinetCounts(prev => ({
@@ -1292,7 +1284,7 @@ export default function ProductsPage() {
                                       [p._id]: value,
                                     }));
                                   }}
-                                  className={`w-20 px-2 py-1 rounded-md text-xs outline-none border ${
+                                  className={`w-20 px-2 py-1 rounded-md text-xs outline-none border [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                                     isDarkMode
                                       ? 'bg-black border-white/20 text-white focus:border-yellow-400'
                                       : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'

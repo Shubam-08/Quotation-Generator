@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf';
 import autoTable, { CellHookData } from 'jspdf-autotable';
 import { 
   ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet, 
-  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search, Settings
+  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search, Settings, Lock, Unlock
 } from 'lucide-react';
 import Link from 'next/link';
 import { renderFormFields as renderLedDisplayFormFields } from '@/app/admin/led-displays/form-content';
@@ -73,6 +73,13 @@ type CartItem = Product & {
   outputCurrent?: string;
   type?: string;
   series?: string;
+  customTotalConverted?: number;
+  // Spare and accessory fields
+  spareModules?: string | number;
+  sparePSU?: string | number;
+  spareReceivingCard?: string | number;
+  package?: string;
+  novastarController?: string;
 };
 
 const isDisplayItem = (item: CartItem) => {
@@ -112,6 +119,12 @@ export default function EnhancedCart() {
   const [loadingDrivers, setLoadingDrivers] = useState(false);
   const [editingDisplay, setEditingDisplay] = useState<CartItem | null>(null);
   const [displayFormData, setDisplayFormData] = useState<any | null>(null);
+  // Password lock for Price Calculation editing
+  const [priceEditUnlocked, setPriceEditUnlocked] = useState(false);
+  const [showPriceEditModal, setShowPriceEditModal] = useState(false);
+  const [priceEditPassword, setPriceEditPassword] = useState('');
+  const [priceEditError, setPriceEditError] = useState('');
+  const PRICE_EDIT_PASSWORD = 'Qlitescreen2025';
   
   // Driver search state
   const [driverSearchTerm, setDriverSearchTerm] = useState('');
@@ -151,6 +164,10 @@ export default function EnhancedCart() {
   const handleCloseDisplayEdit = () => {
     setEditingDisplay(null);
     setDisplayFormData(null);
+    setPriceEditUnlocked(false);
+    setShowPriceEditModal(false);
+    setPriceEditPassword('');
+    setPriceEditError('');
   };
 
   const handleSaveDisplayEdit = () => {
@@ -169,6 +186,17 @@ export default function EnhancedCart() {
       moduleSpecs: displayFormData.moduleSpecs,
       cabinetSpecs: displayFormData.cabinetSpecs,
       screenParams: displayFormData.screenParams,
+      // Include editable calculation fields
+      requiredLength: displayFormData.requiredLength,
+      requiredWidth: displayFormData.requiredWidth,
+      cabinetRequired: displayFormData.cabinetRequired,
+      customTotalConverted: displayFormData.customTotalConverted,
+      // Spare and accessory fields
+      spareModules: displayFormData.spareModules,
+      sparePSU: displayFormData.sparePSU,
+      spareReceivingCard: displayFormData.spareReceivingCard,
+      package: displayFormData.package,
+      novastarController: displayFormData.novastarController,
     };
 
     updateCartItem(editingDisplay.cartItemId, updates);
@@ -815,6 +843,28 @@ export default function EnhancedCart() {
       yPosition += 12;
     }
 
+    // Compute total for PDF using overrides/area logic
+    const FEET_TO_METER = 0.3048;
+    const computeItemTotalConverted = (item: CartItem): number => {
+      const qty = item.quantity ?? 1;
+      const overridden = (item as any).customTotalConverted;
+      if (typeof overridden === 'number' && overridden > 0) return overridden;
+      if (isDisplayItem(item)) {
+        const lenFt = parseFloat((item as any)?.requiredLength ?? '');
+        const widFt = parseFloat((item as any)?.requiredWidth ?? '');
+        if (!isNaN(lenFt) && !isNaN(widFt) && lenFt > 0 && widFt > 0) {
+          const lenM = lenFt * FEET_TO_METER;
+          const widM = widFt * FEET_TO_METER;
+          const areaSqm = lenM * widM;
+          const unitUSD = (item.price ?? 0) * areaSqm;
+          const unitConv = convertPrice(unitUSD);
+          return unitConv * qty;
+        }
+      }
+      return convertPrice(item.price ?? 0) * qty;
+    };
+    const pdfTotal = cart.reduce((sum, item) => sum + computeItemTotalConverted(item), 0);
+
     // Add two boxes side by side (appearing as one)
     const boxX = 14;
     const boxY = 105;
@@ -1042,10 +1092,7 @@ export default function EnhancedCart() {
           { label: 'Category', value: item.category ?? 'N/A' },
           { label: 'Application', value: item.application ?? 'N/A' },
           { label: 'IP Rating', value: typeof asAny.ipRating === 'string' ? asAny.ipRating : (Array.isArray(asAny.ipRating) ? asAny.ipRating.join(', ') : 'N/A') },
-          { label: 'Pixel Pitch', value: asAny.pixelPitch ?? 'N/A' },
-          { label: 'Total Resolution', value: asAny.totalResolution ?? 'N/A' },
-          { label: 'Square Feet', value: (asAny.sqft ?? 'N/A').toString() },
-          { label: 'Price (USD)', value: asAny.price != null ? asAny.price.toString() : 'N/A' },
+          // Removed from Basic Information as requested: Pixel Pitch, Total Resolution, Square Feet, Price (USD)
         ];
 
         // Module Specifications items (5 items -> 3 left, 2 right)
@@ -1286,15 +1333,26 @@ export default function EnhancedCart() {
           const unitPriceConverted = convertPrice(unitPriceUSD);
           const unitPriceText = unitPriceConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           const qtyText = String(qty);
-          const totalText = (unitPriceConverted * qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const totalConv = computeItemTotalConverted(item);
+          const totalText = totalConv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-          const rows: Array<{ label: string; value: string }> = [
+          let rows: Array<{ label: string; value: string }> = [
             { label: `${commLabel} (m)`, value: sizeText },
             { label: 'Cabinet Required (qty)', value: cabinetQty },
-            { label: `Unit Price (${pdfCurrency})`, value: unitPriceText },
             { label: 'Quantity', value: qtyText },
             { label: `Total (${pdfCurrency})`, value: totalText },
           ];
+
+          // Append spare/accessory lines if present
+          const spareLines: Array<{ label: string; value: string }> = [];
+          if (asAny.spareModules) spareLines.push({ label: 'Spare modules (3% of total modules)', value: String(asAny.spareModules) });
+          if (asAny.sparePSU) spareLines.push({ label: 'Spare PSU', value: String(asAny.sparePSU) });
+          if (asAny.spareReceivingCard) spareLines.push({ label: 'Spare receiving card', value: String(asAny.spareReceivingCard) });
+          if (asAny.package) spareLines.push({ label: 'Package', value: String(asAny.package) });
+          if (asAny.novastarController) spareLines.push({ label: 'Novastar Controller', value: String(asAny.novastarController) });
+          if (spareLines.length > 0) {
+            rows = rows.concat(spareLines);
+          }
 
           const commRowH = 16;
           const commHeight = rows.length * commRowH;
@@ -1339,7 +1397,7 @@ export default function EnhancedCart() {
       const finalY = currentY;
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      const formattedTotal = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const formattedTotal = pdfTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
       doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
       
@@ -1499,8 +1557,8 @@ export default function EnhancedCart() {
       const finalY = (doc as any).lastAutoTable.finalY || 140;
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      // Total is already in converted currency, no need to convert again
-      const formattedTotal = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      // Total is computed using overrides/area logic and conversion
+      const formattedTotal = pdfTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
       doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
 
@@ -1744,125 +1802,229 @@ export default function EnhancedCart() {
                     className={`${isDisplay ? 'col-span-2' : ''}`}
                   >
                     <div
-                      className={`rounded-xl p-3 transition-all duration-300 hover:-translate-y-1 ${
-                        isDarkMode 
-                          ? 'bg-white border border-gray-200 hover:border-yellow-400 shadow-md hover:shadow-xl' 
-                          : 'bg-white border border-gray-200 shadow-md hover:shadow-xl hover:border-yellow-400'
+                      className={`rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 bg-white border-2 border-gray-200 hover:border-blue-400 shadow-lg hover:shadow-2xl ${
+                        isDarkMode ? '' : ''
                       }`}
                     >
                       {isDisplay ? (
-                        <div className="flex flex-col gap-3">
-                          <div className="w-full h-56 rounded-lg overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 shadow-sm">
-                            {(item.productImages?.length || item.images?.length) ? (
-                              <img 
-                                src={item.productImages?.[0] || item.images?.[0]} 
-                                alt={item.sku} 
-                                className="w-full h-full object-contain"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Package className="w-8 h-8 text-gray-400" />
-                              </div>
-                            )}
+                        <div className="flex gap-5">
+                          {/* Left: Image */}
+                          <div className="flex-shrink-0">
+                            <div className="w-44 h-44 rounded-xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-slate-300 shadow-md">
+                              {(item.productImages?.length || item.images?.length) ? (
+                                <img 
+                                  src={item.productImages?.[0] || item.images?.[0]} 
+                                  alt={item.sku} 
+                                  className="w-full h-full object-contain p-2"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="w-10 h-10 text-slate-400" />
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex flex-col gap-1">
-                            {(item.requiredLength || item.requiredWidth) && (
-                              <div className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded">
-                                Screen Size: <span className="text-blue-900">
-                                  W{(() => {
-                                    const ft = parseFloat(item.requiredLength || '0');
-                                    return (ft * 0.3048).toFixed(2);
-                                  })()}m × H{(() => {
-                                    const ft = parseFloat(item.requiredWidth || '0');
-                                    return (ft * 0.3048).toFixed(2);
-                                  })()}m
-                                </span>
-                              </div>
-                            )}
-                            {typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0 && (
-                              <div className="text-xs font-semibold text-gray-800">
-                                Cabinet Required: <span className="text-gray-900">{item.cabinetRequired}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex justify-between items-start gap-2">
-                            <div>
-                              <h3 className="font-bold text-sm mb-1 text-gray-900">{item.sku}</h3>
-                              <p className="text-xs text-gray-600 mb-1">{item.category}</p>
-                              <div className="flex flex-wrap gap-1.5 text-[11px] text-gray-700">
-                                {item.application && <span>Application: {item.application}</span>}
-                                {item.ipRating && item.ipRating !== 'N/A' && (
-                                  <span>IP: {
-                                    typeof item.ipRating === 'string' 
-                                      ? item.ipRating 
-                                      : Array.isArray(item.ipRating) 
-                                        ? (item.ipRating as string[]).join(', ')
-                                        : String(item.ipRating)
-                                  }</span>
-                                )}
-                                {item.pixelPitch && <span>Pixel Pitch: {item.pixelPitch}</span>}
-                                {item.totalResolution && <span>Resolution: {item.totalResolution}</span>}
-                                {typeof item.sqft === 'number' && <span>Sq.ft: {item.sqft}</span>}
+                          
+                          {/* Center: Product Info & Specs */}
+                          <div className="flex-1 flex flex-col gap-3">
+                            {/* Header Section */}
+                            <div className="border-b border-gray-200 pb-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <h3 className="font-bold text-lg text-gray-900 tracking-tight">{item.sku}</h3>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-700 text-white shadow-sm">
+                                      {item.category}
+                                    </span>
+                                    {item.pixelPitch && (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white shadow-sm">
+                                        {item.pixelPitch}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
+                            
+                            {/* Specifications Grid with Icons */}
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                              {item.application && (
+                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                  <div className="flex-1">
+                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Application</span>
+                                    <p className="text-xs text-gray-900 font-semibold">{item.application}</p>
+                                  </div>
+                                </div>
+                              )}
+                              {item.ipRating && item.ipRating !== 'N/A' && (
+                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                  <div className="flex-1">
+                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">IP Rating</span>
+                                    <p className="text-xs text-gray-900 font-semibold">{
+                                      typeof item.ipRating === 'string' 
+                                        ? item.ipRating 
+                                        : Array.isArray(item.ipRating) 
+                                          ? (item.ipRating as string[]).join(', ')
+                                          : String(item.ipRating)
+                                    }</p>
+                                  </div>
+                                </div>
+                              )}
+                              {(item.requiredLength || item.requiredWidth) && (
+                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                  <div className="flex-1">
+                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Screen Size</span>
+                                    <p className="text-xs text-gray-900 font-semibold">
+                                      W{(() => {
+                                        const ft = parseFloat(item.requiredLength || '0');
+                                        return (ft * 0.3048).toFixed(2);
+                                      })()}m × H{(() => {
+                                        const ft = parseFloat(item.requiredWidth || '0');
+                                        return (ft * 0.3048).toFixed(2);
+                                      })()}m
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              {typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0 && (
+                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                  <div className="flex-1">
+                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Cabinets</span>
+                                    <p className="text-xs text-gray-900 font-semibold">{item.cabinetRequired} Units</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Quantity & Price Row */}
+                            <div className="flex items-center justify-between gap-4 mt-auto pt-3 border-t border-gray-200">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-semibold text-gray-600">Quantity:</span>
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-slate-100 to-slate-200 border-2 border-slate-300 shadow-sm">
+                                  <button
+                                    onClick={() => decreaseQuantity(item.cartItemId)}
+                                    className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow-md text-gray-700 hover:text-blue-600"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const value = parseInt(e.target.value) || 1;
+                                      updateQuantity(item.cartItemId, value);
+                                    }}
+                                    onFocus={() => setEditingQuantity(item.cartItemId)}
+                                    onBlur={() => setEditingQuantity(null)}
+                                    className="w-12 text-center font-bold text-sm outline-none bg-transparent text-gray-900"
+                                  />
+                                  <button
+                                    onClick={() => increaseQuantity(item.cartItemId)}
+                                    className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow-md text-gray-700 hover:text-blue-600"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[10px] text-gray-500 font-medium mb-0.5">Total (USD)</p>
+                                <p className="text-base font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
+                                  {(() => {
+                                    const FEET_TO_METER = 0.3048;
+                                    const asAny = item as any;
+                                    const lenFt = parseFloat(asAny.requiredLength ?? '0');
+                                    const widFt = parseFloat(asAny.requiredWidth ?? '0');
+                                    let totalUSD = 0;
+                                    if (!isNaN(lenFt) && !isNaN(widFt) && lenFt > 0 && widFt > 0) {
+                                      const areaSqm = (lenFt * FEET_TO_METER) * (widFt * FEET_TO_METER);
+                                      totalUSD = areaSqm * (item.price ?? 0) * (item.quantity ?? 1);
+                                    } else {
+                                      totalUSD = (item.price ?? 0) * (item.quantity ?? 1);
+                                    }
+                                    const formatted = totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    return `$ ${formatted}`;
+                                  })()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Right: Actions */}
+                          <div className="flex flex-col gap-3 items-end justify-between">
                             <button
                               onClick={() => removeFromCart(item.cartItemId)}
-                              className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-50 text-red-600 hover:text-red-700"
-                              title="Remove"
+                              className="p-2.5 rounded-lg transition-all bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 shadow-sm hover:shadow-md"
+                              title="Remove from cart"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                          </div>
-                          <div className="flex items-center justify-between gap-2 mt-1">
-                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 shadow-sm">
-                              <button
-                                onClick={() => decreaseQuantity(item.cartItemId)}
-                                className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <input
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) => {
-                                  const value = parseInt(e.target.value) || 1;
-                                  updateQuantity(item.cartItemId, value);
-                                }}
-                                onFocus={() => setEditingQuantity(item.cartItemId)}
-                                onBlur={() => setEditingQuantity(null)}
-                                className="w-10 text-center font-bold text-xs outline-none bg-transparent text-gray-900"
-                              />
-                              <button
-                                onClick={() => increaseQuantity(item.cartItemId)}
-                                className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] text-gray-500">
-                                {formatPrice(item.price ?? 0)} × {item.quantity}
-                              </p>
-                              <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                                {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex justify-end mt-1">
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 setEditingDisplay(item);
-                                setDisplayFormData({
+                                // Base form data
+                                let baseData: any = {
+                                  __context: 'cart',
                                   ...item,
                                   moduleSpecs: item.moduleSpecs || {},
                                   cabinetSpecs: item.cabinetSpecs || {},
                                   screenParams: item.screenParams || {},
-                                });
+                                  customTotalManuallyEdited: false,
+                                  priceInput: (typeof item.price === 'number' ? String(item.price) : (item.price || '')) as any,
+                                  cabinetRequiredManuallyEdited: false,
+                                };
+                                // Try to hydrate cabinet specs from backend by SKU
+                                try {
+                                  if (item.sku) {
+                                    const res = await fetch(`/api/led-displays?search=${encodeURIComponent(item.sku)}`);
+                                    if (res.ok) {
+                                      const list = await res.json();
+                                      const match = Array.isArray(list) ? list.find((d: any) => d.sku === item.sku) : null;
+                                      if (match?.cabinetSpecs) {
+                                        const mergedCabinetSpecs = { ...match.cabinetSpecs, ...baseData.cabinetSpecs };
+                                        baseData.cabinetSpecs = mergedCabinetSpecs;
+                                        // If required size present, compute initial cabinetRequired
+                                        const FEET_TO_METER = 0.3048;
+                                        const lenFt = parseFloat((baseData as any)?.requiredLength ?? '');
+                                        const widFt = parseFloat((baseData as any)?.requiredWidth ?? '');
+                                        if (!isNaN(lenFt) && !isNaN(widFt) && lenFt > 0 && widFt > 0) {
+                                          const lenM = lenFt * FEET_TO_METER;
+                                          const widM = widFt * FEET_TO_METER;
+                                          const areaSqm = lenM * widM;
+                                          let cabArea = mergedCabinetSpecs?.cabinetArea;
+                                          if (!(cabArea > 0)) {
+                                            const sizeStr = mergedCabinetSpecs?.cabinetSize || '';
+                                            const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                            if (m) {
+                                              const w = parseFloat(m[1]);
+                                              const h = parseFloat(m[2]);
+                                              if (!isNaN(w) && !isNaN(h)) {
+                                                cabArea = (w / 1000) * (h / 1000);
+                                              }
+                                            }
+                                          }
+                                          if (cabArea && cabArea > 0) {
+                                            baseData.cabinetRequired = Math.round(areaSqm / cabArea);
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                } catch {}
+                                setDisplayFormData(baseData);
+                                // Reset price edit lock state when opening editor
+                                setPriceEditUnlocked(false);
+                                setShowPriceEditModal(false);
+                                setPriceEditPassword('');
+                                setPriceEditError('');
                               }}
-                              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-300 text-gray-800 hover:bg-gray-100"
+                              className="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all border-2 border-blue-400 hover:border-blue-500"
                             >
-                              Edit
+                              ✏️ Edit Specs
                             </button>
                           </div>
                         </div>
@@ -2438,51 +2600,192 @@ export default function EnhancedCart() {
         </div>
       )}
 
+      {/* Price Edit Unlock Modal */}
+      {showPriceEditModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className={`w-full max-w-sm rounded-xl overflow-hidden ${
+            isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-lg'
+          }`}>
+            <div className={`p-4 border-b ${isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-white'}`}>
+              <h3 className={`text-base font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <Lock className="w-4 h-4 text-blue-500" /> Enter Password to Edit Price
+              </h3>
+            </div>
+            <div className="p-4">
+              <label className={`text-xs font-semibold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Password</label>
+              <input
+                type="password"
+                value={priceEditPassword}
+                onChange={(e) => { setPriceEditPassword(e.target.value); setPriceEditError(''); }}
+                className={`w-full px-3 py-2 rounded-lg text-sm outline-none ${
+                  isDarkMode ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500' : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400'
+                }`}
+                placeholder="Enter password"
+              />
+              {priceEditError && (
+                <p className={`mt-2 text-xs ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{priceEditError}</p>
+              )}
+            </div>
+            <div className={`flex justify-end gap-2 p-4 border-t ${isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-100 bg-gray-50'}`}>
+              <button
+                type="button"
+                onClick={() => { setShowPriceEditModal(false); setPriceEditPassword(''); setPriceEditError(''); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                  isDarkMode ? 'bg-transparent border border-white/20 text-gray-200 hover:bg-white/10' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (priceEditPassword === PRICE_EDIT_PASSWORD) {
+                    setPriceEditUnlocked(true);
+                    setShowPriceEditModal(false);
+                    setPriceEditPassword('');
+                    setPriceEditError('');
+                  } else {
+                    setPriceEditError('Invalid password');
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                Unlock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Driver Selection Modal */}
       {/* LED Display Edit Modal */}
       {editingDisplay && displayFormData && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`w-full max-w-5xl max-h-[90vh] rounded-xl overflow-hidden flex flex-col ${
-            isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-2xl'
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl ${
+            isDarkMode ? 'bg-gray-900 border-2 border-white/10' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600'
           }`}>
             {/* Header */}
-            <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${
-              isDarkMode ? 'border-white/10' : 'border-gray-200'
+            <div className={`flex items-center justify-between px-6 py-5 border-b-2 flex-shrink-0 ${
+              isDarkMode ? 'border-white/10 bg-gray-900' : 'border-slate-600 bg-gradient-to-r from-slate-700 to-slate-800'
             }`}>
               <div>
-                <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-white'}`}>
                   Edit LED Display Specifications
                 </h3>
-                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-slate-300'}`}>
                   SKU: {editingDisplay.sku}
                 </p>
               </div>
               <button
                 onClick={handleCloseDisplayEdit}
                 className={`p-2 rounded-lg transition-colors ${
-                  isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
+                  isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-slate-600 text-white'
                 }`}
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             </div>
 
             {/* Form Content */}
-            <div className="px-6 py-4 overflow-y-auto flex-1 min-h-0">
+            <div className="px-6 py-5 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-800 via-slate-850 to-slate-900">
               {renderLedDisplayFormFields(displayFormData, setDisplayFormData, isDarkMode)}
-              
-              {/* Price Calculation Preview */}
-              <div className={`mt-6 p-4 rounded-lg border ${
-                isDarkMode ? 'bg-blue-900/20 border-blue-500/30' : 'bg-blue-50 border-blue-200'
-              }`}>
-                <h4 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
-                  Price Calculation Preview
+
+              {/* Spare and Accessories */}
+              <div className={`mt-6 p-5 rounded-xl border-2 shadow-lg ${isDarkMode ? 'bg-gray-900/40 border-white/10' : 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-500'}`}>
+                <h4 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-white'}`}>
+                  <span className="w-1.5 h-7 bg-indigo-600 rounded shadow-sm"></span>
+                  Spare and Accessories
                 </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Spare modules (3% of total modules)</label>
+                    <input
+                      type="text"
+                      value={displayFormData?.spareModules ?? ''}
+                      onChange={(e) => setDisplayFormData({ ...displayFormData, spareModules: e.target.value })}
+                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
+                      placeholder="e.g., 12 pcs"
+                    />
+                  </div>
+                  <div>
+                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Spare PSU</label>
+                    <input
+                      type="text"
+                      value={displayFormData?.sparePSU ?? ''}
+                      onChange={(e) => setDisplayFormData({ ...displayFormData, sparePSU: e.target.value })}
+                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
+                      placeholder="e.g., 2 pcs"
+                    />
+                  </div>
+                  <div>
+                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Spare receiving card</label>
+                    <input
+                      type="text"
+                      value={displayFormData?.spareReceivingCard ?? ''}
+                      onChange={(e) => setDisplayFormData({ ...displayFormData, spareReceivingCard: e.target.value })}
+                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
+                      placeholder="e.g., 1 pc"
+                    />
+                  </div>
+                  <div>
+                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Package</label>
+                    <input
+                      type="text"
+                      value={displayFormData?.package ?? ''}
+                      onChange={(e) => setDisplayFormData({ ...displayFormData, package: e.target.value })}
+                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
+                      placeholder="e.g., Flight case"
+                    />
+                  </div>
+                  <div>
+                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Novastar Controller</label>
+                    <input
+                      type="text"
+                      value={displayFormData?.novastarController ?? ''}
+                      onChange={(e) => setDisplayFormData({ ...displayFormData, novastarController: e.target.value })}
+                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
+                      placeholder="e.g., VX4S"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Price Calculation Preview - EDITABLE */}
+              <div className={`mt-6 p-5 rounded-xl border-2 shadow-lg ${
+                isDarkMode ? 'bg-gray-900/30 border-white/10' : 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-500'
+              }`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-gray-200' : 'text-white'}`}>
+                    <span className="w-1.5 h-7 bg-emerald-600 rounded shadow-sm"></span>
+                    <Settings className="w-5 h-5" />
+                    Price Calculation Preview (Editable)
+                    {!priceEditUnlocked && (
+                      <span className={`ml-2 px-3 py-1 rounded-full text-xs font-bold ${isDarkMode ? 'bg-white/10 text-gray-200' : 'bg-yellow-500 text-slate-900 border-2 border-yellow-400 shadow-sm'}`}>🔒 Locked</span>
+                    )}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!priceEditUnlocked) {
+                        setPriceEditPassword('');
+                        setPriceEditError('');
+                        setShowPriceEditModal(true);
+                      } else {
+                        setPriceEditUnlocked(false);
+                      }
+                    }}
+                    className={`px-2 py-1 rounded text-xs font-semibold inline-flex items-center gap-1 ${
+                      isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-white hover:bg-gray-100 border border-gray-300 text-gray-800'
+                    }`}
+                  >
+                    {priceEditUnlocked ? (<><Unlock className="w-3 h-3" /> Unlocked</>) : (<><Lock className="w-3 h-3" /> Unlock to edit</>)}
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   {(() => {
                     const FEET_TO_METER = 0.3048;
-                    const lenFt = parseFloat((editingDisplay as any)?.requiredLength ?? '0');
-                    const widFt = parseFloat((editingDisplay as any)?.requiredWidth ?? '0');
+                    const lenFt = parseFloat(displayFormData?.requiredLength ?? '0');
+                    const widFt = parseFloat(displayFormData?.requiredWidth ?? '0');
                     const hasLen = !isNaN(lenFt) && lenFt > 0;
                     const hasWid = !isNaN(widFt) && widFt > 0;
                     const lenM = hasLen ? lenFt * FEET_TO_METER : 0;
@@ -2497,59 +2800,269 @@ export default function EnhancedCart() {
 
                     return (
                       <>
+                        {/* Required Length (ft) - EDITABLE */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                          <span className="font-semibold">Required Size (ft):</span>
-                          <div className="mt-1">{hasLen && hasWid ? `W${lenFt}ft × H${widFt}ft` : 'N/A'}</div>
+                          <label className="font-semibold block mb-1">Required Length (ft):</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={displayFormData?.requiredLength ?? ''}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // Update length
+                              let next: any = { ...displayFormData, requiredLength: val };
+                              // Recompute area-based total if possible and not manually overridden
+                              const FEET_TO_METER = 0.3048;
+                              const lenFt = parseFloat(val);
+                              const widFt = parseFloat(displayFormData?.requiredWidth ?? '0');
+                              const hasLen = !isNaN(lenFt) && lenFt > 0;
+                              const hasWid = !isNaN(widFt) && widFt > 0;
+                              if (hasLen && hasWid) {
+                                const lenM = lenFt * FEET_TO_METER;
+                                const widM = widFt * FEET_TO_METER;
+                                const areaSqm = lenM * widM;
+                                // Auto-calc cabinetRequired if cabinet area exists (or derive from cabinet size)
+                                const rawArea = (displayFormData as any)?.cabinetSpecs?.cabinetArea;
+                                let cabArea = typeof rawArea === 'number' ? rawArea : parseFloat(rawArea ?? '');
+                                console.log('🔍 [LENGTH] Cabinet specs:', { cabinetSpecs: displayFormData?.cabinetSpecs, rawArea, cabArea });
+                                if (!(cabArea > 0)) {
+                                  const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                                  console.log('🔍 [LENGTH] Parsing cabinet size:', sizeStr);
+                                  const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                  if (m) {
+                                    const w = parseFloat(m[1]);
+                                    const h = parseFloat(m[2]);
+                                    console.log('🔍 [LENGTH] Parsed dimensions (mm):', { w, h });
+                                    if (!isNaN(w) && !isNaN(h)) {
+                                      // Assume mm, convert to meters
+                                      const wm = w / 1000;
+                                      const hm = h / 1000;
+                                      cabArea = wm * hm; // in sqm
+                                      console.log('🔍 [LENGTH] Calculated cabArea (sqm):', cabArea);
+                                    }
+                                  }
+                                }
+                                console.log('🔧 [LENGTH] Cabinet calc:', { lenFt, widFt, areaSqm, cabArea, manualFlag: displayFormData?.cabinetRequiredManuallyEdited, currentCab: displayFormData?.cabinetRequired });
+                                if (!displayFormData?.cabinetRequiredManuallyEdited && cabArea && cabArea > 0) {
+                                  next.cabinetRequired = Math.round(areaSqm / cabArea);
+                                  console.log('✅ [LENGTH] Auto-updated cabinet to:', next.cabinetRequired);
+                                }
+                                if (!displayFormData?.customTotalManuallyEdited) {
+                                  const unitUSD = areaSqm * (displayFormData?.price || 0);
+                                  const unitConv = convertPrice(unitUSD);
+                                  const qty = editingDisplay?.quantity ?? 1;
+                                  const calc = unitConv * qty;
+                                  next.customTotalConverted = Math.round(calc * 100) / 100;
+                                }
+                              }
+                              setDisplayFormData(next);
+                            }}
+                            disabled={!priceEditUnlocked}
+                            className={`w-full px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                              isDarkMode 
+                                ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}` 
+                                : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                            }`}
+                            placeholder="Width in feet"
+                          />
                         </div>
+
+                        {/* Required Width (ft) - EDITABLE */}
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <label className="font-semibold block mb-1">Required Height (ft):</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={displayFormData?.requiredWidth ?? ''}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              let next: any = { ...displayFormData, requiredWidth: val };
+                              const FEET_TO_METER = 0.3048;
+                              const lenFt = parseFloat(displayFormData?.requiredLength ?? '0');
+                              const widFt = parseFloat(val);
+                              const hasLen = !isNaN(lenFt) && lenFt > 0;
+                              const hasWid = !isNaN(widFt) && widFt > 0;
+                              if (hasLen && hasWid) {
+                                const lenM = lenFt * FEET_TO_METER;
+                                const widM = widFt * FEET_TO_METER;
+                                const areaSqm = lenM * widM;
+                                // Auto-calc cabinetRequired with same robust logic
+                                const rawArea = (displayFormData as any)?.cabinetSpecs?.cabinetArea;
+                                let cabArea = typeof rawArea === 'number' ? rawArea : parseFloat(rawArea ?? '');
+                                console.log('🔍 [HEIGHT] Cabinet specs:', { cabinetSpecs: displayFormData?.cabinetSpecs, rawArea, cabArea });
+                                if (!(cabArea > 0)) {
+                                  const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                                  console.log('🔍 [HEIGHT] Parsing cabinet size:', sizeStr);
+                                  const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                  if (m) {
+                                    const w = parseFloat(m[1]);
+                                    const h = parseFloat(m[2]);
+                                    console.log('🔍 [HEIGHT] Parsed dimensions (mm):', { w, h });
+                                    if (!isNaN(w) && !isNaN(h)) {
+                                      cabArea = (w / 1000) * (h / 1000);
+                                      console.log('🔍 [HEIGHT] Calculated cabArea (sqm):', cabArea);
+                                    }
+                                  }
+                                }
+                                console.log('🔧 [HEIGHT] Cabinet calc:', { lenFt, widFt, areaSqm, cabArea, manualFlag: displayFormData?.cabinetRequiredManuallyEdited, currentCab: displayFormData?.cabinetRequired });
+                                if (!displayFormData?.cabinetRequiredManuallyEdited && cabArea && cabArea > 0) {
+                                  next.cabinetRequired = Math.round(areaSqm / cabArea);
+                                  console.log('✅ [HEIGHT] Auto-updated cabinet to:', next.cabinetRequired);
+                                }
+                                if (!displayFormData?.customTotalManuallyEdited) {
+                                  const unitUSD = areaSqm * (displayFormData?.price || 0);
+                                  const unitConv = convertPrice(unitUSD);
+                                  const qty = editingDisplay?.quantity ?? 1;
+                                  const calc = unitConv * qty;
+                                  next.customTotalConverted = Math.round(calc * 100) / 100;
+                                }
+                              }
+                              setDisplayFormData(next);
+                            }}
+                            disabled={!priceEditUnlocked}
+                            className={`w-full px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                              isDarkMode 
+                                ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}` 
+                                : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                            }`}
+                            placeholder="Height in feet"
+                          />
+                        </div>
+
+                        {/* Required Size (m) - READ ONLY */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
                           <span className="font-semibold">Required Size (m):</span>
                           <div className="mt-1">{hasLen && hasWid ? `W${lenM.toFixed(2)}m × H${widM.toFixed(2)}m` : 'N/A'}</div>
                         </div>
+
+                        {/* Area (sqm) - READ ONLY */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
                           <span className="font-semibold">Area (sqm):</span>
-                          <div className="mt-1">{areaSqm > 0 ? areaSqm.toFixed(2) : 'N/A'}</div>
+                          <div className={`mt-1 font-bold ${isDarkMode ? 'text-gray-100' : 'text-slate-700'}`}>{areaSqm > 0 ? areaSqm.toFixed(2) : 'N/A'}</div>
                         </div>
+
+                        {/* Price per sqm (USD) - EDITABLE */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                          <span className="font-semibold">Price per sqm (USD):</span>
-                          <div className="mt-1">${pricePerSqm.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <label className="font-semibold block mb-1">Price per sqm (USD):</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={displayFormData?.priceInput ?? (displayFormData?.price != null ? String(displayFormData.price) : '')}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // Update string value first to avoid flicker/leading zero
+                              let next: any = { ...displayFormData, priceInput: val };
+                              const parsed = parseFloat(val);
+                              // Recompute total (converted) if numeric and not manually edited
+                              const FEET_TO_METER = 0.3048;
+                              const lenFt = parseFloat(displayFormData?.requiredLength ?? '0');
+                              const widFt = parseFloat(displayFormData?.requiredWidth ?? '0');
+                              const hasLen = !isNaN(lenFt) && lenFt > 0;
+                              const hasWid = !isNaN(widFt) && widFt > 0;
+                              const lenM = hasLen ? lenFt * FEET_TO_METER : 0;
+                              const widM = hasWid ? widFt * FEET_TO_METER : 0;
+                              const areaSqm = hasLen && hasWid ? lenM * widM : 0;
+                              if (!isNaN(parsed)) {
+                                next.price = parsed;
+                                const unitUSD = areaSqm * parsed;
+                                const unitConv = convertPrice(unitUSD);
+                                const qty = editingDisplay?.quantity ?? 1;
+                                const newTotal = Math.round(unitConv * qty * 100) / 100;
+                                if (!displayFormData?.customTotalManuallyEdited) {
+                                  next.customTotalConverted = newTotal;
+                                }
+                              } else {
+                                next.price = undefined;
+                              }
+                              setDisplayFormData(next);
+                            }}
+                            disabled={!priceEditUnlocked}
+                            className={`w-full px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                              isDarkMode 
+                                ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}` 
+                                : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                            }`}
+                            placeholder="Price per sqm"
+                          />
                         </div>
+
+                        {/* Cabinet Required - EDITABLE (auto-calculated if not overridden) */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                          <span className="font-semibold">Cabinet Required:</span>
-                          <div className="mt-1">{(editingDisplay as any)?.cabinetRequired ?? 'N/A'}</div>
+                          <label className="font-semibold block mb-1">Cabinet Required:</label>
+                          <input
+                            type="number"
+                            step="1"
+                            value={displayFormData?.cabinetRequired ?? ''}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            onChange={(e) => setDisplayFormData({ ...displayFormData, cabinetRequired: parseInt(e.target.value) || 0, cabinetRequiredManuallyEdited: true })}
+                            disabled={!priceEditUnlocked}
+                            className={`w-full px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                              isDarkMode 
+                                ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}` 
+                                : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                            }`}
+                            placeholder="Number of cabinets"
+                          />
                         </div>
+
+                        {/* Quantity - READ ONLY (editable elsewhere) */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
                           <span className="font-semibold">Quantity:</span>
                           <div className="mt-1">{qty}</div>
                         </div>
-                        <div className={`col-span-2 pt-2 border-t ${isDarkMode ? 'border-blue-500/30' : 'border-blue-200'}`}>
-                          <div className={`font-bold ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
-                            Unit Price ({currencyDisplay}): {currencyInfo.symbol}{unitPriceConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </div>
-                          <div className={`font-bold mt-1 ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
-                            Total ({currencyDisplay}): {currencyInfo.symbol}{totalConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </div>
+
+                        {/* Calculated Totals - Editable Total when unlocked (Unit Price hidden) */}
+                        <div className={`col-span-2 pt-2 border-t ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                          {/* Unit Price hidden as requested */}
+                          {priceEditUnlocked ? (
+                            <div className="mt-2">
+                              <label className={`text-xs font-semibold block mb-1 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>Total ({currencyDisplay})</label>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>{currencyInfo.symbol}</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={(displayFormData?.customTotalConverted ?? Math.round(totalConverted*100)/100).toFixed(2)}
+                                  onWheel={(e) => e.currentTarget.blur()}
+                                  onChange={(e) => setDisplayFormData({ ...displayFormData, customTotalConverted: parseFloat(e.target.value) || 0, customTotalManuallyEdited: true })}
+                                  className={`flex-1 px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                    isDarkMode 
+                                      ? 'bg-gray-800 border-white/20 text-white' 
+                                      : 'bg-white border-gray-300 text-gray-900'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className={`font-bold mt-1 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>
+                              Total ({currencyDisplay}): {currencyInfo.symbol}{(displayFormData?.customTotalConverted ?? totalConverted).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
                         </div>
                       </>
                     );
                   })()}
                 </div>
                 <p className={`text-[10px] mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Formula: Area (sqm) = W(m) × H(m) | Unit Price = Area × Price per sqm | Total = Unit Price × Quantity
+                  Formula: Area (sqm) = W(m) × H(m) | Total derives from area × price per sqm × qty (unit price hidden)
                 </p>
               </div>
             </div>
 
             {/* Footer Actions */}
-            <div className={`flex justify-end gap-3 px-6 py-4 border-t flex-shrink-0 ${
-              isDarkMode ? 'border-white/10 bg-gray-900/80' : 'border-gray-200 bg-gray-50'
+            <div className={`flex justify-end gap-3 px-6 py-5 border-t-2 flex-shrink-0 ${
+              isDarkMode ? 'border-white/10 bg-gray-900/80' : 'border-slate-600 bg-gradient-to-r from-slate-800 to-slate-900'
             }`}>
               <button
                 type="button"
                 onClick={handleCloseDisplayEdit}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold ${
+                className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
                   isDarkMode
-                    ? 'bg-transparent border border-white/20 text-gray-200 hover:bg-white/10'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
+                    ? 'bg-transparent border-2 border-white/20 text-gray-200 hover:bg-white/10'
+                    : 'bg-white border-2 border-gray-400 text-gray-700 hover:bg-gray-50 shadow-sm'
                 }`}
               >
                 Cancel
@@ -2557,9 +3070,9 @@ export default function EnhancedCart() {
               <button
                 type="button"
                 onClick={handleSaveDisplayEdit}
-                className="px-4 py-2 rounded-lg text-xs font-semibold bg-yellow-400 hover:bg-yellow-500 text-black shadow-sm hover:shadow"
+                className="px-6 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all"
               >
-                Save Changes
+                💾 Save Changes
               </button>
             </div>
           </div>

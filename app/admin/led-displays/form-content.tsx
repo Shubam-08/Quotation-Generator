@@ -1,16 +1,16 @@
 // Comprehensive LED Display Form Content
 export const renderFormFields = (formData: any, setFormData: any, isDarkMode: boolean = false) => {
   // Dynamic class names based on dark mode
-  const labelClass = `block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`;
-  const labelSmallClass = `block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`;
-  const inputClass = `w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 ${
+  const labelClass = `block text-sm font-bold mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`;
+  const labelSmallClass = `block text-xs font-bold mb-1 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`;
+  const inputClass = `w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
     isDarkMode 
       ? 'bg-gray-800 border border-white/20 text-white focus:border-yellow-400 focus:ring-yellow-400/20' 
-      : 'bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-200'
+      : 'bg-white border-2 border-gray-300 text-gray-900 focus:border-gray-500 focus:ring-gray-200'
   }`;
-  const sectionHeaderClass = `text-lg font-bold mb-3 pb-2 border-b ${isDarkMode ? 'text-white border-white/10' : 'text-gray-900 border-gray-200'}`;
-  const descriptionClass = `text-sm mb-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`;
-  const variantBoxClass = `flex items-center gap-3 p-3 rounded-lg border ${isDarkMode ? 'bg-gray-800/50 border-white/10' : 'bg-gray-50 border-gray-200'}`;
+  const sectionHeaderClass = `text-xl font-bold mb-4 pb-3 border-b-2 ${isDarkMode ? 'text-white border-white/20' : 'text-gray-900 border-gray-300'}`;
+  const descriptionClass = `text-sm mb-3 font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`;
+  const variantBoxClass = `flex items-center gap-3 p-4 rounded-lg border-2 ${isDarkMode ? 'bg-gray-800/50 border-white/10' : 'bg-white border-gray-300 shadow-sm'}`;
   
   return (
   <>
@@ -80,27 +80,19 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             className={inputClass}
           />
         </div>
-        <div>
-          <label className={labelClass}>Square Feet</label>
-          <input
-            type="number"
-            step="0.01"
-            placeholder="e.g., 100"
-            value={formData.sqft || ""}
-            onChange={(e) => setFormData({ ...formData, sqft: parseFloat(e.target.value) })}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Price (USD)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={formData.price ?? ""}
-            onChange={(e) => setFormData({ ...formData, price: e.target.value === "" ? undefined : Number(e.target.value) })}
-            className={inputClass}
-          />
-        </div>
+        {/* Square Feet field hidden as requested */}
+        {formData.__context !== 'cart' && (
+          <div>
+            <label className={labelClass}>Price (USD)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.price ?? ""}
+              onChange={(e) => setFormData({ ...formData, price: e.target.value === "" ? undefined : Number(e.target.value) })}
+              className={inputClass}
+            />
+          </div>
+        )}
       </div>
     </div>
 
