@@ -59,8 +59,13 @@ type Product = {
   isoCertificate?: string[];
   cabinetSpecs?: {
     cabinetSize?: string; // W*H in mm, e.g. "960x960"
+    cabinetResolution?: string; // e.g. "128x96"
+    moduleQuantity?: number;
+    pixelDensity?: string; // pixels per sqm
+    cabinetWeight?: number; // in kg
     cabinetArea?: number; // in sqm, if provided
     material?: string; // Cabinet material from Cabinet Specifications
+    maintenance?: string; // Front/Rear
   };
   cabinetRequired?: number;
   requiredLength?: string;

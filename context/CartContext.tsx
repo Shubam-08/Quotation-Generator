@@ -31,6 +31,10 @@ type Product = {
   cabinetRequired?: number;
   requiredLength?: string;
   requiredWidth?: string;
+  // Derived LED display layout fields
+  suggestedSize?: string;
+  cabinetArrangementWidth?: number;
+  cabinetArrangementHeight?: number;
 };
 
 type Driver = {
