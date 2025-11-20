@@ -74,12 +74,28 @@ type CartItem = Product & {
   type?: string;
   series?: string;
   customTotalConverted?: number;
+  // Display-specific editable fields
+  suggestedSize?: string;
+  cabinetArrangementWidth?: number;
+  cabinetArrangementHeight?: number;
   // Spare and accessory fields
   spareModules?: string | number;
   sparePSU?: string | number;
   spareReceivingCard?: string | number;
   package?: string;
   novastarController?: string;
+  // CMS with license duration
+  cmsInclude?: string;
+  cmsLicenseYears?: number;
+  // MS Structure
+  msStructureSqm?: number;
+  // Controllers on cart
+  controller1Name?: string;
+  controller1Price?: number;
+  controller1Qty?: number;
+  controller2Name?: string;
+  controller2Price?: number;
+  controller2Qty?: number;
 };
 
 const isDisplayItem = (item: CartItem) => {
@@ -132,13 +148,32 @@ export default function EnhancedCart() {
   // Terms and Conditions state
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsAndConditions, setTermsAndConditions] = useState({
+    // Common LED lights terms (structured fields)
     deliveryLocation: 'DDP Bahrain',
     deliveryTime: '8-10 Weeks',
     paymentTerms: '50% advance and balance 50% on delivery',
     productMake: 'Qlite UK make',
     validityDays: '45 days',
     vatNote: 'VAT will charged as per applicable government regulations',
-    salesPersonName: ''
+    salesPersonName: '',
+    // Which terms to use in the PDF: 'lights' | 'displays'
+    termsType: 'lights' as 'lights' | 'displays',
+    // Free-form terms text for LED Displays (multi-line, editable)
+    displayTerms:
+      '1. Lead time: within 10 Days\n' +
+      '2. Payment term: 50% with PO and 50% before delivery\n' +
+      '3. Warranty: 3 years\n' +
+      '4. This quotation is valid for 10 days\n' +
+      '5. Replacement of modules is included during warranty period\n' +
+      '6. Any type of civil work is in client scope\n' +
+      '7. Pricing of controller will be changed as per the client requirement\n' +
+      '8. GST Rates: As Applicable\n' +
+      '9. Cranes or ladders required are in client scope\n' +
+      '10. MS Structure Fabrication and installation at site is in Qlite scope\n' +
+      '11. Structure drawing, Control drawing will be provided by Qlite\n' +
+      '12. Supply, Installation, Testing and Commissioning of Videowall - Qlite scope\n' +
+      '13. Payment Processing: A/c transfer\n' +
+      '14. Unloading and storing of LED screen at site location is in client scope',
   });
 
   // Calculate total in selected currency (not base INR price)
@@ -173,6 +208,21 @@ export default function EnhancedCart() {
   const handleSaveDisplayEdit = () => {
     if (!editingDisplay || !displayFormData) return;
 
+    const formatSpare = (nameKey: string, qtyKey: string) => {
+      const name = (displayFormData as any)[nameKey] as string | undefined;
+      const qty = (displayFormData as any)[qtyKey] as number | undefined;
+      if (!qty || qty <= 0) return undefined;
+      const trimmedName = (name || '').trim();
+      return trimmedName ? `${trimmedName} - ${qty}` : String(qty);
+    };
+
+    // Auto-sync MS Structure Area from Price Calculation
+    const widM = parseFloat(displayFormData?.requiredLength ?? '0');
+    const heiM = parseFloat(displayFormData?.requiredWidth ?? '0');
+    const hasWid = !isNaN(widM) && widM > 0;
+    const hasHei = !isNaN(heiM) && heiM > 0;
+    const areaSqm = hasWid && hasHei ? widM * heiM : 0;
+
     const updates: Partial<CartItem> = {
       category: displayFormData.category,
       application: displayFormData.application,
@@ -189,14 +239,19 @@ export default function EnhancedCart() {
       // Include editable calculation fields
       requiredLength: displayFormData.requiredLength,
       requiredWidth: displayFormData.requiredWidth,
+      suggestedSize: (displayFormData as any).suggestedSize,
       cabinetRequired: displayFormData.cabinetRequired,
       customTotalConverted: displayFormData.customTotalConverted,
-      // Spare and accessory fields
-      spareModules: displayFormData.spareModules,
-      sparePSU: displayFormData.sparePSU,
-      spareReceivingCard: displayFormData.spareReceivingCard,
-      package: displayFormData.package,
-      novastarController: displayFormData.novastarController,
+      // Spare and accessory fields (store combined name + quantity)
+      spareModules: formatSpare('spareModulesName', 'spareModulesQty') ?? displayFormData.spareModules,
+      sparePSU: formatSpare('sparePSUName', 'sparePSUQty') ?? displayFormData.sparePSU,
+      spareReceivingCard: formatSpare('spareReceivingCardName', 'spareReceivingCardQty') ?? displayFormData.spareReceivingCard,
+      package: formatSpare('packageName', 'packageQty') ?? displayFormData.package,
+      // CMS with license duration
+      cmsInclude: (displayFormData as any).cmsInclude,
+      cmsLicenseYears: (displayFormData as any).cmsLicenseYears,
+      // MS Structure - auto-synced from area
+      msStructureSqm: areaSqm > 0 ? areaSqm : undefined,
     };
 
     updateCartItem(editingDisplay.cartItemId, updates);
@@ -844,18 +899,16 @@ export default function EnhancedCart() {
     }
 
     // Compute total for PDF using overrides/area logic
-    const FEET_TO_METER = 0.3048;
     const computeItemTotalConverted = (item: CartItem): number => {
       const qty = item.quantity ?? 1;
       const overridden = (item as any).customTotalConverted;
       if (typeof overridden === 'number' && overridden > 0) return overridden;
       if (isDisplayItem(item)) {
-        const lenFt = parseFloat((item as any)?.requiredLength ?? '');
-        const widFt = parseFloat((item as any)?.requiredWidth ?? '');
-        if (!isNaN(lenFt) && !isNaN(widFt) && lenFt > 0 && widFt > 0) {
-          const lenM = lenFt * FEET_TO_METER;
-          const widM = widFt * FEET_TO_METER;
-          const areaSqm = lenM * widM;
+        // requiredLength and requiredWidth are now stored in METERS
+        const widM = parseFloat((item as any)?.requiredLength ?? '');
+        const heiM = parseFloat((item as any)?.requiredWidth ?? '');
+        if (!isNaN(widM) && !isNaN(heiM) && widM > 0 && heiM > 0) {
+          const areaSqm = widM * heiM;
           const unitUSD = (item.price ?? 0) * areaSqm;
           const unitConv = convertPrice(unitUSD);
           return unitConv * qty;
@@ -863,7 +916,33 @@ export default function EnhancedCart() {
       }
       return convertPrice(item.price ?? 0) * qty;
     };
-    const pdfTotal = cart.reduce((sum, item) => sum + computeItemTotalConverted(item), 0);
+    // Calculate total including CMS and Controller prices
+    let pdfTotal = cart.reduce((sum, item) => sum + computeItemTotalConverted(item), 0);
+    
+    // Add CMS and Controller prices for LED Display items
+    cart.forEach(item => {
+      if (isDisplayItem(item)) {
+        const asAny = item as any;
+        
+        // Add CMS price
+        if (asAny.cmsInclude && String(asAny.cmsInclude).toLowerCase() === 'yes') {
+          const years = asAny.cmsLicenseYears || 3;
+          const priceMap: { [key: number]: number } = { 1: 125, 3: 375, 5: 625, 7: 875 };
+          const cmsPrice = priceMap[years] || 375;
+          pdfTotal += convertPrice(cmsPrice);
+        }
+        
+        // Add Controller 1 price
+        if (asAny.controller1Price && asAny.controller1Qty && asAny.controller1Qty > 0) {
+          pdfTotal += convertPrice(asAny.controller1Price) * asAny.controller1Qty;
+        }
+        
+        // Add Controller 2 price
+        if (asAny.controller2Price && asAny.controller2Qty && asAny.controller2Qty > 0) {
+          pdfTotal += convertPrice(asAny.controller2Price) * asAny.controller2Qty;
+        }
+      }
+    });
 
     // Add two boxes side by side (appearing as one)
     const boxX = 14;
@@ -897,22 +976,28 @@ export default function EnhancedCart() {
     
     // Attn
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175); // blue label
     doc.text('Attn:', leftX, leftY);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     doc.text(userInfo.project || '', leftX + labelWidth, leftY);
     leftY += lineHeight;
     
     // Company
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
     doc.text('Company:', leftX, leftY);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     doc.text(userInfo.company || '', leftX + labelWidth, leftY);
     leftY += lineHeight;
     
     // Subject
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
     doc.text('Subject:', leftX, leftY);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     doc.text(userInfo.subject || '', leftX + labelWidth, leftY);
     
     // Right box content
@@ -921,23 +1006,29 @@ export default function EnhancedCart() {
     
     // Contact No
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
     doc.text('Contact No:', rightColX, rightY);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     doc.text(userInfo.mobile || '', rightColX + labelWidth, rightY);
     rightY += lineHeight;
     
     // Date
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
     doc.text('Date:', rightColX, rightY);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     doc.text(currentDate, rightColX + labelWidth, rightY);
     rightY += lineHeight;
     
     // Invoice No
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
     doc.text('Invoice No:', rightColX, rightY);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     doc.text(userInfo.invoiceNo || '', rightColX + labelWidth, rightY);
 
     const pdfCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
@@ -1220,13 +1311,29 @@ export default function EnhancedCart() {
 
           for (let f = 0; f < slice.length; f++) {
             const field = slice[f];
-            const fieldY = currentY + (f * rowHeight) + rowHeight * 0.7;
+            const rowTopY = currentY + (f * rowHeight);
+            const fieldY = rowTopY + rowHeight * 0.7;
 
             if (field.isSection) {
-              // Section header - centered and bold
+              // Section header - colored band with bold blue text
+              const sectionX = boxX;
+              const sectionW = leftColWidth;
+              // Light blue background behind the section row
+              doc.setFillColor(230, 240, 255); // very light blue
+              doc.setDrawColor(200, 220, 255);
+              doc.rect(sectionX, rowTopY, sectionW, rowHeight, 'F');
+
+              // Header text
               doc.setFont('helvetica', 'bold');
-              const sectionCenterX = boxX + (leftColWidth / 2);
+              doc.setFontSize(8.5);
+              doc.setTextColor(30, 64, 175); // dark blue
+              const sectionCenterX = boxX + leftColWidth / 2;
               doc.text(field.label, sectionCenterX, fieldY, { align: 'center' });
+
+              // Restore defaults for non-section rows
+              doc.setFontSize(7);
+              doc.setTextColor(0, 0, 0);
+              doc.setDrawColor(0, 0, 0);
             } else {
               // Left Label
               doc.setFont('helvetica', 'bold');
@@ -1311,95 +1418,519 @@ export default function EnhancedCart() {
           currentY += sliceHeight + 10; // small gap before next slice
         }
 
-        // Draw commercial details in a separate box (left spec area)
+        // Draw new QUOTATION table with 7 columns, including spare & accessories as additional rows
         {
-          const FEET_TO_METER = 0.3048;
-          const commLabel = 'Required Size';
-          const lenFt = parseFloat(asAny.requiredLength ?? '');
-          const widFt = parseFloat(asAny.requiredWidth ?? '');
-          const toM = (ft: number) => (ft * FEET_TO_METER);
+          const METER_TO_FEET = 1 / 0.3048;
+          // requiredLength and requiredWidth are now stored in METERS
+          const widM = parseFloat(asAny.requiredLength ?? '');
+          const heiM = parseFloat(asAny.requiredWidth ?? '');
+          const toFt = (m: number) => (m * METER_TO_FEET);
           const fmt = (m: number) => m.toFixed(2);
-          const hasLen = !isNaN(lenFt);
-          const hasWid = !isNaN(widFt);
-          const sizeText = hasLen && hasWid
-            ? `W${fmt(toM(lenFt))}m × H${fmt(toM(widFt))}m`
-            : 'N/A';
+          const hasWid = !isNaN(widM) && widM > 0;
+          const hasHei = !isNaN(heiM) && heiM > 0;
 
-          const cabinetQty = asAny.cabinetRequired != null ? String(asAny.cabinetRequired) : 'N/A';
+          // Calculate values for the main screen row
+          const requestSizeFt = hasWid && hasHei ? `${toFt(widM).toFixed(2)}' × ${toFt(heiM).toFixed(2)}'` : 'N/A';
+          const requestSizeM = hasWid && hasHei ? `${fmt(widM)}m × ${fmt(heiM)}m` : 'N/A';
+          // Use the suggested size entered in Edit LED Display Specifications if available; fallback to request size
+          const suggestedSizeM = asAny.suggestedSize
+            ? String(asAny.suggestedSize)
+            : requestSizeM;
+          const cabinetCount = asAny.cabinetRequired != null ? String(asAny.cabinetRequired) : 'N/A';
+          const areaSqm = hasWid && hasHei ? (widM * heiM) : 0;
           const qty = (item.quantity ?? 1);
-          // Price per sqm is stored in USD in item.price; compute area-based price
-          const areaSqm = hasLen && hasWid ? (toM(lenFt) * toM(widFt)) : 0;
-          const unitPriceUSD = (item.price ?? 0) * areaSqm;
-          const unitPriceConverted = convertPrice(unitPriceUSD);
-          const unitPriceText = unitPriceConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-          const qtyText = String(qty);
           const totalConv = computeItemTotalConverted(item);
           const totalText = totalConv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-          let rows: Array<{ label: string; value: string }> = [
-            { label: `${commLabel} (m)`, value: sizeText },
-            { label: 'Cabinet Required (qty)', value: cabinetQty },
-            { label: 'Quantity', value: qtyText },
-            { label: `Total (${pdfCurrency})`, value: totalText },
-          ];
+          // Build spare & accessories rows
+          type SpareRow = { label: string; qty: string; price?: number };
+          const spareRows: SpareRow[] = [];
 
-          // Append spare/accessory lines if present
-          const spareLines: Array<{ label: string; value: string }> = [];
-          if (asAny.spareModules) spareLines.push({ label: 'Spare modules (3% of total modules)', value: String(asAny.spareModules) });
-          if (asAny.sparePSU) spareLines.push({ label: 'Spare PSU', value: String(asAny.sparePSU) });
-          if (asAny.spareReceivingCard) spareLines.push({ label: 'Spare receiving card', value: String(asAny.spareReceivingCard) });
-          if (asAny.package) spareLines.push({ label: 'Package', value: String(asAny.package) });
-          if (asAny.novastarController) spareLines.push({ label: 'Novastar Controller', value: String(asAny.novastarController) });
-          if (spareLines.length > 0) {
-            rows = rows.concat(spareLines);
+          const rawSpareModules = asAny.spareModules;
+          if (rawSpareModules) {
+            spareRows.push({
+              label: 'Spare modules (3% of total modules)',
+              qty: String(rawSpareModules),
+            });
           }
 
-          const commRowH = 16;
-          const commHeight = rows.length * commRowH;
+          const parseNameQty = (raw: string | undefined | null) => {
+            if (!raw) return { name: '', qty: '' };
+            const str = String(raw);
+            const parts = str.split(' - ');
+            if (parts.length >= 2) {
+              const maybeQty = parts[parts.length - 1].trim();
+              const namePart = parts.slice(0, parts.length - 1).join(' - ').trim();
+              return { name: namePart, qty: maybeQty };
+            }
+            return { name: '', qty: str };
+          };
 
-          // Page break if needed
-          if (currentY + commHeight + 10 > pageHeight - bottomMargin) {
+          const { name: psuName, qty: psuQty } = parseNameQty(asAny.sparePSU);
+          if (asAny.sparePSU) {
+            spareRows.push({
+              label: psuName ? `Spare PSU: ${psuName}` : 'Spare PSU',
+              qty: psuQty || String(asAny.sparePSU),
+            });
+          }
+
+          const rawReceiving = asAny.spareReceivingCard;
+          if (rawReceiving) {
+            spareRows.push({
+              label: 'Spare receiving card',
+              qty: String(rawReceiving),
+            });
+          }
+
+          const { name: pkgName, qty: pkgQty } = parseNameQty(asAny.package);
+          if (asAny.package) {
+            spareRows.push({
+              label: pkgName ? `Package: ${pkgName}` : 'Package',
+              qty: pkgQty || String(asAny.package),
+            });
+          }
+
+          // Controller 1: add row if name and quantity are provided
+          const hasController1 = !!(asAny.controller1Name || asAny.controller1Qty || asAny.controller1Price);
+          if (asAny.controller1Name && asAny.controller1Qty && asAny.controller1Qty > 0) {
+            spareRows.push({
+              label: `Controller 1: ${asAny.controller1Name}`,
+              qty: String(asAny.controller1Qty),
+              price: asAny.controller1Price,
+            });
+          }
+
+          // Controller 2:
+          // - If it has proper values, show them
+          // - Otherwise, when Controller 1 exists but Controller 2 is empty, show "Controller 2: N/A"
+          const hasController2Values = asAny.controller2Name && asAny.controller2Qty && asAny.controller2Qty > 0;
+          if (hasController2Values) {
+            spareRows.push({
+              label: `Controller 2: ${asAny.controller2Name}`,
+              qty: String(asAny.controller2Qty),
+              price: asAny.controller2Price,
+            });
+          } else if (hasController1) {
+            spareRows.push({
+              label: 'Controller 2: N/A',
+              qty: 'N/A',
+            });
+          }
+
+          // Additional spare / accessory information rows
+          // These are informational and use fixed "as per site requirement" quantity text
+          spareRows.push({
+            label: 'Main Power 3-phase Cable — connect to the nearby power distribution room',
+            qty: 'As per site requirement',
+          });
+
+          spareRows.push({
+            label: 'Fibre Cable from Control Room',
+            qty: 'As per site requirement',
+          });
+
+          spareRows.push({
+            label: 'Power Distributor Box / Signal Fibre Cable',
+            qty: 'As per site requirement',
+          });
+
+          spareRows.push({
+            label: 'Equipment Rack for Controller',
+            qty: 'As per site requirement',
+          });
+
+          // CMS with license duration: add row when included
+          if (asAny.cmsInclude && String(asAny.cmsInclude).toLowerCase() === 'yes') {
+            const years = asAny.cmsLicenseYears || 3;
+            const priceMap: { [key: number]: number } = { 1: 125, 3: 375, 5: 625, 7: 875 };
+            const cmsPrice = priceMap[years] || 375;
+            spareRows.push({
+              label: `CMS (Content Management System) - ${years} Year License`,
+              qty: '1',
+              price: cmsPrice,
+            });
+          }
+
+          // MS Structure Fabrication and Installation at Site: use area in sqm if provided
+          if (typeof asAny.msStructureSqm === 'number' && asAny.msStructureSqm > 0) {
+            spareRows.push({
+              label: 'MS Structure Fabrication and Installation at Site',
+              qty: `${asAny.msStructureSqm.toFixed(2)} sqm`,
+            });
+          }
+
+          // Split spare rows into two groups:
+          // - firstTableSpareRows: up to and including Controller 2 (stay on first page)
+          // - extraSpareRows: remaining accessories (start from second page)
+          const controller2Index = spareRows.findIndex((row) => row.label.startsWith('Controller 2'));
+          const splitIndex = controller2Index === -1 ? spareRows.length : controller2Index + 1;
+          const firstTableSpareRows = spareRows.slice(0, splitIndex);
+          const extraSpareRows = spareRows.slice(splitIndex);
+
+          // Table dimensions
+          const tableX = boxX;
+          const tableWidth = pageWidth - 28; // Full width
+          const headerHeight = 25;
+          const mainRowHeight = 90; // increased to fit multi-line content (incl. cabinet arrangement & resolution)
+          const spareRowHeight = 20; // more compact rows for accessories
+          const totalRowsHeight = mainRowHeight + spareRowHeight * firstTableSpareRows.length;
+          const totalTableHeight = headerHeight + totalRowsHeight;
+
+          // Page break if needed (relaxed so QUOTATION can stay on first page when possible)
+          if (currentY + totalTableHeight > pageHeight - bottomMargin) {
             doc.addPage();
             currentY = 40;
           }
 
-          // Box and content
-          const commX = boxX;
-          const commW = leftColWidth; // only spec area, not image
-          doc.setLineWidth(1.2);
-          doc.setDrawColor(0, 0, 0);
-          doc.rect(commX, currentY, commW, commHeight);
+          // Draw QUOTATION header with colored bar
+          doc.setLineWidth(1.5);
+          doc.setDrawColor(15, 76, 129); // deep blue border
+          doc.setFillColor(15, 76, 129); // deep blue fill
+          doc.rect(tableX, currentY, tableWidth, headerHeight, 'FD'); // fill + stroke
+          doc.setFontSize(15);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(255, 255, 255); // white title text
+          doc.text('QUOTATION', tableX + tableWidth / 2, currentY + headerHeight / 2 + 5, { align: 'center' });
+          // Restore text color for body content
+          doc.setTextColor(0, 0, 0);
 
-          // Horizontal separators
-          for (let r = 1; r < rows.length; r++) {
-            doc.line(commX, currentY + r * commRowH, commX + commW, currentY + r * commRowH);
+          // Column widths (7 columns)
+          const colWidths = [
+            tableWidth * 0.06,  // Item (narrower)
+            tableWidth * 0.18,  // Equipment Name
+            tableWidth * 0.25,  // Type
+            tableWidth * 0.25,  // Screen Info
+            tableWidth * 0.08,  // Quantity
+            tableWidth * 0.08,  // Area
+            tableWidth * 0.10   // Price (wider)
+          ];
+
+          const columnHeaders = ['Item', 'Equipment Name', 'Type', 'Screen Info', 'Quantity', 'Area', 'Price'];
+
+          // Draw table structure
+          let currentX = tableX;
+          const tableY = currentY + headerHeight;
+
+          // Draw outer border for all data rows (main + spare)
+          doc.rect(tableX, tableY, tableWidth, totalRowsHeight);
+
+          // Draw vertical lines for columns.
+          // For the boundaries between Equipment Name, Type, and Screen Info (indexes 2 and 3),
+          // only draw down to the bottom of the main row so the spare rows visually have
+          // a single merged box for those three columns.
+          for (let i = 0; i < colWidths.length; i++) {
+            if (i > 0) {
+              const lineX = currentX;
+              const isMiddleMergeBoundary = i === 2 || i === 3; // between col1-2 and col2-3
+              const lineBottomY = isMiddleMergeBoundary
+                ? tableY + mainRowHeight
+                : tableY + totalRowsHeight;
+              doc.line(lineX, tableY, lineX, lineBottomY);
+            }
+            currentX += colWidths[i];
           }
 
-          // Labels/values
+          // Draw column headers with subtle tinted background
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          // Header background band
+          doc.setFillColor(230, 240, 255); // very light blue
+          doc.rect(tableX, tableY, tableWidth, 12, 'F');
+          // Column header text
+          currentX = tableX;
+          for (let i = 0; i < columnHeaders.length; i++) {
+            const centerX = currentX + colWidths[i] / 2;
+            // All headers, including Screen Info, use the same blue color
+            doc.setTextColor(30, 64, 175); // dark blue text
+            doc.text(columnHeaders[i], centerX, tableY + 8, { align: 'center' });
+            currentX += colWidths[i];
+          }
+          // Restore default text color for data rows
+          doc.setTextColor(0, 0, 0);
+
+          // Horizontal line after headers
+          doc.line(tableX, tableY + 12, tableX + tableWidth, tableY + 12);
+
+          // Horizontal line after main row
+          const mainRowBottomY = tableY + mainRowHeight;
+          doc.line(tableX, mainRowBottomY, tableX + tableWidth, mainRowBottomY);
+
+          // Horizontal lines between spare rows (if any) for first table group
+          for (let s = 1; s < firstTableSpareRows.length; s++) {
+            const y = mainRowBottomY + s * spareRowHeight;
+            doc.line(tableX, y, tableX + tableWidth, y);
+          }
+
+          // Fill in main data row (Item 1)
           doc.setFontSize(8);
-          const labX = commX + 5;
-          const valX = commX + 120;
-          const maxValW = commW - (valX - commX) - 6;
-          for (let r = 0; r < rows.length; r++) {
-            const y = currentY + r * commRowH + commRowH * 0.7;
-            doc.setFont('helvetica', 'bold');
-            doc.text(rows[r].label + ':', labX, y);
-            doc.setFont('helvetica', 'normal');
-            const wrapped = doc.splitTextToSize(rows[r].value, maxValW);
-            doc.text(wrapped[0] || rows[r].value, valX, y);
+          doc.setFont('helvetica', 'normal');
+          currentX = tableX;
+
+          const cabW = (item as any).cabinetArrangementWidth as number | undefined;
+          const cabH = (item as any).cabinetArrangementHeight as number | undefined;
+          const cabinetArrangementLine = (cabW && cabH)
+            ? `Cabinet Arrangement: W${cabW} × H${cabH} (${cabinetCount} cabinets)`
+            : `Cabinet Arrangement: ${cabinetCount} cabinets`;
+          const cabinetArrangementValueLine = (cabW && cabH)
+            ? `W${cabW} × H${cabH} (${cabinetCount} cabinets)`
+            : `${cabinetCount} cabinets`;
+          const hasResolution = !!(item.totalResolution && item.totalResolution.trim() !== '');
+          const screenResolutionLine = hasResolution
+            ? `Screen Resolution: ${item.totalResolution}`
+            : 'Screen Resolution: N/A';
+          const screenResolutionValueLine = hasResolution
+            ? item.totalResolution!
+            : 'N/A';
+
+          const mainRowData = [
+            '1', // Item - main screen
+            item.sku || 'N/A', // Equipment Name - SKU
+            `Request Size (Ft)\nRequest Size (M)\nSuggested Size (M)\nCabinet Arrangement\nScreen Resolution`, // Type (labels only)
+            `${requestSizeFt}\n${requestSizeM}\n${suggestedSizeM}\n${cabinetArrangementValueLine}\n${screenResolutionValueLine}`, // Screen Info (values only)
+            areaSqm > 0 ? fmt(areaSqm) : 'N/A', // Quantity in sqm
+            areaSqm > 0 ? `${fmt(areaSqm)} m²` : 'N/A', // Area
+            `${pdfCurrency} ${totalText}` // Total Price
+          ];
+
+          for (let i = 0; i < mainRowData.length; i++) {
+            const centerX = currentX + colWidths[i] / 2;
+
+            // Always use black text for data cells
+            doc.setTextColor(0, 0, 0);
+
+            // Handle multi-line text for Type and Screen Info columns with sub-box borders
+            if (i === 2 || i === 3) {
+              const lines = mainRowData[i].split('\n');
+              const cellTop = tableY + 12; // data area starts after header separator
+              const cellBottom = tableY + mainRowHeight;
+              const cellHeight = cellBottom - cellTop;
+              const segmentCount = lines.length;
+              const segmentHeight = cellHeight / segmentCount;
+
+              const colLeft = currentX;
+              const colRight = currentX + colWidths[i];
+
+              // For the Screen Info column (index 3), fill the entire cell with a light brown background
+              if (i === 3) {
+                doc.setFillColor(255, 236, 214); // light brown-ish background
+                doc.rect(colLeft, cellTop, colRight - colLeft, cellHeight, 'F');
+                doc.setDrawColor(0, 0, 0); // ensure borders stay black
+              }
+
+              // Draw horizontal lines inside this column to create sub-boxes
+              for (let j = 1; j < segmentCount; j++) {
+                const lineY = cellTop + segmentHeight * j;
+                doc.line(colLeft, lineY, colRight, lineY);
+              }
+
+              // Center each line of text inside its sub-box
+              for (let j = 0; j < segmentCount; j++) {
+                const textY = cellTop + segmentHeight * j + segmentHeight / 2 + 2;
+                doc.text(lines[j], centerX, textY, { align: 'center' });
+              }
+            } else {
+              // For single-line columns, center vertically in the cell
+              const cellY = tableY + (mainRowHeight / 2) + 3;
+              doc.text(mainRowData[i], centerX, cellY, { align: 'center' });
+            }
+            currentX += colWidths[i];
           }
 
-          currentY += commHeight + 12;
+          // Fill in primary spare & accessories rows as additional items (2, 3, ...)
+          for (let index = 0; index < firstTableSpareRows.length; index++) {
+            const spare = firstTableSpareRows[index];
+            const rowTop = mainRowBottomY + index * spareRowHeight;
+            const rowCenterY = rowTop + spareRowHeight / 2 + 2;
+
+            let colX = tableX;
+
+            // Column 0: Item number (2, 3, ...)
+            const itemCenterX = colX + colWidths[0] / 2;
+            doc.text(String(index + 2), itemCenterX, rowCenterY, { align: 'center' });
+            colX += colWidths[0];
+
+            // Columns 1-3 merged logically: Equipment Name + Type + Screen Info
+            const mergedWidth = colWidths[1] + colWidths[2] + colWidths[3];
+            const mergedTextX = colX + 2; // minimal left padding inside merged box
+            doc.text(spare.label, mergedTextX, rowCenterY, { align: 'left' });
+            colX += mergedWidth;
+
+            // Column 4: Quantity
+            const qtyCenterX = colX + colWidths[4] / 2;
+            doc.text(spare.qty, qtyCenterX, rowCenterY, { align: 'center' });
+            colX += colWidths[4];
+
+            // Column 5: Area - leave blank
+            colX += colWidths[5];
+
+            // Column 6: Price - show if spare has price
+            if (spare.price !== undefined) {
+              const priceCenterX = colX + colWidths[6] / 2;
+              const priceText = spare.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              doc.text(priceText, priceCenterX, rowCenterY, { align: 'center' });
+            }
+          }
+
+          currentY += totalTableHeight + 15;
+
+          // If there are extra spare rows (beyond Novastar Controller), render them
+          // on a new page in a separate QUOTATION table.
+          if (extraSpareRows.length > 0) {
+            doc.addPage();
+            currentY = 40;
+
+            const extraTableX = boxX;
+            const extraTableWidth = pageWidth - 28;
+            const extraHeaderHeight = 25;
+            const extraRowHeight = 20;
+            // Include the 12pt header band plus all data rows inside the outer border
+            const extraRowsHeight = 12 + extraRowHeight * extraSpareRows.length;
+            const extraTotalHeight = extraHeaderHeight + extraRowsHeight;
+
+            // Draw QUOTATION header on second page
+            doc.setLineWidth(1.5);
+            doc.setDrawColor(15, 76, 129);
+            doc.setFillColor(15, 76, 129);
+            doc.rect(extraTableX, currentY, extraTableWidth, extraHeaderHeight, 'FD');
+            doc.setFontSize(15);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.text('QUOTATION', extraTableX + extraTableWidth / 2, currentY + extraHeaderHeight / 2 + 5, { align: 'center' });
+            doc.setTextColor(0, 0, 0);
+
+            // Column widths (reuse same proportions as first table)
+            const extraColWidths = [
+              extraTableWidth * 0.06,  // Item (narrower)
+              extraTableWidth * 0.18,  // Equipment Name
+              extraTableWidth * 0.25,  // Type
+              extraTableWidth * 0.25,  // Screen Info
+              extraTableWidth * 0.08,  // Quantity
+              extraTableWidth * 0.08,  // Area
+              extraTableWidth * 0.10,  // Price (wider)
+            ];
+            const extraColumnHeaders = ['Item', 'Equipment Name', 'Type', 'Screen Info', 'Quantity', 'Area', 'Price'];
+
+            let extraX = extraTableX;
+            const extraTableY = currentY + extraHeaderHeight;
+
+            // Outer border
+            doc.rect(extraTableX, extraTableY, extraTableWidth, extraRowsHeight);
+
+            // Vertical lines for all columns.
+            // - For Equipment / Type / Screen Info boundaries (indexes 2 and 3),
+            //   draw only through the header band so the data rows appear merged.
+            // - Skip the boundary between Quantity and Area (index 5) entirely so
+            //   those two columns are visually merged as well.
+            for (let i = 0; i < extraColWidths.length; i++) {
+              if (i > 0) {
+                const isMiddleMergeBoundary = i === 2 || i === 3; // Equipment/Type and Type/Screen Info
+                const isQtyAreaBoundary = i === 5; // between Quantity and Area
+                if (!isQtyAreaBoundary) {
+                  const lineBottomY = isMiddleMergeBoundary
+                    ? extraTableY + 12 // stop at bottom of header band
+                    : extraTableY + extraRowsHeight;
+                  doc.line(extraX, extraTableY, extraX, lineBottomY);
+                }
+              }
+              extraX += extraColWidths[i];
+            }
+
+            // Header band and text
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setFillColor(230, 240, 255);
+            doc.rect(extraTableX, extraTableY, extraTableWidth, 12, 'F');
+            extraX = extraTableX;
+            for (let i = 0; i < extraColumnHeaders.length; i++) {
+              const centerX = extraX + extraColWidths[i] / 2;
+              // All headers, including Screen Info, use the same blue color
+              doc.setTextColor(30, 64, 175); // blue
+              doc.text(extraColumnHeaders[i], centerX, extraTableY + 8, { align: 'center' });
+              extraX += extraColWidths[i];
+            }
+            doc.setTextColor(0, 0, 0);
+
+            // Horizontal line after headers
+            doc.line(extraTableX, extraTableY + 12, extraTableX + extraTableWidth, extraTableY + 12);
+
+            // Draw row separators for extra rows
+            for (let s = 1; s < extraSpareRows.length; s++) {
+              const y = extraTableY + 12 + s * extraRowHeight;
+              doc.line(extraTableX, y, extraTableX + extraTableWidth, y);
+            }
+
+            // Fill in extra spare rows, continuing item numbering
+            const startingItemNumber = 2 + firstTableSpareRows.length;
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+
+            for (let index = 0; index < extraSpareRows.length; index++) {
+              const spare = extraSpareRows[index];
+              const rowTop = extraTableY + 12 + index * extraRowHeight;
+              const rowCenterY = rowTop + extraRowHeight / 2 + 2;
+
+              let colX = extraTableX;
+
+              // Item number
+              const itemCenterX = colX + extraColWidths[0] / 2;
+              doc.text(String(startingItemNumber + index), itemCenterX, rowCenterY, { align: 'center' });
+              colX += extraColWidths[0];
+
+              // Merged description across columns 1-3
+              const mergedWidth = extraColWidths[1] + extraColWidths[2] + extraColWidths[3];
+              const mergedTextX = colX + 2;
+              doc.text(spare.label, mergedTextX, rowCenterY, { align: 'left' });
+              colX += mergedWidth;
+
+              // Quantity + Area merged visually: center text across both columns
+              const mergedQtyWidth = extraColWidths[4] + extraColWidths[5];
+              const qtyCenterX = colX + mergedQtyWidth / 2;
+              doc.text(spare.qty, qtyCenterX, rowCenterY, { align: 'center' });
+              colX += mergedQtyWidth;
+              
+              // Total Price column - show if spare has price
+              if (spare.price !== undefined) {
+                const priceCenterX = colX + extraColWidths[6] / 2;
+                const priceText = spare.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                doc.text(priceText, priceCenterX, rowCenterY, { align: 'center' });
+              }
+            }
+
+            currentY = extraTableY + extraTotalHeight + 15;
+          }
         }
       }
       
-      // Add total at the end
+      // Add total at the end with highlighted styling
       const finalY = currentY;
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
       const formattedTotal = pdfTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const currencyDisplay = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
-      doc.text(`Total Amount: ${currencyDisplay} ${formattedTotal}`, rightX, finalY + 20, { align: 'right' });
+
+      const totalLabel = 'Total Amount:';
+      const totalText = `${currencyDisplay} ${formattedTotal}`;
+      const totalY = finalY + 20;
+
+      // Measure width to size the highlight box
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      const labelWidth = doc.getTextWidth(totalLabel + ' ' + totalText);
+      const paddingX = 6;
+      const paddingY = 4;
+      const boxX = rightX - labelWidth - paddingX * 2;
+      const boxY = totalY - 10;
+
+      // Yellow highlight box
+      doc.setFillColor(255, 223, 0); // bright yellow
+      doc.setDrawColor(204, 158, 0); // darker yellow border
+      doc.rect(boxX, boxY, labelWidth + paddingX * 2, 18 + paddingY, 'FD');
+
+      // Total text in dark color on top
+      doc.setTextColor(30, 64, 175); // dark blue text
+      doc.text(`${totalLabel} ${totalText}`, rightX, totalY, { align: 'right' });
+
+      // Restore text and draw colors
+      doc.setTextColor(0, 0, 0);
+      doc.setDrawColor(0, 0, 0);
       
       // Skip the autoTable section and go directly to terms
       const termsStartY = finalY + 50;
@@ -1593,20 +2124,37 @@ export default function EnhancedCart() {
       termsContentY += 15;
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      
-      const terms = [
-        `1. The prices quoted on ${termsAndConditions.deliveryLocation}.`,
-        `2. Delivery: Within ${termsAndConditions.deliveryTime} from the date of PO and advance payment.`,
-        `3. Payment Terms: ${termsAndConditions.paymentTerms}.`,
-        `4. The quoted products are ${termsAndConditions.productMake}`,
-        `5. Validity of offer: ${termsAndConditions.validityDays}`,
-        `6. ${termsAndConditions.vatNote}`
-      ];
+
+      let terms: string[];
+      if (termsAndConditions.termsType === 'displays') {
+        // Use free-form LED Display terms, one line per point
+        terms = (termsAndConditions.displayTerms || '')
+          .split('\n')
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
+      } else {
+        // Default: LED Lights terms using structured fields
+        terms = [
+          `1. The prices quoted on ${termsAndConditions.deliveryLocation}.`,
+          `2. Delivery: Within ${termsAndConditions.deliveryTime} from the date of PO and advance payment.`,
+          `3. Payment Terms: ${termsAndConditions.paymentTerms}.`,
+          `4. The quoted products are ${termsAndConditions.productMake}`,
+          `5. Validity of offer: ${termsAndConditions.validityDays}`,
+          `6. ${termsAndConditions.vatNote}`,
+        ];
+      }
       
       terms.forEach((term) => {
         const lines = doc.splitTextToSize(term, termsBoxWidth - 20);
+        // Draw the term text
         doc.text(lines, termsBoxX + 8, termsContentY);
-        termsContentY += lines.length * 12;
+        // Draw a horizontal divider under this term
+        const termBlockHeight = lines.length * 12;
+        const lineY = termsContentY + termBlockHeight - 8; // a bit above the next term start
+        doc.setDrawColor(200, 200, 200);
+        doc.line(termsBoxX + 6, lineY, termsBoxX + termsBoxWidth - 6, lineY);
+        doc.setDrawColor(0, 0, 0);
+        termsContentY += termBlockHeight;
       });
       
       // Add closing
@@ -1872,32 +2420,174 @@ export default function EnhancedCart() {
                                   </div>
                                 </div>
                               )}
-                              {(item.requiredLength || item.requiredWidth) && (
+                              {(item.suggestedSize || item.requiredLength || item.requiredWidth) && (
                                 <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
                                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
                                   <div className="flex-1">
-                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Screen Size</span>
+                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Suggested Size</span>
                                     <p className="text-xs text-gray-900 font-semibold">
-                                      W{(() => {
-                                        const ft = parseFloat(item.requiredLength || '0');
-                                        return (ft * 0.3048).toFixed(2);
-                                      })()}m × H{(() => {
-                                        const ft = parseFloat(item.requiredWidth || '0');
-                                        return (ft * 0.3048).toFixed(2);
-                                      })()}m
+                                      {item.suggestedSize && item.suggestedSize.trim() !== ''
+                                        ? item.suggestedSize
+                                        : (item.requiredLength || item.requiredWidth)
+                                          ? `W${(() => {
+                                              const ft = parseFloat(item.requiredLength || '0');
+                                              return (ft * 0.3048).toFixed(2);
+                                            })()}m × H${(() => {
+                                              const ft = parseFloat(item.requiredWidth || '0');
+                                              return (ft * 0.3048).toFixed(2);
+                                            })()}m`
+                                          : 'N/A'}
                                     </p>
                                   </div>
                                 </div>
                               )}
-                              {typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0 && (
+                              {(item.totalResolution && item.totalResolution.trim() !== '') && (
                                 <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
                                   <div className="flex-1">
-                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Cabinets</span>
-                                    <p className="text-xs text-gray-900 font-semibold">{item.cabinetRequired} Units</p>
+                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Screen Resolution</span>
+                                    <p className="text-xs text-gray-900 font-semibold">{item.totalResolution}</p>
                                   </div>
                                 </div>
                               )}
+                              {(typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0) && (
+                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                  <div className="flex-1">
+                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Cabinet Arrangement</span>
+                                    {(() => {
+                                      const w = (item as any).cabinetArrangementWidth as number | undefined;
+                                      const h = (item as any).cabinetArrangementHeight as number | undefined;
+                                      const total = item.cabinetRequired;
+                                      if (w && h) {
+                                        return (
+                                          <div className="flex flex-col text-xs text-gray-900 font-semibold">
+                                            <span>{`W${w} × H${h}`}</span>
+                                            <span className="text-[10px] text-gray-500 font-normal">({total} cabinets)</span>
+                                          </div>
+                                        );
+                                      }
+                                      return (
+                                        <p className="text-xs text-gray-900 font-semibold">{total} cabinets</p>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              )}
+                              {/* Controllers (inline in cart, next to Screen Resolution area) */}
+                              <div className="mt-3 grid grid-cols-2 gap-3">
+                                {/* Controller 1 */}
+                                <div className="bg-white/70 px-3 py-3 rounded-lg border border-gray-200">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Controller 1</span>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <div>
+                                      <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Name</span>
+                                      <input
+                                        type="text"
+                                        value={item.controller1Name ?? ''}
+                                        onChange={(e) =>
+                                          updateCartItem(item.cartItemId, { controller1Name: e.target.value })
+                                        }
+                                        className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Enter controller name"
+                                      />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Price (USD)</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step="0.01"
+                                          value={item.controller1Price ?? ''}
+                                          onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            updateCartItem(item.cartItemId, {
+                                              controller1Price: isNaN(val) || val < 0 ? undefined : val,
+                                            });
+                                          }}
+                                          className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                          placeholder="0.00"
+                                        />
+                                      </div>
+                                      <div>
+                                        <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Quantity</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          value={item.controller1Qty ?? ''}
+                                          onChange={(e) => {
+                                            const val = parseInt(e.target.value, 10);
+                                            updateCartItem(item.cartItemId, {
+                                              controller1Qty: isNaN(val) || val < 0 ? undefined : val,
+                                            });
+                                          }}
+                                          className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Controller 2 */}
+                                <div className="bg-white/70 px-3 py-3 rounded-lg border border-gray-200">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Controller 2</span>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <div>
+                                      <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Name</span>
+                                      <input
+                                        type="text"
+                                        value={item.controller2Name ?? ''}
+                                        onChange={(e) =>
+                                          updateCartItem(item.cartItemId, { controller2Name: e.target.value })
+                                        }
+                                        className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Enter controller name"
+                                      />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Price (USD)</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step="0.01"
+                                          value={item.controller2Price ?? ''}
+                                          onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            updateCartItem(item.cartItemId, {
+                                              controller2Price: isNaN(val) || val < 0 ? undefined : val,
+                                            });
+                                          }}
+                                          className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                          placeholder="0.00"
+                                        />
+                                      </div>
+                                      <div>
+                                        <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Quantity</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          value={item.controller2Qty ?? ''}
+                                          onChange={(e) => {
+                                            const val = parseInt(e.target.value, 10);
+                                            updateCartItem(item.cartItemId, {
+                                              controller2Qty: isNaN(val) || val < 0 ? undefined : val,
+                                            });
+                                          }}
+                                          className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                             
                             {/* Quantity & Price Row */}
@@ -1935,13 +2625,20 @@ export default function EnhancedCart() {
                                 <p className="text-[10px] text-gray-500 font-medium mb-0.5">Total (USD)</p>
                                 <p className="text-base font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
                                   {(() => {
-                                    const FEET_TO_METER = 0.3048;
                                     const asAny = item as any;
-                                    const lenFt = parseFloat(asAny.requiredLength ?? '0');
-                                    const widFt = parseFloat(asAny.requiredWidth ?? '0');
+                                    
+                                    // Use customTotalConverted if available (from Price Calculation Preview)
+                                    if (typeof asAny.customTotalConverted === 'number') {
+                                      const formatted = asAny.customTotalConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                      return `$ ${formatted}`;
+                                    }
+                                    
+                                    // Fallback: calculate from area if dimensions exist
+                                    const widM = parseFloat(asAny.requiredLength ?? '0');
+                                    const heiM = parseFloat(asAny.requiredWidth ?? '0');
                                     let totalUSD = 0;
-                                    if (!isNaN(lenFt) && !isNaN(widFt) && lenFt > 0 && widFt > 0) {
-                                      const areaSqm = (lenFt * FEET_TO_METER) * (widFt * FEET_TO_METER);
+                                    if (!isNaN(widM) && !isNaN(heiM) && widM > 0 && heiM > 0) {
+                                      const areaSqm = widM * heiM;
                                       totalUSD = areaSqm * (item.price ?? 0) * (item.quantity ?? 1);
                                     } else {
                                       totalUSD = (item.price ?? 0) * (item.quantity ?? 1);
@@ -2697,56 +3394,316 @@ export default function EnhancedCart() {
                   Spare and Accessories
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Spare modules (3% of total modules)</label>
-                    <input
-                      type="text"
-                      value={displayFormData?.spareModules ?? ''}
-                      onChange={(e) => setDisplayFormData({ ...displayFormData, spareModules: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
-                      placeholder="e.g., 12 pcs"
-                    />
+                  {/* Spare modules - Quantity only */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-4 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Spare modules (3% of total modules)</span>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Quantity</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = Number(displayFormData?.spareModulesQty ?? 0) || 0;
+                            const next = Math.max(0, current - 1);
+                            setDisplayFormData({ ...displayFormData, spareModulesQty: next });
+                          }}
+                          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={0}
+                          value={displayFormData?.spareModulesQty ?? 0}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            setDisplayFormData({ ...displayFormData, spareModulesQty: isNaN(val) || val < 0 ? 0 : val });
+                          }}
+                          className={`flex-1 text-center py-2 rounded-lg border-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white'}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = Number(displayFormData?.spareModulesQty ?? 0) || 0;
+                            const next = current + 1;
+                            setDisplayFormData({ ...displayFormData, spareModulesQty: next });
+                          }}
+                          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Spare PSU</label>
-                    <input
-                      type="text"
-                      value={displayFormData?.sparePSU ?? ''}
-                      onChange={(e) => setDisplayFormData({ ...displayFormData, sparePSU: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
-                      placeholder="e.g., 2 pcs"
-                    />
+
+                  {/* Spare PSU - With name and quantity */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-2 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Spare PSU</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Name</label>
+                        <input
+                          type="text"
+                          value={displayFormData?.sparePSUName ?? ''}
+                          onChange={(e) => setDisplayFormData({ ...displayFormData, sparePSUName: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
+                          placeholder="e.g., Spare PSU"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Quantity</label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Number(displayFormData?.sparePSUQty ?? 0) || 0;
+                              const next = Math.max(0, current - 1);
+                              setDisplayFormData({ ...displayFormData, sparePSUQty: next });
+                            }}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            value={displayFormData?.sparePSUQty ?? 0}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              setDisplayFormData({ ...displayFormData, sparePSUQty: isNaN(val) || val < 0 ? 0 : val });
+                            }}
+                            className={`flex-1 text-center py-2 rounded-lg border-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white'}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Number(displayFormData?.sparePSUQty ?? 0) || 0;
+                              const next = current + 1;
+                              setDisplayFormData({ ...displayFormData, sparePSUQty: next });
+                            }}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Spare receiving card</label>
-                    <input
-                      type="text"
-                      value={displayFormData?.spareReceivingCard ?? ''}
-                      onChange={(e) => setDisplayFormData({ ...displayFormData, spareReceivingCard: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
-                      placeholder="e.g., 1 pc"
-                    />
+
+                  {/* Main Power 3-phase Cable - Info only */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-2 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Main Power 3-phase Cable</span>
+                    </div>
+                    <p className={isDarkMode ? 'text-xs text-gray-300' : 'text-xs text-gray-200'}>
+                      Connect to the nearby power distribution room (as per site requirement).
+                    </p>
                   </div>
-                  <div>
-                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Package</label>
-                    <input
-                      type="text"
-                      value={displayFormData?.package ?? ''}
-                      onChange={(e) => setDisplayFormData({ ...displayFormData, package: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
-                      placeholder="e.g., Flight case"
-                    />
+
+                  {/* Fibre Cable from Control Room - Info only */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-2 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Fibre Cable from Control Room</span>
+                    </div>
+                    <p className={isDarkMode ? 'text-xs text-gray-300' : 'text-xs text-gray-200'}>
+                      As per site requirement.
+                    </p>
                   </div>
-                  <div>
-                    <label className={`font-bold block mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Novastar Controller</label>
-                    <input
-                      type="text"
-                      value={displayFormData?.novastarController ?? ''}
-                      onChange={(e) => setDisplayFormData({ ...displayFormData, novastarController: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-900 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
-                      placeholder="e.g., VX4S"
-                    />
+
+                  {/* Power Distributor Box / Signal Fibre Cable - Info only */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-2 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Power Distributor Box / Signal Fibre Cable</span>
+                    </div>
+                    <p className={isDarkMode ? 'text-xs text-gray-300' : 'text-xs text-gray-200'}>
+                      As per site requirement.
+                    </p>
                   </div>
+
+                  {/* Equipment Rack for Controller - Info only */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-2 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Equipment Rack for Controller</span>
+                    </div>
+                    <p className={isDarkMode ? 'text-xs text-gray-300' : 'text-xs text-gray-200'}>
+                      As per site requirement.
+                    </p>
+                  </div>
+
+                  {/* CMS with License Duration */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-2 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>CMS (Content Management System)</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Include CMS?</label>
+                        <select
+                          value={displayFormData?.cmsInclude ?? 'No'}
+                          onChange={(e) => {
+                            const include = e.target.value;
+                            setDisplayFormData({
+                              ...displayFormData,
+                              cmsInclude: include,
+                              cmsLicenseYears: include === 'Yes' ? (displayFormData?.cmsLicenseYears || 3) : undefined,
+                            });
+                          }}
+                          className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${
+                            isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white'
+                          }`}
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </select>
+                      </div>
+                      {displayFormData?.cmsInclude === 'Yes' && (
+                        <div>
+                          <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>License Duration</label>
+                          <select
+                            value={displayFormData?.cmsLicenseYears ?? 3}
+                            onChange={(e) => setDisplayFormData({ ...displayFormData, cmsLicenseYears: parseInt(e.target.value, 10) })}
+                            className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${
+                              isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white'
+                            }`}
+                          >
+                            <option value={1}>1 Year ($125)</option>
+                            <option value={3}>3 Years ($375)</option>
+                            <option value={5}>5 Years ($625)</option>
+                            <option value={7}>7 Years ($875)</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* MS Structure Fabrication and Installation at Site - sqm auto-populated */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-2 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>MS Structure Fabrication and Installation at Site</span>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>
+                        Area (sqm) - Auto from Price Calculation
+                      </label>
+                      <div className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-semibold ${
+                        isDarkMode ? 'bg-gray-800/50 border-white/10 text-gray-300' : 'bg-slate-800/50 border-slate-400 text-gray-300'
+                      }`}>
+                        {(() => {
+                          const widM = parseFloat(displayFormData?.requiredLength ?? '0');
+                          const heiM = parseFloat(displayFormData?.requiredWidth ?? '0');
+                          const hasWid = !isNaN(widM) && widM > 0;
+                          const hasHei = !isNaN(heiM) && heiM > 0;
+                          const areaSqm = hasWid && hasHei ? widM * heiM : 0;
+                          return areaSqm > 0 ? areaSqm.toFixed(2) : 'N/A';
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Spare receiving card - Quantity only */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-4 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Spare receiving card</span>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Quantity</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = Number(displayFormData?.spareReceivingCardQty ?? 0) || 0;
+                            const next = Math.max(0, current - 1);
+                            setDisplayFormData({ ...displayFormData, spareReceivingCardQty: next });
+                          }}
+                          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={0}
+                          value={displayFormData?.spareReceivingCardQty ?? 0}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            setDisplayFormData({ ...displayFormData, spareReceivingCardQty: isNaN(val) || val < 0 ? 0 : val });
+                          }}
+                          className={`flex-1 text-center py-2 rounded-lg border-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white'}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = Number(displayFormData?.spareReceivingCardQty ?? 0) || 0;
+                            const next = current + 1;
+                            setDisplayFormData({ ...displayFormData, spareReceivingCardQty: next });
+                          }}
+                          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Package - With name and quantity */}
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                    <div className="font-bold mb-2 flex justify-between items-center">
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Package</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Name</label>
+                        <input
+                          type="text"
+                          value={displayFormData?.packageName ?? ''}
+                          onChange={(e) => setDisplayFormData({ ...displayFormData, packageName: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
+                          placeholder="e.g., Flight case"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Quantity</label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Number(displayFormData?.packageQty ?? 0) || 0;
+                              const next = Math.max(0, current - 1);
+                              setDisplayFormData({ ...displayFormData, packageQty: next });
+                            }}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            value={displayFormData?.packageQty ?? 0}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              setDisplayFormData({ ...displayFormData, packageQty: isNaN(val) || val < 0 ? 0 : val });
+                            }}
+                            className={`flex-1 text-center py-2 rounded-lg border-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white'}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Number(displayFormData?.packageQty ?? 0) || 0;
+                              const next = current + 1;
+                              setDisplayFormData({ ...displayFormData, packageQty: next });
+                            }}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
               
@@ -2783,14 +3740,13 @@ export default function EnhancedCart() {
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   {(() => {
-                    const FEET_TO_METER = 0.3048;
-                    const lenFt = parseFloat(displayFormData?.requiredLength ?? '0');
-                    const widFt = parseFloat(displayFormData?.requiredWidth ?? '0');
-                    const hasLen = !isNaN(lenFt) && lenFt > 0;
-                    const hasWid = !isNaN(widFt) && widFt > 0;
-                    const lenM = hasLen ? lenFt * FEET_TO_METER : 0;
-                    const widM = hasWid ? widFt * FEET_TO_METER : 0;
-                    const areaSqm = hasLen && hasWid ? lenM * widM : 0;
+                    const METER_TO_FEET = 1 / 0.3048;
+                    // Now requiredLength and requiredWidth are stored in METERS
+                    const widM = parseFloat(displayFormData?.requiredLength ?? '0');
+                    const heiM = parseFloat(displayFormData?.requiredWidth ?? '0');
+                    const hasWid = !isNaN(widM) && widM > 0;
+                    const hasHei = !isNaN(heiM) && heiM > 0;
+                    const areaSqm = hasWid && hasHei ? widM * heiM : 0;
                     const pricePerSqm = displayFormData.price ?? 0;
                     const unitPriceUSD = areaSqm * pricePerSqm;
                     const unitPriceConverted = convertPrice(unitPriceUSD);
@@ -2800,9 +3756,9 @@ export default function EnhancedCart() {
 
                     return (
                       <>
-                        {/* Required Length (ft) - EDITABLE */}
+                        {/* Request Width (m) - EDITABLE */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                          <label className="font-semibold block mb-1">Required Length (ft):</label>
+                          <label className="font-semibold block mb-1">Request Width (m):</label>
                           <input
                             type="number"
                             step="0.01"
@@ -2810,43 +3766,37 @@ export default function EnhancedCart() {
                             onWheel={(e) => e.currentTarget.blur()}
                             onChange={(e) => {
                               const val = e.target.value;
-                              // Update length
+                              // Update width (stored in requiredLength for backward compatibility)
                               let next: any = { ...displayFormData, requiredLength: val };
                               // Recompute area-based total if possible and not manually overridden
-                              const FEET_TO_METER = 0.3048;
-                              const lenFt = parseFloat(val);
-                              const widFt = parseFloat(displayFormData?.requiredWidth ?? '0');
-                              const hasLen = !isNaN(lenFt) && lenFt > 0;
-                              const hasWid = !isNaN(widFt) && widFt > 0;
-                              if (hasLen && hasWid) {
-                                const lenM = lenFt * FEET_TO_METER;
-                                const widM = widFt * FEET_TO_METER;
-                                const areaSqm = lenM * widM;
-                                // Auto-calc cabinetRequired if cabinet area exists (or derive from cabinet size)
-                                const rawArea = (displayFormData as any)?.cabinetSpecs?.cabinetArea;
-                                let cabArea = typeof rawArea === 'number' ? rawArea : parseFloat(rawArea ?? '');
-                                console.log('🔍 [LENGTH] Cabinet specs:', { cabinetSpecs: displayFormData?.cabinetSpecs, rawArea, cabArea });
-                                if (!(cabArea > 0)) {
-                                  const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
-                                  console.log('🔍 [LENGTH] Parsing cabinet size:', sizeStr);
-                                  const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
-                                  if (m) {
-                                    const w = parseFloat(m[1]);
-                                    const h = parseFloat(m[2]);
-                                    console.log('🔍 [LENGTH] Parsed dimensions (mm):', { w, h });
-                                    if (!isNaN(w) && !isNaN(h)) {
-                                      // Assume mm, convert to meters
-                                      const wm = w / 1000;
-                                      const hm = h / 1000;
-                                      cabArea = wm * hm; // in sqm
-                                      console.log('🔍 [LENGTH] Calculated cabArea (sqm):', cabArea);
-                                    }
+                              const widM = parseFloat(val);
+                              const heiM = parseFloat(displayFormData?.requiredWidth ?? '0');
+                              const hasWid = !isNaN(widM) && widM > 0;
+                              const hasHei = !isNaN(heiM) && heiM > 0;
+                              if (hasWid && hasHei) {
+                                const areaSqm = widM * heiM;
+                                // Auto-calc cabinet arrangement using cabinet size from DB (in mm)
+                                const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                                const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                if (m && !displayFormData?.cabinetRequiredManuallyEdited) {
+                                  const cabWidMm = parseFloat(m[1]);
+                                  const cabHeiMm = parseFloat(m[2]);
+                                  if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+                                    const cabWidM = cabWidMm / 1000;
+                                    const cabHeiM = cabHeiMm / 1000;
+                                    const cabsWid = widM / cabWidM;
+                                    const cabsHei = heiM / cabHeiM;
+                                    // Custom rounding: ≤0.5 rounds down, >0.5 rounds up
+                                    const customRound = (v: number) => {
+                                      const dec = v - Math.floor(v);
+                                      return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+                                    };
+                                    const roundedW = customRound(cabsWid);
+                                    const roundedH = customRound(cabsHei);
+                                    next.cabinetRequired = roundedW * roundedH;
+                                    next.cabinetArrangementWidth = roundedW;
+                                    next.cabinetArrangementHeight = roundedH;
                                   }
-                                }
-                                console.log('🔧 [LENGTH] Cabinet calc:', { lenFt, widFt, areaSqm, cabArea, manualFlag: displayFormData?.cabinetRequiredManuallyEdited, currentCab: displayFormData?.cabinetRequired });
-                                if (!displayFormData?.cabinetRequiredManuallyEdited && cabArea && cabArea > 0) {
-                                  next.cabinetRequired = Math.round(areaSqm / cabArea);
-                                  console.log('✅ [LENGTH] Auto-updated cabinet to:', next.cabinetRequired);
                                 }
                                 if (!displayFormData?.customTotalManuallyEdited) {
                                   const unitUSD = areaSqm * (displayFormData?.price || 0);
@@ -2864,13 +3814,13 @@ export default function EnhancedCart() {
                                 ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}` 
                                 : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
                             }`}
-                            placeholder="Width in feet"
+                            placeholder="Width in meters"
                           />
                         </div>
 
-                        {/* Required Width (ft) - EDITABLE */}
+                        {/* Request Height (m) - EDITABLE */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                          <label className="font-semibold block mb-1">Required Height (ft):</label>
+                          <label className="font-semibold block mb-1">Request Height (m):</label>
                           <input
                             type="number"
                             step="0.01"
@@ -2879,37 +3829,33 @@ export default function EnhancedCart() {
                             onChange={(e) => {
                               const val = e.target.value;
                               let next: any = { ...displayFormData, requiredWidth: val };
-                              const FEET_TO_METER = 0.3048;
-                              const lenFt = parseFloat(displayFormData?.requiredLength ?? '0');
-                              const widFt = parseFloat(val);
-                              const hasLen = !isNaN(lenFt) && lenFt > 0;
-                              const hasWid = !isNaN(widFt) && widFt > 0;
-                              if (hasLen && hasWid) {
-                                const lenM = lenFt * FEET_TO_METER;
-                                const widM = widFt * FEET_TO_METER;
-                                const areaSqm = lenM * widM;
-                                // Auto-calc cabinetRequired with same robust logic
-                                const rawArea = (displayFormData as any)?.cabinetSpecs?.cabinetArea;
-                                let cabArea = typeof rawArea === 'number' ? rawArea : parseFloat(rawArea ?? '');
-                                console.log('🔍 [HEIGHT] Cabinet specs:', { cabinetSpecs: displayFormData?.cabinetSpecs, rawArea, cabArea });
-                                if (!(cabArea > 0)) {
-                                  const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
-                                  console.log('🔍 [HEIGHT] Parsing cabinet size:', sizeStr);
-                                  const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
-                                  if (m) {
-                                    const w = parseFloat(m[1]);
-                                    const h = parseFloat(m[2]);
-                                    console.log('🔍 [HEIGHT] Parsed dimensions (mm):', { w, h });
-                                    if (!isNaN(w) && !isNaN(h)) {
-                                      cabArea = (w / 1000) * (h / 1000);
-                                      console.log('🔍 [HEIGHT] Calculated cabArea (sqm):', cabArea);
-                                    }
+                              const widM = parseFloat(displayFormData?.requiredLength ?? '0');
+                              const heiM = parseFloat(val);
+                              const hasWid = !isNaN(widM) && widM > 0;
+                              const hasHei = !isNaN(heiM) && heiM > 0;
+                              if (hasWid && hasHei) {
+                                const areaSqm = widM * heiM;
+                                // Auto-calc cabinet arrangement
+                                const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                                const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                if (m && !displayFormData?.cabinetRequiredManuallyEdited) {
+                                  const cabWidMm = parseFloat(m[1]);
+                                  const cabHeiMm = parseFloat(m[2]);
+                                  if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+                                    const cabWidM = cabWidMm / 1000;
+                                    const cabHeiM = cabHeiMm / 1000;
+                                    const cabsWid = widM / cabWidM;
+                                    const cabsHei = heiM / cabHeiM;
+                                    const customRound = (v: number) => {
+                                      const dec = v - Math.floor(v);
+                                      return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+                                    };
+                                    const roundedW = customRound(cabsWid);
+                                    const roundedH = customRound(cabsHei);
+                                    next.cabinetRequired = roundedW * roundedH;
+                                    next.cabinetArrangementWidth = roundedW;
+                                    next.cabinetArrangementHeight = roundedH;
                                   }
-                                }
-                                console.log('🔧 [HEIGHT] Cabinet calc:', { lenFt, widFt, areaSqm, cabArea, manualFlag: displayFormData?.cabinetRequiredManuallyEdited, currentCab: displayFormData?.cabinetRequired });
-                                if (!displayFormData?.cabinetRequiredManuallyEdited && cabArea && cabArea > 0) {
-                                  next.cabinetRequired = Math.round(areaSqm / cabArea);
-                                  console.log('✅ [HEIGHT] Auto-updated cabinet to:', next.cabinetRequired);
                                 }
                                 if (!displayFormData?.customTotalManuallyEdited) {
                                   const unitUSD = areaSqm * (displayFormData?.price || 0);
@@ -2927,14 +3873,143 @@ export default function EnhancedCart() {
                                 ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}` 
                                 : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
                             }`}
-                            placeholder="Height in feet"
+                            placeholder="Height in meters"
                           />
                         </div>
 
-                        {/* Required Size (m) - READ ONLY */}
+                        {/* Request Size (Ft) - Display Only - Converted from meters */}
+                        <div className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'} col-span-2`}>
+                          <label className="font-semibold block mb-1">Request Size (Ft):</label>
+                          <div className={`w-full px-3 py-2 rounded border text-sm ${
+                            isDarkMode ? 'bg-gray-800/50 border-white/20' : 'bg-white/90 border-gray-300 text-gray-900'
+                          }`}>
+                            {hasWid && hasHei
+                              ? `W${(widM * METER_TO_FEET).toFixed(2)}ft × H${(heiM * METER_TO_FEET).toFixed(2)}ft`
+                              : 'Enter width and height above'
+                            }
+                          </div>
+                        </div>
+
+                        {/* Request Size (m) - READ ONLY - Original meter input */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                          <span className="font-semibold">Required Size (m):</span>
-                          <div className="mt-1">{hasLen && hasWid ? `W${lenM.toFixed(2)}m × H${widM.toFixed(2)}m` : 'N/A'}</div>
+                          <span className="font-semibold">Request Size (m):</span>
+                          <div className="mt-1">{hasWid && hasHei ? `W${widM.toFixed(2)}m × H${heiM.toFixed(2)}m` : 'N/A'}</div>
+                        </div>
+
+                        {/* Suggested Size (m) - AUTO from cabinet arrangement (recomputed) and cabinet size, editable when unlocked */}
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <span className="font-semibold block mb-1">Suggested Size (m):</span>
+                          {(() => {
+                            const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                            const match = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+
+                            let autoValue: string | null = null;
+                            if (hasWid && hasHei && match) {
+                              const cabWidMm = parseFloat(match[1]);
+                              const cabHeiMm = parseFloat(match[2]);
+                              if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+                                const cabWidM = cabWidMm / 1000;
+                                const cabHeiM = cabHeiMm / 1000;
+                                const cabsWid = widM / cabWidM;
+                                const cabsHei = heiM / cabHeiM;
+
+                                const customRound = (v: number) => {
+                                  const dec = v - Math.floor(v);
+                                  return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+                                };
+
+                                const roundedW = customRound(cabsWid);
+                                const roundedH = customRound(cabsHei);
+
+                                const sugWid = roundedW * cabWidM;
+                                const sugHei = roundedH * cabHeiM;
+                                autoValue = `W${sugWid.toFixed(2)}m × H${sugHei.toFixed(2)}m`;
+                              }
+                            }
+
+                            const effectiveValue = (displayFormData as any)?.suggestedSize || autoValue || 'N/A';
+
+                            if (!priceEditUnlocked) {
+                              return <div className="mt-1">{effectiveValue}</div>;
+                            }
+
+                            return (
+                              <input
+                                type="text"
+                                value={(displayFormData as any)?.suggestedSize ?? autoValue ?? ''}
+                                onChange={(e) => setDisplayFormData({ ...displayFormData, suggestedSize: e.target.value })}
+                                className={`mt-1 w-full px-2 py-1.5 rounded border text-xs ${
+                                  isDarkMode
+                                    ? 'bg-gray-800 border-white/20 text-white'
+                                    : 'bg-white border-gray-300 text-gray-900'
+                                }`}
+                                placeholder={autoValue || 'Enter suggested size'}
+                              />
+                            );
+                          })()}
+                        </div>
+
+                        {/* Screen Resolution - AUTO from cabinet arrangement and cabinet resolution, editable when unlocked */}
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                          <span className="font-semibold block mb-1">Screen Resolution:</span>
+                          {(() => {
+                            const resStr = (displayFormData as any)?.cabinetSpecs?.cabinetResolution || '';
+                            const match = String(resStr).match(/(\d+)\s*[xX*×]\s*(\d+)/);
+
+                            let autoValue: string | null = null;
+                            if (hasWid && hasHei && match) {
+                              const cabWidPx = parseInt(match[1], 10);
+                              const cabHeiPx = parseInt(match[2], 10);
+                              if (!isNaN(cabWidPx) && !isNaN(cabHeiPx) && cabWidPx > 0 && cabHeiPx > 0) {
+                                // Reuse the same arrangement rounding logic as Suggested Size
+                                const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                                const sizeMatch = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                if (sizeMatch) {
+                                  const cabWidMm = parseFloat(sizeMatch[1]);
+                                  const cabHeiMm = parseFloat(sizeMatch[2]);
+                                  if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+                                    const cabWidM = cabWidMm / 1000;
+                                    const cabHeiM = cabHeiMm / 1000;
+                                    const cabsWid = widM / cabWidM;
+                                    const cabsHei = heiM / cabHeiM;
+
+                                    const customRound = (v: number) => {
+                                      const dec = v - Math.floor(v);
+                                      return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+                                    };
+
+                                    const roundedW = customRound(cabsWid);
+                                    const roundedH = customRound(cabsHei);
+
+                                    const totalWidPx = roundedW * cabWidPx;
+                                    const totalHeiPx = roundedH * cabHeiPx;
+                                    autoValue = `W${totalWidPx.toLocaleString()} × H${totalHeiPx.toLocaleString()}`;
+                                  }
+                                }
+                              }
+                            }
+
+                            const manualVal = (displayFormData as any)?.totalResolution as string | undefined;
+                            const effectiveValue = manualVal || autoValue || 'N/A';
+
+                            if (!priceEditUnlocked) {
+                              return <div className="mt-1">{effectiveValue}</div>;
+                            }
+
+                            return (
+                              <input
+                                type="text"
+                                value={manualVal ?? autoValue ?? ''}
+                                onChange={(e) => setDisplayFormData({ ...displayFormData, totalResolution: e.target.value })}
+                                className={`mt-1 w-full px-2 py-1.5 rounded border text-xs ${
+                                  isDarkMode
+                                    ? 'bg-gray-800 border-white/20 text-white'
+                                    : 'bg-white border-gray-300 text-gray-900'
+                                }`}
+                                placeholder={autoValue || 'Enter screen resolution'}
+                              />
+                            );
+                          })()}
                         </div>
 
                         {/* Area (sqm) - READ ONLY */}
@@ -2957,14 +4032,12 @@ export default function EnhancedCart() {
                               let next: any = { ...displayFormData, priceInput: val };
                               const parsed = parseFloat(val);
                               // Recompute total (converted) if numeric and not manually edited
-                              const FEET_TO_METER = 0.3048;
-                              const lenFt = parseFloat(displayFormData?.requiredLength ?? '0');
-                              const widFt = parseFloat(displayFormData?.requiredWidth ?? '0');
-                              const hasLen = !isNaN(lenFt) && lenFt > 0;
-                              const hasWid = !isNaN(widFt) && widFt > 0;
-                              const lenM = hasLen ? lenFt * FEET_TO_METER : 0;
-                              const widM = hasWid ? widFt * FEET_TO_METER : 0;
-                              const areaSqm = hasLen && hasWid ? lenM * widM : 0;
+                              // Now using meters directly
+                              const widM = parseFloat(displayFormData?.requiredLength ?? '0');
+                              const heiM = parseFloat(displayFormData?.requiredWidth ?? '0');
+                              const hasWid = !isNaN(widM) && widM > 0;
+                              const hasHei = !isNaN(heiM) && heiM > 0;
+                              const areaSqm = hasWid && hasHei ? widM * heiM : 0;
                               if (!isNaN(parsed)) {
                                 next.price = parsed;
                                 const unitUSD = areaSqm * parsed;
@@ -2989,23 +4062,121 @@ export default function EnhancedCart() {
                           />
                         </div>
 
-                        {/* Cabinet Required - EDITABLE (auto-calculated if not overridden) */}
+                        {/* Cabinet Arrangement - Display W×H format (same logic as product page), editable when unlocked */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                          <label className="font-semibold block mb-1">Cabinet Required:</label>
-                          <input
-                            type="number"
-                            step="1"
-                            value={displayFormData?.cabinetRequired ?? ''}
-                            onWheel={(e) => e.currentTarget.blur()}
-                            onChange={(e) => setDisplayFormData({ ...displayFormData, cabinetRequired: parseInt(e.target.value) || 0, cabinetRequiredManuallyEdited: true })}
-                            disabled={!priceEditUnlocked}
-                            className={`w-full px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                              isDarkMode 
-                                ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}` 
-                                : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
-                            }`}
-                            placeholder="Number of cabinets"
-                          />
+                          <span className="font-semibold block mb-1">Cabinet Arrangement:</span>
+                          {(() => {
+                            const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                            const match = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                            if (!hasWid || !hasHei || !match) {
+                              return (
+                                <span className="text-xs text-gray-500">Enter dimensions above</span>
+                              );
+                            }
+
+                            const cabWidMm = parseFloat(match[1]);
+                            const cabHeiMm = parseFloat(match[2]);
+                            if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+                              const cabWidM = cabWidMm / 1000;
+                              const cabHeiM = cabHeiMm / 1000;
+                              const cabsWid = widM / cabWidM;
+                              const cabsHei = heiM / cabHeiM;
+
+                              const customRound = (v: number) => {
+                                const dec = v - Math.floor(v);
+                                return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+                              };
+
+                              const autoW = customRound(cabsWid);
+                              const autoH = customRound(cabsHei);
+
+                              const manualW = (displayFormData as any)?.cabinetArrangementWidth as number | undefined;
+                              const manualH = (displayFormData as any)?.cabinetArrangementHeight as number | undefined;
+                              const effW = manualW && manualW > 0 ? manualW : autoW;
+                              const effH = manualH && manualH > 0 ? manualH : autoH;
+                              const total = effW * effH;
+
+                              // Keep cabinetRequired in sync with effective arrangement
+                              if (displayFormData.cabinetRequired !== total) {
+                                setDisplayFormData({ ...displayFormData, cabinetRequired: total });
+                              }
+
+                              if (!priceEditUnlocked) {
+                                return (
+                                  <div className="mt-1 flex flex-col gap-1">
+                                    <span className="font-bold text-yellow-400">
+                                      {`W${effW} × H${effH}`}
+                                    </span>
+                                    <span className="text-[10px] text-gray-400">
+                                      ({total} cabinets)
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              // Editable W/H when unlocked
+                              return (
+                                <div className="mt-1 flex flex-col gap-1">
+                                  <div className="flex items-center gap-2 text-[11px]">
+                                    <span className="text-gray-500">Edit:</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={manualW ?? autoW}
+                                      onChange={(e) => {
+                                        const val = parseInt(e.target.value, 10);
+                                        const nextW = isNaN(val) || val <= 0 ? autoW : val;
+                                        const nextTotal = nextW * effH;
+                                        setDisplayFormData({
+                                          ...displayFormData,
+                                          cabinetArrangementWidth: nextW,
+                                          cabinetRequired: nextTotal,
+                                        });
+                                      }}
+                                      onWheel={(e) => e.currentTarget.blur()}
+                                      className={`w-12 px-1 py-0.5 rounded border text-[10px] outline-none ${
+                                        isDarkMode
+                                          ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                          : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                      }`}
+                                    />
+                                    <span className="text-gray-500">×</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={manualH ?? autoH}
+                                      onChange={(e) => {
+                                        const val = parseInt(e.target.value, 10);
+                                        const nextH = isNaN(val) || val <= 0 ? autoH : val;
+                                        const nextTotal = effW * nextH;
+                                        setDisplayFormData({
+                                          ...displayFormData,
+                                          cabinetArrangementHeight: nextH,
+                                          cabinetRequired: nextTotal,
+                                        });
+                                      }}
+                                      onWheel={(e) => e.currentTarget.blur()}
+                                      className={`w-12 px-1 py-0.5 rounded border text-[10px] outline-none ${
+                                        isDarkMode
+                                          ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                          : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                      }`}
+                                    />
+                                  </div>
+                                  <span className="font-bold text-yellow-400">
+                                    {`W${effW} × H${effH}`}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400">
+                                    ({total} cabinets)
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <span className="text-xs text-gray-500">Enter dimensions above</span>
+                            );
+                          })()}
                         </div>
 
                         {/* Quantity - READ ONLY (editable elsewhere) */}
@@ -3529,6 +4700,103 @@ export default function EnhancedCart() {
             {/* Content */}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               <div className="space-y-4">
+                {/* Terms Type Selector */}
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Terms apply to
+                  </label>
+                  <select
+                    value={termsAndConditions.termsType}
+                    onChange={(e) =>
+                      setTermsAndConditions((prev) => ({
+                        ...prev,
+                        termsType: e.target.value as 'lights' | 'displays',
+                      }))
+                    }
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${
+                      isDarkMode
+                        ? 'bg-gray-800 border border-white/20 text-white focus:border-blue-500'
+                        : 'bg-white border border-gray-300 text-gray-900 focus:border-blue-500'
+                    }`}
+                  >
+                    <option value="lights">LED Lights</option>
+                    <option value="displays">LED Displays</option>
+                  </select>
+                  <p className={`mt-1 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    This choice controls which Terms & Conditions appear in the PDF quotation.
+                  </p>
+                </div>
+
+                {/* LED Display Terms (hidden editor, kept for future use) */}
+
+                {/* Live Preview of Terms that will appear in PDF */}
+                <div
+                  className={
+                    isDarkMode
+                      ? 'border border-blue-500/40 bg-blue-950/40 rounded-lg p-4'
+                      : 'border border-blue-300 bg-blue-50 rounded-lg p-4'
+                  }
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span
+                      className={
+                        isDarkMode
+                          ? 'text-xs font-semibold uppercase tracking-wide text-blue-300'
+                          : 'text-xs font-semibold uppercase tracking-wide text-blue-700'
+                      }
+                    >
+                      PDF Terms Preview ({termsAndConditions.termsType === 'displays' ? 'LED Displays' : 'LED Lights'})
+                    </span>
+                  </div>
+                  <div className={`text-xs space-y-1 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                    {termsAndConditions.termsType === 'displays' ? (
+                      // Preview for LED Displays: each non-empty line from displayTerms
+                      (termsAndConditions.displayTerms || '')
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .filter((line) => line.length > 0)
+                        .map((line, idx) => (
+                          <div key={idx} className="flex gap-1">
+                            <span className="shrink-0">•</span>
+                            <span className="whitespace-pre-wrap">{line}</span>
+                          </div>
+                        ))
+                    ) : (
+                      // Preview for LED Lights: structured terms using individual fields
+                      <>
+                        <div className="flex gap-1">
+                          <span className="shrink-0">1.</span>
+                          <span>
+                            The prices quoted on {termsAndConditions.deliveryLocation}.
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <span className="shrink-0">2.</span>
+                          <span>
+                            Delivery: Within {termsAndConditions.deliveryTime} from the date of PO and advance payment.
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <span className="shrink-0">3.</span>
+                          <span>Payment Terms: {termsAndConditions.paymentTerms}.</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <span className="shrink-0">4.</span>
+                          <span>The quoted products are {termsAndConditions.productMake}</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <span className="shrink-0">5.</span>
+                          <span>Validity of offer: {termsAndConditions.validityDays}</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <span className="shrink-0">6.</span>
+                          <span>{termsAndConditions.vatNote}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 {/* Delivery Location */}
                 <div>
                   <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>

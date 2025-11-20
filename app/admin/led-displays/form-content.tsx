@@ -1,5 +1,10 @@
 // Comprehensive LED Display Form Content
-export const renderFormFields = (formData: any, setFormData: any, isDarkMode: boolean = false) => {
+export const renderFormFields = (
+  formData: any,
+  setFormData: any,
+  isDarkMode: boolean = false,
+  screenParamSuggestions?: { [key: string]: string[] }
+) => {
   // Dynamic class names based on dark mode
   const labelClass = `block text-sm font-bold mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`;
   const labelSmallClass = `block text-xs font-bold mb-1 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`;
@@ -11,6 +16,28 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
   const sectionHeaderClass = `text-xl font-bold mb-4 pb-3 border-b-2 ${isDarkMode ? 'text-white border-white/20' : 'text-gray-900 border-gray-300'}`;
   const descriptionClass = `text-sm mb-3 font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`;
   const variantBoxClass = `flex items-center gap-3 p-4 rounded-lg border-2 ${isDarkMode ? 'bg-gray-800/50 border-white/10' : 'bg-white border-gray-300 shadow-sm'}`;
+
+  const renderSuggestionChips = (values: string[] | undefined, onSelect: (value: string) => void) => {
+    if (!values || values.length === 0) return null;
+    return (
+      <div className="mt-1 flex flex-wrap gap-1 text-xs">
+        {values.slice(0, 8).map((val) => (
+          <button
+            key={val}
+            type="button"
+            onClick={() => onSelect(val)}
+            className={`px-2 py-1 rounded-full border transition-colors ${
+              isDarkMode
+                ? 'border-gray-600 bg-gray-800 text-gray-100 hover:bg-gray-700'
+                : 'border-gray-300 bg-gray-100 text-gray-800 hover:bg-gray-200'
+            }`}
+          >
+            {val}
+          </button>
+        ))}
+      </div>
+    );
+  };
   
   return (
   <>
@@ -370,6 +397,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.brightnessControl,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, brightnessControl: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>2. White Balance Brightness</label>
@@ -383,6 +418,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.whiteBalanceBrightness,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, whiteBalanceBrightness: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>3. Color Temperature</label>
@@ -396,6 +439,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.colorTemperature,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, colorTemperature: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>4. Best Viewing Distance</label>
@@ -409,6 +460,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.bestViewingDistance,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, bestViewingDistance: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>5. Brightness Uniformity</label>
@@ -422,6 +481,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.brightnessUniformity,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, brightnessUniformity: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>6. Color Uniformity</label>
@@ -435,6 +502,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.colorUniformity,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, colorUniformity: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>7. Protective Grade</label>
@@ -448,6 +523,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.protectiveGrade,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, protectiveGrade: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>8. View Angle</label>
@@ -461,6 +544,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.viewAngle,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, viewAngle: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>9. Defects Rate</label>
@@ -474,6 +565,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.defectsRate,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, defectsRate: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>10. Frame Frequency</label>
@@ -487,6 +586,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.frameFrequency,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, frameFrequency: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>11. Refresh Rate</label>
@@ -500,6 +607,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.refreshRate,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, refreshRate: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>12. Input Voltage</label>
@@ -513,6 +628,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.inputVoltage,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, inputVoltage: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>13. Max Power Consumption</label>
@@ -526,6 +649,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.maxPowerConsumption,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, maxPowerConsumption: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>14. Avg Power Consumption</label>
@@ -539,6 +670,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.avgPowerConsumption,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, avgPowerConsumption: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>15. Life Span</label>
@@ -552,6 +691,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.lifeSpan,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, lifeSpan: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>16. Temperature-Operating</label>
@@ -565,6 +712,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.temperatureOperating,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, temperatureOperating: val },
+              })
+          )}
         </div>
         <div>
           <label className={labelClass}>17. Humidity-Operating</label>
@@ -578,6 +733,14 @@ export const renderFormFields = (formData: any, setFormData: any, isDarkMode: bo
             })}
             className={inputClass}
           />
+          {renderSuggestionChips(
+            screenParamSuggestions?.humidityOperating,
+            (val) =>
+              setFormData({
+                ...formData,
+                screenParams: { ...formData.screenParams, humidityOperating: val },
+              })
+          )}
         </div>
       </div>
     </div>

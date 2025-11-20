@@ -196,6 +196,38 @@ export default function LedDisplaysAdmin() {
     currentPage * itemsPerPage
   );
 
+  // Build Screen Parameters suggestion lists from existing displays
+  const screenParamSuggestions = displays.reduce((acc, d) => {
+    const sp = d.screenParams || {};
+    const add = (key: keyof NonNullable<typeof d.screenParams>) => {
+      const val = sp[key];
+      if (val && typeof val === 'string') {
+        const arr = acc[key] || (acc[key] = []);
+        if (!arr.includes(val)) arr.push(val);
+      }
+    };
+
+    add('brightnessControl');
+    add('whiteBalanceBrightness');
+    add('colorTemperature');
+    add('bestViewingDistance');
+    add('brightnessUniformity');
+    add('colorUniformity');
+    add('protectiveGrade');
+    add('viewAngle');
+    add('defectsRate');
+    add('frameFrequency');
+    add('refreshRate');
+    add('inputVoltage');
+    add('maxPowerConsumption');
+    add('avgPowerConsumption');
+    add('lifeSpan');
+    add('temperatureOperating');
+    add('humidityOperating');
+
+    return acc;
+  }, {} as { [key: string]: string[] });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -349,7 +381,7 @@ export default function LedDisplaysAdmin() {
                     </div>
                   </div>
 
-                  {renderFormFields(formData, setFormData)}
+                  {renderFormFields(formData, setFormData, false, screenParamSuggestions)}
 
                   <div className="flex gap-3 pt-4">
                     <button

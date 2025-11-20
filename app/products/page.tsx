@@ -97,38 +97,59 @@ const lumenRanges = [
 ];
 
 const FEET_TO_METER = 0.3048;
+const METER_TO_FEET = 1 / 0.3048;
 
-const computeCabinetCount = (product: Product, lengthFeetStr?: string, widthFeetStr?: string): number | null => {
-  const lengthFeet = parseFloat(lengthFeetStr || '');
-  const widthFeet = parseFloat(widthFeetStr || '');
-
-  if (!isFinite(lengthFeet) || !isFinite(widthFeet) || lengthFeet <= 0 || widthFeet <= 0) return null;
-
-  const areaSqm = lengthFeet * widthFeet * FEET_TO_METER * FEET_TO_METER;
-
-  let cabinetAreaSqm = product.cabinetSpecs?.cabinetArea && product.cabinetSpecs.cabinetArea > 0
-    ? product.cabinetSpecs.cabinetArea
-    : undefined;
-
-  if (!cabinetAreaSqm && product.cabinetSpecs?.cabinetSize) {
-    const parts = product.cabinetSpecs.cabinetSize
-      .split(/x|×|\*/i)
-      .map(p => parseFloat(p.trim()))
-      .filter(n => !isNaN(n) && n > 0);
-
-    if (parts.length >= 2) {
-      const widthM = parts[0] / 1000;
-      const heightM = parts[1] / 1000;
-      cabinetAreaSqm = widthM * heightM;
-    }
+// Custom rounding: ≤0.5 rounds down, >0.5 rounds up
+const customRound = (value: number): number => {
+  const decimal = value - Math.floor(value);
+  if (decimal <= 0.5) {
+    return Math.floor(value);
+  } else {
+    return Math.ceil(value);
   }
+};
 
-  if (!cabinetAreaSqm || cabinetAreaSqm <= 0) return null;
+type CabinetArrangement = {
+  width: number;
+  height: number;
+  total: number;
+};
 
-  const rawCount = areaSqm / cabinetAreaSqm;
-  if (!isFinite(rawCount) || rawCount <= 0) return null;
+const computeCabinetArrangement = (product: Product, widthMeterStr?: string, heightMeterStr?: string): CabinetArrangement | null => {
+  const widthMeter = parseFloat(widthMeterStr || '');
+  const heightMeter = parseFloat(heightMeterStr || '');
 
-  return Math.round(rawCount);
+  if (!isFinite(widthMeter) || !isFinite(heightMeter) || widthMeter <= 0 || heightMeter <= 0) return null;
+
+  // Get cabinet size from cabinetSpecs.cabinetSize (stored in mm)
+  if (!product.cabinetSpecs?.cabinetSize) return null;
+
+  const parts = product.cabinetSpecs.cabinetSize
+    .split(/x|×|\*/i)
+    .map(p => parseFloat(p.trim()))
+    .filter(n => !isNaN(n) && n > 0);
+
+  if (parts.length < 2) return null;
+
+  // Convert cabinet size from mm to meters
+  const cabinetWidthM = parts[0] / 1000;
+  const cabinetHeightM = parts[1] / 1000;
+
+  if (cabinetWidthM <= 0 || cabinetHeightM <= 0) return null;
+
+  // Calculate number of cabinets in width and height
+  const cabinetsWidth = widthMeter / cabinetWidthM;
+  const cabinetsHeight = heightMeter / cabinetHeightM;
+
+  // Apply custom rounding
+  const roundedWidth = customRound(cabinetsWidth);
+  const roundedHeight = customRound(cabinetsHeight);
+
+  return {
+    width: roundedWidth,
+    height: roundedHeight,
+    total: roundedWidth * roundedHeight
+  };
 };
 
 export default function ProductsPage() {
@@ -154,6 +175,7 @@ export default function ProductsPage() {
   const [requiredLength, setRequiredLength] = useState<Record<string, string>>({});
   const [requiredWidth, setRequiredWidth] = useState<Record<string, string>>({});
   const [cabinetCounts, setCabinetCounts] = useState<Record<string, string>>({});
+  const [manualCabinetArrangements, setManualCabinetArrangements] = useState<Record<string, { width: string; height: string }>>({});
   const [showFilters, setShowFilters] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -996,8 +1018,8 @@ export default function ProductsPage() {
                         { label: 'IP Rating', key: 'ipRating' },
                         { label: 'Pixel Pitch', key: 'pixelPitch' },
                         { label: 'Cabinet Material', key: 'cabinetMaterial' },
-                        { label: 'Screen Inputs (L × W)', key: 'sqft' },
-                        { label: 'Cabinet Required', key: 'cabinets' },
+                        { label: 'Screen Inputs (W × H)', key: 'sqft' },
+                        { label: 'Cabinet Arrangement', key: 'cabinets' },
                         { label: 'Action', key: 'action' }
                       ].map(col => (
                         <th 
@@ -1180,7 +1202,7 @@ export default function ProductsPage() {
                                 <div className="flex flex-col gap-1">
                                   <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-xs font-semibold">Required size <span className="text-[10px] text-gray-500">( Enter in feet)</span></span>
+                                      <span className="text-xs font-semibold">Required size <span className="text-[10px] text-gray-500">( Enter in meters)</span></span>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -1199,10 +1221,10 @@ export default function ProductsPage() {
                                           ...prev,
                                           [p._id]: `${value}x${requiredWidth[p._id] ?? ''}`,
                                         }));
-                                        const auto = computeCabinetCount(p, value, requiredWidth[p._id]);
+                                        const auto = computeCabinetArrangement(p, value, requiredWidth[p._id]);
                                         setCabinetCounts(prev => ({
                                           ...prev,
-                                          [p._id]: auto !== null ? String(auto) : prev[p._id] ?? '',
+                                          [p._id]: auto !== null ? String(auto.total) : prev[p._id] ?? '',
                                         }));
                                       }}
                                       className={`w-20 px-2 py-1 rounded-md text-xs outline-none border [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
@@ -1210,7 +1232,7 @@ export default function ProductsPage() {
                                           ? 'bg-black border-white/20 text-white focus:border-yellow-400'
                                           : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
                                       }`}
-                                      placeholder="Length (ft)"
+                                      placeholder="Width (m)"
                                     />
                                     <span className="text-xs">×</span>
                                     <input
@@ -1228,10 +1250,10 @@ export default function ProductsPage() {
                                           ...prev,
                                           [p._id]: `${requiredLength[p._id] ?? ''}x${value}`,
                                         }));
-                                        const auto = computeCabinetCount(p, requiredLength[p._id], value);
+                                        const auto = computeCabinetArrangement(p, requiredLength[p._id], value);
                                         setCabinetCounts(prev => ({
                                           ...prev,
-                                          [p._id]: auto !== null ? String(auto) : prev[p._id] ?? '',
+                                          [p._id]: auto !== null ? String(auto.total) : prev[p._id] ?? '',
                                         }));
                                       }}
                                       className={`w-20 px-2 py-1 rounded-md text-xs outline-none border [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
@@ -1239,29 +1261,29 @@ export default function ProductsPage() {
                                           ? 'bg-black border-white/20 text-white focus:border-yellow-400'
                                           : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
                                       }`}
-                                      placeholder="Width (ft)"
+                                      placeholder="Height (m)"
                                     />
                                   </div>
                                   {(() => {
-                                    const lenFt = parseFloat(requiredLength[p._id] ?? '');
-                                    const widFt = parseFloat(requiredWidth[p._id] ?? '');
-                                    const hasLen = !isNaN(lenFt);
-                                    const hasWid = !isNaN(widFt);
-                                    const toM = (ft: number) => (ft * FEET_TO_METER);
-                                    const fmt = (m: number) => m.toFixed(2);
+                                    const lenM = parseFloat(requiredLength[p._id] ?? '');
+                                    const widM = parseFloat(requiredWidth[p._id] ?? '');
+                                    const hasLen = !isNaN(lenM);
+                                    const hasWid = !isNaN(widM);
+                                    const toFt = (m: number) => (m * METER_TO_FEET);
+                                    const fmt = (ft: number) => ft.toFixed(2);
                                     if (hasLen && hasWid) {
                                       return (
                                         <span className="text-[10px] text-gray-500 mt-1">
-                                          ≈ W{fmt(toM(lenFt))}m × H{fmt(toM(widFt))}m
+                                          ≈ W{fmt(toFt(lenM))}ft × H{fmt(toFt(widM))}ft
                                         </span>
                                       );
                                     }
                                     if (hasLen || hasWid) {
                                       return (
                                         <span className="text-[10px] text-gray-500 mt-1">
-                                          {hasLen ? `W${fmt(toM(lenFt))}m` : ''}
+                                          {hasLen ? `W${fmt(toFt(lenM))}ft` : ''}
                                           {hasLen && hasWid ? ' · ' : ''}
-                                          {hasWid ? `H${fmt(toM(widFt))}m` : ''}
+                                          {hasWid ? `H${fmt(toFt(widM))}ft` : ''}
                                         </span>
                                       );
                                     }
@@ -1272,32 +1294,85 @@ export default function ProductsPage() {
                             </td>
                             <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                               <div className="flex flex-col gap-1">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={cabinetCounts[p._id] ?? ''}
-                                  onWheel={(e) => e.currentTarget.blur()}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
+                                {(() => {
+                                  const arrangement = computeCabinetArrangement(p, requiredLength[p._id], requiredWidth[p._id]);
+                                  if (!arrangement) {
+                                    return (
+                                      <span className="text-xs text-gray-500">
+                                        Enter dimensions
+                                      </span>
+                                    );
+                                  }
+
+                                  const manual = manualCabinetArrangements[p._id];
+                                  const displayWidth = manual?.width ? parseInt(manual.width, 10) || 0 : arrangement.width;
+                                  const displayHeight = manual?.height ? parseInt(manual.height, 10) || 0 : arrangement.height;
+                                  const hasDisplay = displayWidth > 0 && displayHeight > 0;
+                                  const total = hasDisplay ? displayWidth * displayHeight : arrangement.total;
+
+                                  if (cabinetCounts[p._id] !== String(total)) {
                                     setCabinetCounts(prev => ({
                                       ...prev,
-                                      [p._id]: value,
+                                      [p._id]: String(total),
                                     }));
-                                  }}
-                                  className={`w-20 px-2 py-1 rounded-md text-xs outline-none border [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                                    isDarkMode
-                                      ? 'bg-black border-white/20 text-white focus:border-yellow-400'
-                                      : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
-                                  }`}
-                                  placeholder="Cabinets"
-                                />
-                                {(() => {
-                                  const auto = computeCabinetCount(p, requiredLength[p._id], requiredWidth[p._id]);
-                                  return auto !== null ? (
-                                    <span className="text-[10px] text-gray-400">
-                                      Auto: {auto} cabinets
-                                    </span>
-                                  ) : null;
+                                  }
+
+                                  return (
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-sm font-semibold text-yellow-400">
+                                        W{hasDisplay ? displayWidth : arrangement.width} × H{hasDisplay ? displayHeight : arrangement.height}
+                                      </span>
+                                      <span className="text-[10px] text-gray-400">
+                                        ({total} cabinets)
+                                      </span>
+                                      <div className="flex items-center gap-2 mt-1 text-[10px]">
+                                        <span className="text-gray-500">Edit:</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          value={manual?.width ?? String(arrangement.width)}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setManualCabinetArrangements(prev => ({
+                                              ...prev,
+                                              [p._id]: {
+                                                width: val,
+                                                height: prev[p._id]?.height ?? String(arrangement.height),
+                                              },
+                                            }));
+                                          }}
+                                          onWheel={(e) => e.currentTarget.blur()}
+                                          className={`w-12 px-1 py-0.5 rounded border text-[10px] outline-none ${
+                                            isDarkMode
+                                              ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                              : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                          }`}
+                                        />
+                                        <span className="text-gray-500">×</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          value={manual?.height ?? String(arrangement.height)}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setManualCabinetArrangements(prev => ({
+                                              ...prev,
+                                              [p._id]: {
+                                                width: prev[p._id]?.width ?? String(arrangement.width),
+                                                height: val,
+                                              },
+                                            }));
+                                          }}
+                                          onWheel={(e) => e.currentTarget.blur()}
+                                          className={`w-12 px-1 py-0.5 rounded border text-[10px] outline-none ${
+                                            isDarkMode
+                                              ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                              : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                          }`}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
                                 })()}
                               </div>
                             </td>
@@ -1308,12 +1383,49 @@ export default function ProductsPage() {
                                   onClick={() => {
                                     if (addingProductId !== cartItemId) {
                                       setAddingProductId(cartItemId);
+                                      
+                                      // Compute cabinet arrangement and derived values for update
+                                      const arrangement = computeCabinetArrangement(p, requiredLength[p._id], requiredWidth[p._id]);
+                                      const manual = manualCabinetArrangements[p._id];
+                                      const arrWidth = manual?.width ? parseInt(manual.width, 10) || 0 : arrangement?.width;
+                                      const arrHeight = manual?.height ? parseInt(manual.height, 10) || 0 : arrangement?.height;
+                                      
+                                      // Compute suggested size from cabinet arrangement
+                                      let suggestedSize: string | undefined;
+                                      if (arrangement && arrWidth && arrHeight && p.cabinetSpecs?.cabinetSize) {
+                                        const sizeMatch = p.cabinetSpecs.cabinetSize.match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                        if (sizeMatch) {
+                                          const cabWidMm = parseFloat(sizeMatch[1]);
+                                          const cabHeiMm = parseFloat(sizeMatch[2]);
+                                          const sugWid = (arrWidth * cabWidMm) / 1000;
+                                          const sugHei = (arrHeight * cabHeiMm) / 1000;
+                                          suggestedSize = `W${sugWid.toFixed(2)}m × H${sugHei.toFixed(2)}m`;
+                                        }
+                                      }
+                                      
+                                      // Compute total resolution from cabinet arrangement
+                                      let totalResolution: string | undefined;
+                                      if (arrangement && arrWidth && arrHeight && p.cabinetSpecs?.cabinetResolution) {
+                                        const resMatch = String(p.cabinetSpecs.cabinetResolution).match(/(\d+)\s*[xX*×]\s*(\d+)/);
+                                        if (resMatch) {
+                                          const cabWidPx = parseInt(resMatch[1], 10);
+                                          const cabHeiPx = parseInt(resMatch[2], 10);
+                                          const totalWidPx = arrWidth * cabWidPx;
+                                          const totalHeiPx = arrHeight * cabHeiPx;
+                                          totalResolution = `W${totalWidPx.toLocaleString()} × H${totalHeiPx.toLocaleString()}`;
+                                        }
+                                      }
+                                      
                                       updateCartItem(cartItemId, {
                                         cabinetRequired: cabinetCounts[p._id]
                                           ? parseInt(cabinetCounts[p._id], 10) || undefined
                                           : undefined,
                                         requiredLength: requiredLength[p._id] || undefined,
                                         requiredWidth: requiredWidth[p._id] || undefined,
+                                        suggestedSize,
+                                        totalResolution,
+                                        cabinetArrangementWidth: arrWidth,
+                                        cabinetArrangementHeight: arrHeight,
                                       });
                                       setTimeout(() => setAddingProductId(null), 500);
                                     }
@@ -1335,8 +1447,40 @@ export default function ProductsPage() {
                                     if (addingProductId !== cartItemId) {
                                       setAddingProductId(cartItemId);
                                       // Get selected beam angle if multiple exist
-                                      const beamAnglesForCart = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
+                                      const beamAnglesForCart = p.beamAngle ? p.beamAngle.split(/[/,]/).map(angle => angle.trim()).filter(Boolean) : [];
                                       const selectedBeamAngleForCart = beamAnglesForCart.length > 1 ? (selectedBeamAngles[p._id] || beamAnglesForCart[0]) : p.beamAngle;
+                                      
+                                      // Compute cabinet arrangement and derived values
+                                      const arrangement = computeCabinetArrangement(p, requiredLength[p._id], requiredWidth[p._id]);
+                                      const manual = manualCabinetArrangements[p._id];
+                                      const arrWidth = manual?.width ? parseInt(manual.width, 10) || 0 : arrangement?.width;
+                                      const arrHeight = manual?.height ? parseInt(manual.height, 10) || 0 : arrangement?.height;
+                                      
+                                      // Compute suggested size from cabinet arrangement
+                                      let suggestedSize: string | undefined;
+                                      if (arrangement && arrWidth && arrHeight && p.cabinetSpecs?.cabinetSize) {
+                                        const sizeMatch = p.cabinetSpecs.cabinetSize.match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                        if (sizeMatch) {
+                                          const cabWidMm = parseFloat(sizeMatch[1]);
+                                          const cabHeiMm = parseFloat(sizeMatch[2]);
+                                          const sugWid = (arrWidth * cabWidMm) / 1000;
+                                          const sugHei = (arrHeight * cabHeiMm) / 1000;
+                                          suggestedSize = `W${sugWid.toFixed(2)}m × H${sugHei.toFixed(2)}m`;
+                                        }
+                                      }
+                                      
+                                      // Compute total resolution from cabinet arrangement
+                                      let totalResolution: string | undefined;
+                                      if (arrangement && arrWidth && arrHeight && p.cabinetSpecs?.cabinetResolution) {
+                                        const resMatch = String(p.cabinetSpecs.cabinetResolution).match(/(\d+)\s*[xX*×]\s*(\d+)/);
+                                        if (resMatch) {
+                                          const cabWidPx = parseInt(resMatch[1], 10);
+                                          const cabHeiPx = parseInt(resMatch[2], 10);
+                                          const totalWidPx = arrWidth * cabWidPx;
+                                          const totalHeiPx = arrHeight * cabHeiPx;
+                                          totalResolution = `W${totalWidPx.toLocaleString()} × H${totalHeiPx.toLocaleString()}`;
+                                        }
+                                      }
                                       
                                       const productToAdd = {
                                         ...p,
@@ -1352,6 +1496,10 @@ export default function ProductsPage() {
                                           : undefined,
                                         requiredLength: requiredLength[p._id] || undefined,
                                         requiredWidth: requiredWidth[p._id] || undefined,
+                                        suggestedSize,
+                                        totalResolution,
+                                        cabinetArrangementWidth: arrWidth,
+                                        cabinetArrangementHeight: arrHeight,
                                       };
                                       
                                       addToCart(productToAdd);
