@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Plus, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { renderFormFields } from "./form-content";
+import { useToast } from "@/context/ToastContext";
 
 interface LedDisplay {
   _id: string;
@@ -68,6 +69,7 @@ interface LedDisplay {
 export default function LedDisplaysAdmin() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { showToast } = useToast();
   const [displays, setDisplays] = useState<LedDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -145,6 +147,7 @@ export default function LedDisplaysAdmin() {
         throw new Error(errorData.details || "Failed to save display");
       }
 
+      showToast(editingDisplay ? "Display updated successfully" : "Display created successfully", "success");
       await fetchDisplays();
       setShowModal(false);
       setEditingDisplay(null);

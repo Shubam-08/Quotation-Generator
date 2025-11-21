@@ -5,10 +5,12 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, ArrowLeft } from "lucide-react";
+import { useToast } from '@/context/ToastContext';
 
 export default function ChangePasswordPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -67,7 +69,7 @@ export default function ChangePasswordPage() {
         
         // Show success message and redirect to login after 2 seconds
         setTimeout(() => {
-          alert("Password changed successfully! Please login again with your new password.");
+          showToast("Password changed successfully! Please login again with your new password.", "success");
           window.location.href = "/api/auth/signout?callbackUrl=/login";
         }, 2000);
       }

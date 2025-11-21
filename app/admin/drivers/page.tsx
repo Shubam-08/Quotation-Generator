@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Plus, X, Zap, Search, Upload, Download } from "lucide-react";
+import { useToast } from "@/context/ToastContext";
 import * as XLSX from 'xlsx';
 
 interface Driver {
@@ -31,6 +32,7 @@ interface Driver {
 export default function DriversManagement() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { showToast } = useToast();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -129,6 +131,7 @@ export default function DriversManagement() {
         throw new Error(errorData.error || "Failed to save driver");
       }
 
+      showToast(editingDriver ? "Driver updated successfully" : "Driver created successfully", "success");
       await fetchDrivers();
       closeModal();
     } catch (err: any) {

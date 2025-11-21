@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Plus, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { useToast } from "@/context/ToastContext";
 
 interface LightingControl {
   _id: string;
@@ -30,6 +31,7 @@ interface LightingControl {
 export default function LightingControlsAdmin() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { showToast } = useToast();
   const [controls, setControls] = useState<LightingControl[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -80,6 +82,7 @@ export default function LightingControlsAdmin() {
 
       if (!res.ok) throw new Error("Failed to save control");
 
+      showToast(editingControl ? "Control updated successfully" : "Control created successfully", "success");
       await fetchControls();
       setShowModal(false);
       setEditingControl(null);

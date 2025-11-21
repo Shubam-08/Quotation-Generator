@@ -184,6 +184,21 @@ export default function ProductsPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Initialize theme from localStorage so cart page can share the same theme
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const storedTheme = window.localStorage.getItem('qlite-theme');
+      if (storedTheme === 'light') {
+        setIsDarkMode(false);
+      } else if (storedTheme === 'dark') {
+        setIsDarkMode(true);
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -489,7 +504,17 @@ export default function ProductsPage() {
             <div className="flex items-center gap-3 flex-wrap">
               {/* Theme Toggle Button */}
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
+                onClick={() => {
+                  const next = !isDarkMode;
+                  setIsDarkMode(next);
+                  if (typeof window !== 'undefined') {
+                    try {
+                      window.localStorage.setItem('qlite-theme', next ? 'dark' : 'light');
+                    } catch {
+                      // Ignore localStorage errors
+                    }
+                  }
+                }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
                   isDarkMode 
                     ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20' 
@@ -1147,8 +1172,8 @@ export default function ProductsPage() {
                                 <img
                                   src={p.productImages?.[0] || p.images?.[0]}
                                   alt={p.sku}
-                                  className={`w-28 h-28 object-cover rounded-xl border-2 mx-auto ${
-                                    isDarkMode ? 'border-white/10' : 'border-gray-200'
+                                  className={`w-40 h-32 md:w-48 md:h-36 object-contain rounded-2xl border-2 shadow-sm mx-auto ${
+                                    isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white'
                                   }`}
                                 />
                               ) : (

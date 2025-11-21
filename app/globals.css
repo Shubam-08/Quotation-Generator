@@ -173,3 +173,26 @@
 .animate-scroll2 {
   animation: scroll2 40s linear infinite;
 }
+
+/* Breathing (scale in/out) animation for floating cart button */
+@keyframes cart-breath {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.cart-breath {
+  animation: cart-breath 1.08s ease-in-out infinite;
+}
+
+.cart-breath:hover {
+  animation-play-state: paused;
+  transform: scale(1.18);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.65) !important;
+}

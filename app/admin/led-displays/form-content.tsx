@@ -46,15 +46,44 @@ export const renderFormFields = (
       <h3 className={sectionHeaderClass}>Basic Information</h3>
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className={labelClass}>Image URL</label>
+          <label className={labelClass}>Image URL 1 (Front)</label>
           <input
             type="text"
             placeholder="https://..."
             value={formData.images?.[0] || ""}
-            onChange={(e) => setFormData({
-              ...formData,
-              images: e.target.value ? [e.target.value] : [],
-            })}
+            onChange={(e) => {
+              const newImages = [...(formData.images || [])];
+              if (e.target.value) {
+                newImages[0] = e.target.value;
+              } else {
+                newImages.splice(0, 1);
+              }
+              setFormData({
+                ...formData,
+                images: newImages,
+              });
+            }}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Image URL 2 (Back)</label>
+          <input
+            type="text"
+            placeholder="https://..."
+            value={formData.images?.[1] || ""}
+            onChange={(e) => {
+              const newImages = [...(formData.images || [])];
+              if (e.target.value) {
+                newImages[1] = e.target.value;
+              } else {
+                newImages.splice(1, 1);
+              }
+              setFormData({
+                ...formData,
+                images: newImages,
+              });
+            }}
             className={inputClass}
           />
         </div>

@@ -7,8 +7,8 @@ let cachedRates: {
   nextUpdate: number;
 } | null = null;
 
-// Cache duration: 24 hours (in milliseconds)
-const CACHE_DURATION = 24 * 60 * 60 * 1000;
+// Cache duration: 1 hour (in milliseconds)
+const CACHE_DURATION = 60 * 60 * 1000;
 
 // Fallback rates (used if API fails)
 // These rates represent: 1 USD = X foreign currency

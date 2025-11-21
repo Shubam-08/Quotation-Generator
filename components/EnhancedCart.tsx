@@ -10,10 +10,12 @@ import { jsPDF } from 'jspdf';
 import autoTable, { CellHookData } from 'jspdf-autotable';
 import { 
   ShoppingCart, Trash2, Plus, Minus, FileText, FileSpreadsheet, 
-  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search, Settings, Lock, Unlock
+  Package, ArrowLeft, AlertCircle, CheckCircle2, X, Mail, Phone, Briefcase, MapPin, Zap, Search, Settings, Lock, Unlock,
+  Sun, Moon
 } from 'lucide-react';
 import Link from 'next/link';
 import { renderFormFields as renderLedDisplayFormFields } from '@/app/admin/led-displays/form-content';
+import { useToast } from '@/context/ToastContext';
 
 interface Product {
   _id: string;
@@ -116,6 +118,7 @@ export default function EnhancedCart() {
   };
   const { formatPrice, convertPrice, currencyInfo } = useCurrency();
   const { data: session } = useSession();
+  const { showToast } = useToast();
   
   // Check if user is admin
   const isAdmin = session?.user?.role === 'admin';
@@ -145,6 +148,21 @@ export default function EnhancedCart() {
   // Driver search state
   const [driverSearchTerm, setDriverSearchTerm] = useState('');
   
+  // Initialize theme from localStorage so it matches the products page selection
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const storedTheme = window.localStorage.getItem('qlite-theme');
+      if (storedTheme === 'light') {
+        setIsDarkMode(false);
+      } else if (storedTheme === 'dark') {
+        setIsDarkMode(true);
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
   // Terms and Conditions state
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsAndConditions, setTermsAndConditions] = useState({
@@ -176,11 +194,54 @@ export default function EnhancedCart() {
       '14. Unloading and storing of LED screen at site location is in client scope',
   });
 
-  // Calculate total in selected currency (not base INR price)
-  const subtotal = cart.reduce((sum, item) => {
-    const convertedPrice = convertPrice(item.price ?? 0);
-    return sum + (convertedPrice * (item.quantity ?? 1));
-  }, 0);
+  // Helper to compute the screen-only total for a single cart item (excluding controllers) in selected currency
+  const computeItemTotal = (item: CartItem): number => {
+    const asAny = item as any;
+
+    // If there's a manual override, use that (already in converted currency)
+    if (typeof asAny.customTotalConverted === 'number') {
+      return asAny.customTotalConverted;
+    }
+
+    // Otherwise, calculate based on area or standard price
+    const widM = parseFloat(asAny.requiredLength ?? '0');
+    const heiM = parseFloat(asAny.requiredWidth ?? '0');
+    let totalUSD = 0;
+    if (!isNaN(widM) && !isNaN(heiM) && widM > 0 && heiM > 0) {
+      const areaSqm = widM * heiM;
+      totalUSD = areaSqm * (item.price ?? 0) * (item.quantity ?? 1);
+    } else {
+      totalUSD = (item.price ?? 0) * (item.quantity ?? 1);
+    }
+
+    // Convert base price to selected currency (controllers NOT included here)
+    return convertPrice(totalUSD);
+  };
+
+  // Helper to compute controller totals for summary
+  const computeControllerTotal = (item: CartItem): number => {
+    const asAny = item as any;
+    let controllerTotal = 0;
+
+    // Add Controller 1 price (price * quantity) - convert to selected currency
+    if (typeof asAny.controller1Price === 'number' && asAny.controller1Price > 0 &&
+        typeof asAny.controller1Qty === 'number' && asAny.controller1Qty > 0) {
+      controllerTotal += convertPrice(asAny.controller1Price) * asAny.controller1Qty;
+    }
+
+    // Add Controller 2 price (price * quantity) - convert to selected currency
+    if (typeof asAny.controller2Price === 'number' && asAny.controller2Price > 0 &&
+        typeof asAny.controller2Qty === 'number' && asAny.controller2Qty > 0) {
+      controllerTotal += convertPrice(asAny.controller2Price) * asAny.controller2Qty;
+    }
+
+    return controllerTotal;
+  };
+
+  // Calculate subtotal: screen prices + controller prices
+  const screenSubtotal = cart.reduce((sum, item) => sum + computeItemTotal(item), 0);
+  const controllerSubtotal = cart.reduce((sum, item) => sum + computeControllerTotal(item), 0);
+  const subtotal = screenSubtotal + controllerSubtotal;
   const discountAmount = (subtotal * discount) / 100;
   const total = subtotal - discountAmount;
   const canDownload = userInfo.email && userInfo.mobile && userInfo.project;
@@ -255,6 +316,7 @@ export default function EnhancedCart() {
     };
 
     updateCartItem(editingDisplay.cartItemId, updates);
+    showToast('Display settings updated successfully', 'success');
     handleCloseDisplayEdit();
   };
 
@@ -873,7 +935,13 @@ export default function EnhancedCart() {
     
     if (!canDownload) { setShowError(true); return; }
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    // Decide PDF orientation:
+    // - If there are any LED display items, keep portrait (existing layout)
+    // - If there are only LED lights (no displays), use landscape for a wider table
+    const hasDisplayInCart = cart.some(item => !item.isDriver && isDisplayItem(item));
+    const orientation: 'portrait' | 'landscape' = hasDisplayInCart ? 'portrait' : 'landscape';
+
+    const doc = new jsPDF({ orientation, unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const marginRight = 20;
     const rightX = pageWidth - marginRight;
@@ -916,33 +984,8 @@ export default function EnhancedCart() {
       }
       return convertPrice(item.price ?? 0) * qty;
     };
-    // Calculate total including CMS and Controller prices
-    let pdfTotal = cart.reduce((sum, item) => sum + computeItemTotalConverted(item), 0);
-    
-    // Add CMS and Controller prices for LED Display items
-    cart.forEach(item => {
-      if (isDisplayItem(item)) {
-        const asAny = item as any;
-        
-        // Add CMS price
-        if (asAny.cmsInclude && String(asAny.cmsInclude).toLowerCase() === 'yes') {
-          const years = asAny.cmsLicenseYears || 3;
-          const priceMap: { [key: number]: number } = { 1: 125, 3: 375, 5: 625, 7: 875 };
-          const cmsPrice = priceMap[years] || 375;
-          pdfTotal += convertPrice(cmsPrice);
-        }
-        
-        // Add Controller 1 price
-        if (asAny.controller1Price && asAny.controller1Qty && asAny.controller1Qty > 0) {
-          pdfTotal += convertPrice(asAny.controller1Price) * asAny.controller1Qty;
-        }
-        
-        // Add Controller 2 price
-        if (asAny.controller2Price && asAny.controller2Qty && asAny.controller2Qty > 0) {
-          pdfTotal += convertPrice(asAny.controller2Price) * asAny.controller2Qty;
-        }
-      }
-    });
+    // Use the same total as shown in the summary (includes screens, controllers, CMS, and discount)
+    const pdfTotal = total;
 
     // Add two boxes side by side (appearing as one)
     const boxX = 14;
@@ -1041,6 +1084,11 @@ export default function EnhancedCart() {
       return url || null;
     };
 
+    const getSecondaryImageUrl = (item: CartItem): string | null => {
+      const url = item.productImages?.[1] || item.images?.[1] || null;
+      return url || null;
+    };
+
     const resolveImageUrl = async (url: string): Promise<string> => {
       try {
         if (url.includes('drive.google.com')) {
@@ -1113,6 +1161,14 @@ export default function EnhancedCart() {
       })
     );
 
+    const secondaryImageDataUrls = await Promise.all(
+      organizedCart.map(async (item) => {
+        const url = getSecondaryImageUrl(item);
+        if (!url) return null;
+        try { return await toDataUrl(url); } catch { return null; }
+      })
+    );
+
     const getScaledImgHeight = (dataUrl: string, targetWidth: number): Promise<number> => {
       return new Promise((resolve) => {
         const img = new Image();
@@ -1126,6 +1182,17 @@ export default function EnhancedCart() {
     };
 
     const targetImgWidth = 46;
+
+    // Helper to normalize special symbols for jsPDF's built-in fonts,
+    // so values like ">=1000cd" or "-30℃~+60℃" render correctly instead of corrupting.
+    const sanitizePdfText = (value: string): string => {
+      return value
+        .replace(/≥/g, '>=')
+        .replace(/≤/g, '<=')
+        .replace(/±/g, '+/-')
+        .replace(/℃/g, 'degC')
+        .replace(/°/g, 'deg');
+    };
     const rowHeights = await Promise.all(
       imageDataUrls.map(async (du) => {
         if (!du) return 0;
@@ -1150,8 +1217,8 @@ export default function EnhancedCart() {
 
         const boxX = 14;
         const boxWidth = pageWidth - 28;
-        const leftColWidth = boxWidth * 0.75; // 75% for specs
-        const rightColWidth = boxWidth * 0.25; // 25% for image
+        const leftColWidth = boxWidth * 0.68; // ~68% for specs (slightly narrower)
+        const rightColWidth = boxWidth * 0.32; // ~32% for image (wider for larger photos)
 
         const asAny = item as any;
 
@@ -1337,74 +1404,135 @@ export default function EnhancedCart() {
             } else {
               // Left Label
               doc.setFont('helvetica', 'bold');
-              doc.text(field.label + ':', leftLabelX, fieldY);
+              doc.text(sanitizePdfText(field.label + ':'), leftLabelX, fieldY);
 
               // Left Value
               doc.setFont('helvetica', 'normal');
-              const wrappedLeft = doc.splitTextToSize(field.value, leftMaxWidth);
-              doc.text(wrappedLeft[0] || field.value, leftValueX, fieldY);
+              const leftRaw = field.value;
+              const leftText = sanitizePdfText(leftRaw);
+              const wrappedLeft = doc.splitTextToSize(leftText, leftMaxWidth);
+              doc.text(wrappedLeft[0] || leftText, leftValueX, fieldY);
 
               // Right side (for paired rows)
               if (field.rightLabel) {
                 // Right label
                 doc.setFont('helvetica', 'bold');
-                doc.text(field.rightLabel + ':', rightLabelX, fieldY);
+                doc.text(sanitizePdfText(field.rightLabel + ':'), rightLabelX, fieldY);
 
                 // Right value
                 doc.setFont('helvetica', 'normal');
-                const wrappedRight = doc.splitTextToSize(field.rightValue || 'N/A', rightMaxWidth);
-                doc.text(wrappedRight[0] || field.rightValue || 'N/A', rightValueX, fieldY);
+                const rightRaw = field.rightValue || 'N/A';
+                const rightText = sanitizePdfText(rightRaw);
+                const wrappedRight = doc.splitTextToSize(rightText, rightMaxWidth);
+                doc.text(wrappedRight[0] || rightText, rightValueX, fieldY);
               }
             }
           }
 
-          // Add image only on the first slice for this item
+          // Add image(s) only on the first slice for this item
           if (isFirstSlice) {
-            const imageUrl = getPrimaryImageUrl(item);
+            const primaryImageUrl = getPrimaryImageUrl(item);
+            const secondaryImageUrl = getSecondaryImageUrl(item);
             const imgX = boxX + leftColWidth + 10;
             const imgY = currentY + 10;
             const imgMaxWidth = rightColWidth - 20;
             const imgMaxHeight = sliceHeight - 20;
 
-            if (imageUrl) {
-              const dataUrl = imageDataUrls[i];
-              if (dataUrl) {
-                try {
-                  const img = new Image();
-                  await new Promise((resolve) => {
-                    img.onload = resolve;
-                    img.src = dataUrl;
-                  });
+            const primaryDataUrl = imageDataUrls[i];
+            const secondaryDataUrl = secondaryImageDataUrls[i];
 
-                  const aspectRatio = img.width / img.height;
-                  let imgWidth = imgMaxWidth;
-                  let imgHeight = imgWidth / aspectRatio;
+            // If we have both images, display them stacked vertically (top & bottom)
+            if (primaryDataUrl && secondaryDataUrl) {
+              const singleImgHeight = (imgMaxHeight - 2) / 2; // Split height with very small gap
+              const availableWidth = imgMaxWidth;
 
-                  if (imgHeight > imgMaxHeight) {
-                    imgHeight = imgMaxHeight;
-                    imgWidth = imgHeight * aspectRatio;
-                  }
+              try {
+                // Add first image (top)
+                const img1 = new Image();
+                await new Promise((resolve) => {
+                  img1.onload = resolve;
+                  img1.src = primaryDataUrl;
+                });
 
-                  const imgCenterX = imgX + (imgMaxWidth - imgWidth) / 2;
-                  const imgCenterY = imgY + (imgMaxHeight - imgHeight) / 2;
+                const aspectRatio1 = img1.width / img1.height;
+                let imgWidth1 = availableWidth;
+                let imgHeight1 = imgWidth1 / aspectRatio1;
 
-                  doc.addImage(dataUrl, 'JPEG', imgCenterX, imgCenterY, imgWidth, imgHeight);
-                } catch (error) {
-                  console.error('Error adding image:', error);
-                  doc.setFontSize(10);
-                  doc.setFont('helvetica', 'normal');
-                  doc.setTextColor(150);
-                  doc.text('No Image', imgX + imgMaxWidth / 2, imgY + imgMaxHeight / 2, { align: 'center' });
-                  doc.setTextColor(0);
+                if (imgHeight1 > singleImgHeight) {
+                  imgHeight1 = singleImgHeight;
+                  imgWidth1 = imgHeight1 * aspectRatio1;
                 }
-              } else {
+
+                const imgCenterX1 = imgX + (availableWidth - imgWidth1) / 2;
+                const imgCenterY1 = imgY + (singleImgHeight - imgHeight1) / 2;
+
+                doc.addImage(primaryDataUrl, 'JPEG', imgCenterX1, imgCenterY1, imgWidth1, imgHeight1);
+
+                // Add second image (bottom)
+                const img2 = new Image();
+                await new Promise((resolve) => {
+                  img2.onload = resolve;
+                  img2.src = secondaryDataUrl;
+                });
+
+                const aspectRatio2 = img2.width / img2.height;
+                let imgWidth2 = availableWidth;
+                let imgHeight2 = imgWidth2 / aspectRatio2;
+
+                if (imgHeight2 > singleImgHeight) {
+                  imgHeight2 = singleImgHeight;
+                  imgWidth2 = imgHeight2 * aspectRatio2;
+                }
+
+                const imgCenterX2 = imgX + (availableWidth - imgWidth2) / 2;
+                const imageGap = 4; // minimal clean gap between images
+                const firstBottomY = imgCenterY1 + imgHeight1 / 2;
+                const imgCenterY2 = firstBottomY + imageGap + imgHeight2 / 2;
+
+                doc.addImage(secondaryDataUrl, 'JPEG', imgCenterX2, imgCenterY2, imgWidth2, imgHeight2);
+              } catch (error) {
+                console.error('Error adding images:', error);
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(150);
+                doc.text('Images Error', imgX + imgMaxWidth / 2, imgY + imgMaxHeight / 2, { align: 'center' });
+                doc.setTextColor(0);
+              }
+            }
+            // If we have only one image, display it centered
+            else if (primaryDataUrl || secondaryDataUrl) {
+              const dataUrl = primaryDataUrl || secondaryDataUrl;
+              try {
+                const img = new Image();
+                await new Promise((resolve) => {
+                  img.onload = resolve;
+                  img.src = dataUrl!;
+                });
+
+                const aspectRatio = img.width / img.height;
+                let imgWidth = imgMaxWidth;
+                let imgHeight = imgWidth / aspectRatio;
+
+                if (imgHeight > imgMaxHeight) {
+                  imgHeight = imgMaxHeight;
+                  imgWidth = imgHeight * aspectRatio;
+                }
+
+                const imgCenterX = imgX + (imgMaxWidth - imgWidth) / 2;
+                const imgCenterY = imgY + (imgMaxHeight - imgHeight) / 2;
+
+                doc.addImage(dataUrl!, 'JPEG', imgCenterX, imgCenterY, imgWidth, imgHeight);
+              } catch (error) {
+                console.error('Error adding image:', error);
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(150);
                 doc.text('No Image', imgX + imgMaxWidth / 2, imgY + imgMaxHeight / 2, { align: 'center' });
                 doc.setTextColor(0);
               }
-            } else {
+            }
+            // No images available
+            else {
               doc.setFontSize(10);
               doc.setFont('helvetica', 'normal');
               doc.setTextColor(150);
@@ -1752,7 +1880,7 @@ export default function EnhancedCart() {
             // Columns 1-3 merged logically: Equipment Name + Type + Screen Info
             const mergedWidth = colWidths[1] + colWidths[2] + colWidths[3];
             const mergedTextX = colX + 2; // minimal left padding inside merged box
-            doc.text(spare.label, mergedTextX, rowCenterY, { align: 'left' });
+            doc.text(sanitizePdfText(spare.label), mergedTextX, rowCenterY, { align: 'left' });
             colX += mergedWidth;
 
             // Column 4: Quantity
@@ -1763,10 +1891,15 @@ export default function EnhancedCart() {
             // Column 5: Area - leave blank
             colX += colWidths[5];
 
-            // Column 6: Price - show if spare has price
+            // Column 6: Price - show if spare has price.
+            // If quantity is numeric, display total = unit price * quantity.
             if (spare.price !== undefined) {
               const priceCenterX = colX + colWidths[6] / 2;
-              const priceText = spare.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const rawQty = spare.qty != null ? String(spare.qty) : '';
+              const qtyNumber = parseFloat(rawQty.split(' ')[0]);
+              const unitPrice = spare.price;
+              const totalPrice = !isNaN(qtyNumber) ? unitPrice * qtyNumber : unitPrice;
+              const priceText = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               doc.text(priceText, priceCenterX, rowCenterY, { align: 'center' });
             }
           }
@@ -1879,19 +2012,24 @@ export default function EnhancedCart() {
               // Merged description across columns 1-3
               const mergedWidth = extraColWidths[1] + extraColWidths[2] + extraColWidths[3];
               const mergedTextX = colX + 2;
-              doc.text(spare.label, mergedTextX, rowCenterY, { align: 'left' });
+              doc.text(sanitizePdfText(spare.label), mergedTextX, rowCenterY, { align: 'left' });
               colX += mergedWidth;
 
               // Quantity + Area merged visually: center text across both columns
               const mergedQtyWidth = extraColWidths[4] + extraColWidths[5];
               const qtyCenterX = colX + mergedQtyWidth / 2;
-              doc.text(spare.qty, qtyCenterX, rowCenterY, { align: 'center' });
+              doc.text(sanitizePdfText(spare.qty), qtyCenterX, rowCenterY, { align: 'center' });
               colX += mergedQtyWidth;
               
-              // Total Price column - show if spare has price
+              // Total Price column - show if spare has price.
+              // If quantity is numeric, display total = unit price * quantity.
               if (spare.price !== undefined) {
                 const priceCenterX = colX + extraColWidths[6] / 2;
-                const priceText = spare.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const rawQty = spare.qty != null ? String(spare.qty) : '';
+                const qtyNumber = parseFloat(rawQty.split(' ')[0]);
+                const unitPrice = spare.price;
+                const totalPrice = !isNaN(qtyNumber) ? unitPrice * qtyNumber : unitPrice;
+                const priceText = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 doc.text(priceText, priceCenterX, rowCenterY, { align: 'center' });
               }
             }
@@ -2184,7 +2322,7 @@ export default function EnhancedCart() {
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-[#001f3f]'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-white'}`}>
       {/* Login Prompt Modal */}
       {showLoginPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -2341,7 +2479,7 @@ export default function EnhancedCart() {
               </div>
 
               {/* Products Grid */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {cart.map((item) => {
                 const isDisplay = isDisplayItem(item);
                 return (
@@ -2350,82 +2488,125 @@ export default function EnhancedCart() {
                     className={`${isDisplay ? 'col-span-2' : ''}`}
                   >
                     <div
-                      className={`rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 bg-white border-2 border-gray-200 hover:border-blue-400 shadow-lg hover:shadow-2xl ${
+                      className={`rounded-xl p-3 transition-all duration-200 bg-white border border-gray-200 hover:border-blue-300 shadow-md hover:shadow-lg ${
                         isDarkMode ? '' : ''
                       }`}
                     >
                       {isDisplay ? (
-                        <div className="flex gap-5">
+                        <div className="flex flex-col md:flex-row gap-4">
                           {/* Left: Image */}
-                          <div className="flex-shrink-0">
-                            <div className="w-44 h-44 rounded-xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-slate-300 shadow-md">
-                              {(item.productImages?.length || item.images?.length) ? (
-                                <img 
-                                  src={item.productImages?.[0] || item.images?.[0]} 
-                                  alt={item.sku} 
-                                  className="w-full h-full object-contain p-2"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <Package className="w-10 h-10 text-slate-400" />
-                                </div>
-                              )}
+                          <div className="flex-shrink-0 md:self-stretch">
+                            <div className="w-full max-w-sm md:max-w-md min-h-[12rem] md:min-h-[14rem] h-full rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex flex-col overflow-hidden mx-auto md:mx-0">
+                              {(() => {
+                                const image1 = item.productImages?.[0] || item.images?.[0];
+                                const image2 = item.productImages?.[1] || item.images?.[1];
+
+                                if (!image1 && !image2) {
+                                  return (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <Package className="w-10 h-10 text-slate-400" />
+                                    </div>
+                                  );
+                                }
+
+                                // Both images: stack with subtle divider, each taking half height
+                                if (image1 && image2) {
+                                  return (
+                                    <>
+                                      <div className="h-1/2 border-b border-slate-200 bg-white/60">
+                                        <img
+                                          src={image1}
+                                          alt={item.sku}
+                                          className="w-full h-full object-contain p-3"
+                                        />
+                                      </div>
+                                      <div className="h-1/2 bg-white/60">
+                                        <img
+                                          src={image2}
+                                          alt={item.sku}
+                                          className="w-full h-full object-contain p-3"
+                                        />
+                                      </div>
+                                    </>
+                                  );
+                                }
+
+                                // Single image only
+                                const single = image1 || image2;
+                                return (
+                                  <div className="w-full h-full relative bg-white/60">
+                                    <img
+                                      src={single}
+                                      alt={item.sku}
+                                      className="w-full h-full object-contain p-3"
+                                    />
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
-                          
+
                           {/* Center: Product Info & Specs */}
-                          <div className="flex-1 flex flex-col gap-3">
+                          <div className="flex-1 flex flex-col gap-3 mt-3 md:mt-0">
                             {/* Header Section */}
-                            <div className="border-b border-gray-200 pb-2">
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <h3 className="font-bold text-lg text-gray-900 tracking-tight">{item.sku}</h3>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-700 text-white shadow-sm">
+                            <div className="flex items-start justify-between gap-3 border-b border-gray-200 pb-2">
+                              <div>
+                                <h3 className="font-semibold text-base text-gray-900 tracking-tight">
+                                  {item.sku}
+                                </h3>
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  {item.category && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-white">
                                       {item.category}
                                     </span>
-                                    {item.pixelPitch && (
-                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white shadow-sm">
-                                        {item.pixelPitch}
-                                      </span>
-                                    )}
-                                  </div>
+                                  )}
+                                  {item.pixelPitch && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-600 text-white">
+                                      {item.pixelPitch}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                            
-                            {/* Specifications Grid with Icons */}
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+
+                            {/* Specifications Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
                               {item.application && (
-                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                                   <div className="flex-1">
-                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Application</span>
-                                    <p className="text-xs text-gray-900 font-semibold">{item.application}</p>
+                                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                      Application
+                                    </p>
+                                    <p className="text-xs font-semibold text-gray-900">{item.application}</p>
                                   </div>
                                 </div>
                               )}
                               {item.ipRating && item.ipRating !== 'N/A' && (
-                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
                                   <div className="flex-1">
-                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">IP Rating</span>
-                                    <p className="text-xs text-gray-900 font-semibold">{
-                                      typeof item.ipRating === 'string' 
-                                        ? item.ipRating 
-                                        : Array.isArray(item.ipRating) 
+                                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                      IP Rating
+                                    </p>
+                                    <p className="text-xs font-semibold text-gray-900">
+                                      {typeof item.ipRating === 'string'
+                                        ? item.ipRating
+                                        : Array.isArray(item.ipRating)
                                           ? (item.ipRating as string[]).join(', ')
-                                          : String(item.ipRating)
-                                    }</p>
+                                          : String(item.ipRating)}
+                                    </p>
                                   </div>
                                 </div>
                               )}
                               {(item.suggestedSize || item.requiredLength || item.requiredWidth) && (
-                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
                                   <div className="flex-1">
-                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Suggested Size</span>
-                                    <p className="text-xs text-gray-900 font-semibold">
+                                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                      Suggested Size
+                                    </p>
+                                    <p className="text-xs font-semibold text-gray-900">
                                       {item.suggestedSize && item.suggestedSize.trim() !== ''
                                         ? item.suggestedSize
                                         : (item.requiredLength || item.requiredWidth)
@@ -2441,20 +2622,24 @@ export default function EnhancedCart() {
                                   </div>
                                 </div>
                               )}
-                              {(item.totalResolution && item.totalResolution.trim() !== '') && (
-                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                              {item.totalResolution && item.totalResolution.trim() !== '' && (
+                                <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
                                   <div className="flex-1">
-                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Screen Resolution</span>
-                                    <p className="text-xs text-gray-900 font-semibold">{item.totalResolution}</p>
+                                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                      Screen Resolution
+                                    </p>
+                                    <p className="text-xs font-semibold text-gray-900">{item.totalResolution}</p>
                                   </div>
                                 </div>
                               )}
-                              {(typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0) && (
-                                <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-lg border border-gray-200">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                              {typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0 && (
+                                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 col-span-2">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
                                   <div className="flex-1">
-                                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Cabinet Arrangement</span>
+                                    <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                      Cabinet Arrangement
+                                    </p>
                                     {(() => {
                                       const w = (item as any).cabinetArrangementWidth as number | undefined;
                                       const h = (item as any).cabinetArrangementHeight as number | undefined;
@@ -2468,138 +2653,139 @@ export default function EnhancedCart() {
                                         );
                                       }
                                       return (
-                                        <p className="text-xs text-gray-900 font-semibold">{total} cabinets</p>
+                                        <p className="text-xs font-semibold text-gray-900">{total} cabinets</p>
                                       );
                                     })()}
                                   </div>
                                 </div>
                               )}
-                              {/* Controllers (inline in cart, next to Screen Resolution area) */}
-                              <div className="mt-3 grid grid-cols-2 gap-3">
-                                {/* Controller 1 */}
-                                <div className="bg-white/70 px-3 py-3 rounded-lg border border-gray-200">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Controller 1</span>
+                            </div>
+
+                            {/* Controllers Row */}
+                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Controller 1 */}
+                              <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                  Controller 1
+                                </p>
+                                <div className="space-y-1.5">
+                                  <div>
+                                    <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Name</span>
+                                    <input
+                                      type="text"
+                                      value={item.controller1Name ?? ''}
+                                      onChange={(e) =>
+                                        updateCartItem(item.cartItemId, { controller1Name: e.target.value })
+                                      }
+                                      className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      placeholder="Enter controller name"
+                                    />
                                   </div>
-                                  <div className="space-y-1.5">
+                                  <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                      <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Name</span>
+                                      <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Price (USD)</span>
                                       <input
-                                        type="text"
-                                        value={item.controller1Name ?? ''}
-                                        onChange={(e) =>
-                                          updateCartItem(item.cartItemId, { controller1Name: e.target.value })
-                                        }
-                                        className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Enter controller name"
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={item.controller1Price ?? ''}
+                                        onChange={(e) => {
+                                          const val = parseFloat(e.target.value);
+                                          updateCartItem(item.cartItemId, {
+                                            controller1Price: isNaN(val) || val < 0 ? undefined : val,
+                                          });
+                                        }}
+                                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="0.00"
                                       />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Price (USD)</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step="0.01"
-                                          value={item.controller1Price ?? ''}
-                                          onChange={(e) => {
-                                            const val = parseFloat(e.target.value);
-                                            updateCartItem(item.cartItemId, {
-                                              controller1Price: isNaN(val) || val < 0 ? undefined : val,
-                                            });
-                                          }}
-                                          className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                          placeholder="0.00"
-                                        />
-                                      </div>
-                                      <div>
-                                        <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Quantity</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          value={item.controller1Qty ?? ''}
-                                          onChange={(e) => {
-                                            const val = parseInt(e.target.value, 10);
-                                            updateCartItem(item.cartItemId, {
-                                              controller1Qty: isNaN(val) || val < 0 ? undefined : val,
-                                            });
-                                          }}
-                                          className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                          placeholder="0"
-                                        />
-                                      </div>
+                                    <div>
+                                      <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Quantity</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={item.controller1Qty ?? ''}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value, 10);
+                                          updateCartItem(item.cartItemId, {
+                                            controller1Qty: isNaN(val) || val < 0 ? undefined : val,
+                                          });
+                                        }}
+                                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="0"
+                                      />
                                     </div>
                                   </div>
                                 </div>
+                              </div>
 
-                                {/* Controller 2 */}
-                                <div className="bg-white/70 px-3 py-3 rounded-lg border border-gray-200">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Controller 2</span>
+                              {/* Controller 2 */}
+                              <div className="rounded-xl border border-gray-200 bg-white/80 px-3 py-3">
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                  Controller 2
+                                </p>
+                                <div className="space-y-1.5">
+                                  <div>
+                                    <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Name</span>
+                                    <input
+                                      type="text"
+                                      value={item.controller2Name ?? ''}
+                                      onChange={(e) =>
+                                        updateCartItem(item.cartItemId, { controller2Name: e.target.value })
+                                      }
+                                      className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      placeholder="Enter controller name"
+                                    />
                                   </div>
-                                  <div className="space-y-1.5">
+                                  <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                      <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Name</span>
+                                      <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Price (USD)</span>
                                       <input
-                                        type="text"
-                                        value={item.controller2Name ?? ''}
-                                        onChange={(e) =>
-                                          updateCartItem(item.cartItemId, { controller2Name: e.target.value })
-                                        }
-                                        className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Enter controller name"
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={item.controller2Price ?? ''}
+                                        onChange={(e) => {
+                                          const val = parseFloat(e.target.value);
+                                          updateCartItem(item.cartItemId, {
+                                            controller2Price: isNaN(val) || val < 0 ? undefined : val,
+                                          });
+                                        }}
+                                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="0.00"
                                       />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Price (USD)</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step="0.01"
-                                          value={item.controller2Price ?? ''}
-                                          onChange={(e) => {
-                                            const val = parseFloat(e.target.value);
-                                            updateCartItem(item.cartItemId, {
-                                              controller2Price: isNaN(val) || val < 0 ? undefined : val,
-                                            });
-                                          }}
-                                          className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                          placeholder="0.00"
-                                        />
-                                      </div>
-                                      <div>
-                                        <span className="block text-[10px] text-gray-500 font-medium mb-0.5">Quantity</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          value={item.controller2Qty ?? ''}
-                                          onChange={(e) => {
-                                            const val = parseInt(e.target.value, 10);
-                                            updateCartItem(item.cartItemId, {
-                                              controller2Qty: isNaN(val) || val < 0 ? undefined : val,
-                                            });
-                                          }}
-                                          className="w-full px-2 py-1.5 rounded border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                          placeholder="0"
-                                        />
-                                      </div>
+                                    <div>
+                                      <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Quantity</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={item.controller2Qty ?? ''}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value, 10);
+                                          updateCartItem(item.cartItemId, {
+                                            controller2Qty: isNaN(val) || val < 0 ? undefined : val,
+                                          });
+                                        }}
+                                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="0"
+                                      />
                                     </div>
                                   </div>
                                 </div>
                               </div>
                             </div>
-                            
-                            {/* Quantity & Price Row */}
-                            <div className="flex items-center justify-between gap-4 mt-auto pt-3 border-t border-gray-200">
+
+                            {/* Quantity & Total Row */}
+                            <div className="mt-3 flex items-center justify-between gap-4 border-t border-gray-200 pt-3">
                               <div className="flex items-center gap-3">
                                 <span className="text-xs font-semibold text-gray-600">Quantity:</span>
-                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-slate-100 to-slate-200 border-2 border-slate-300 shadow-sm">
+                                <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 px-3 py-2 shadow-sm">
                                   <button
                                     onClick={() => decreaseQuantity(item.cartItemId)}
-                                    className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow-md text-gray-700 hover:text-blue-600"
+                                    className="flex h-6 w-6 items-center justify-center rounded-md text-gray-700 transition-all hover:bg-white hover:text-blue-600 hover:shadow-md"
                                   >
-                                    <Minus className="w-3.5 h-3.5" />
+                                    <Minus className="h-3.5 w-3.5" />
                                   </button>
                                   <input
                                     type="number"
@@ -2611,54 +2797,40 @@ export default function EnhancedCart() {
                                     }}
                                     onFocus={() => setEditingQuantity(item.cartItemId)}
                                     onBlur={() => setEditingQuantity(null)}
-                                    className="w-12 text-center font-bold text-sm outline-none bg-transparent text-gray-900"
+                                    className="w-12 bg-transparent text-center text-sm font-bold text-gray-900 outline-none"
                                   />
                                   <button
                                     onClick={() => increaseQuantity(item.cartItemId)}
-                                    className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow-md text-gray-700 hover:text-blue-600"
+                                    className="flex h-6 w-6 items-center justify-center rounded-md text-gray-700 transition-all hover:bg-white hover:text-blue-600 hover:shadow-md"
                                   >
-                                    <Plus className="w-3.5 h-3.5" />
+                                    <Plus className="h-3.5 w-3.5" />
                                   </button>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] text-gray-500 font-medium mb-0.5">Total (USD)</p>
-                                <p className="text-base font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
+                                <p className="mb-0.5 text-[10px] font-medium text-gray-500">Total Display Price ({currencyInfo.code})</p>
+                                <p className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-base font-bold text-transparent">
                                   {(() => {
-                                    const asAny = item as any;
-                                    
-                                    // Use customTotalConverted if available (from Price Calculation Preview)
-                                    if (typeof asAny.customTotalConverted === 'number') {
-                                      const formatted = asAny.customTotalConverted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                      return `$ ${formatted}`;
-                                    }
-                                    
-                                    // Fallback: calculate from area if dimensions exist
-                                    const widM = parseFloat(asAny.requiredLength ?? '0');
-                                    const heiM = parseFloat(asAny.requiredWidth ?? '0');
-                                    let totalUSD = 0;
-                                    if (!isNaN(widM) && !isNaN(heiM) && widM > 0 && heiM > 0) {
-                                      const areaSqm = widM * heiM;
-                                      totalUSD = areaSqm * (item.price ?? 0) * (item.quantity ?? 1);
-                                    } else {
-                                      totalUSD = (item.price ?? 0) * (item.quantity ?? 1);
-                                    }
-                                    const formatted = totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                    return `$ ${formatted}`;
+                                    const totalConverted = computeItemTotal(item);
+                                    const formatted = totalConverted.toLocaleString('en-US', {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    });
+                                    return `${currencyInfo.symbol} ${formatted}`;
                                   })()}
                                 </p>
                               </div>
                             </div>
                           </div>
-                          
+
                           {/* Right: Actions */}
-                          <div className="flex flex-col gap-3 items-end justify-between">
+                          <div className="flex flex-col items-end justify-between gap-3">
                             <button
                               onClick={() => removeFromCart(item.cartItemId)}
-                              className="p-2.5 rounded-lg transition-all bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 shadow-sm hover:shadow-md"
+                              className="rounded-full border border-red-200 bg-red-50 p-2.5 text-red-600 shadow-sm transition-all hover:border-red-300 hover:bg-red-100 hover:text-red-700 hover:shadow-md"
                               title="Remove from cart"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                             <button
                               onClick={async () => {
@@ -2881,9 +3053,42 @@ export default function EnhancedCart() {
               <div className={`rounded-lg p-4 sticky top-6 ${
                 isDarkMode ? 'bg-gray-900/50 border border-white/10' : 'bg-white border border-gray-200 shadow-sm'
               }`}>
-                <h2 className={`text-lg font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Summary
-                </h2>
+                <div className="flex items-center justify-between mb-4 gap-3">
+                  <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Summary
+                  </h2>
+                  <button
+                    onClick={() => {
+                      const next = !isDarkMode;
+                      setIsDarkMode(next);
+                      if (typeof window !== 'undefined') {
+                        try {
+                          window.localStorage.setItem('qlite-theme', next ? 'dark' : 'light');
+                        } catch {
+                          // Ignore localStorage errors
+                        }
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all ${
+                      isDarkMode
+                        ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                        : 'bg-gray-800 hover:bg-gray-900 text-white border border-gray-700'
+                    }`}
+                    title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                  >
+                    {isDarkMode ? (
+                      <>
+                        <Sun className="w-3.5 h-3.5" />
+                        <span>Light</span>
+                      </>
+                    ) : (
+                      <>
+                        <Moon className="w-3.5 h-3.5" />
+                        <span>Dark</span>
+                      </>
+                    )}
+                  </button>
+                </div>
 
                 {/* Contact Details */}
                 <div className="mb-4">
@@ -3359,17 +3564,17 @@ export default function EnhancedCart() {
       {editingDisplay && displayFormData && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className={`w-full max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl ${
-            isDarkMode ? 'bg-gray-900 border-2 border-white/10' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600'
+            isDarkMode ? 'bg-gray-900 border-2 border-white/10' : 'bg-white border-2 border-gray-200'
           }`}>
             {/* Header */}
             <div className={`flex items-center justify-between px-6 py-5 border-b-2 flex-shrink-0 ${
-              isDarkMode ? 'border-white/10 bg-gray-900' : 'border-slate-600 bg-gradient-to-r from-slate-700 to-slate-800'
+              isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-gray-100'
             }`}>
               <div>
-                <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-white'}`}>
+                <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   Edit LED Display Specifications
                 </h3>
-                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-slate-300'}`}>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-black'}`}>
                   SKU: {editingDisplay.sku}
                 </p>
               </div>
@@ -3384,23 +3589,27 @@ export default function EnhancedCart() {
             </div>
 
             {/* Form Content */}
-            <div className="px-6 py-5 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-800 via-slate-850 to-slate-900">
+            <div className={`px-6 py-5 overflow-y-auto flex-1 min-h-0 ${
+              isDarkMode ? 'bg-gradient-to-b from-slate-800 via-slate-850 to-slate-900' : 'bg-white'
+            }`}>
               {renderLedDisplayFormFields(displayFormData, setDisplayFormData, isDarkMode)}
 
               {/* Spare and Accessories */}
-              <div className={`mt-6 p-5 rounded-xl border-2 shadow-lg ${isDarkMode ? 'bg-gray-900/40 border-white/10' : 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-500'}`}>
-                <h4 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-white'}`}>
+              <div className={`mt-6 p-5 rounded-xl border-2 shadow-lg ${
+                isDarkMode ? 'bg-gray-900/40 border-white/10' : 'bg-white border-gray-200'
+              }`}>
+                <h4 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   <span className="w-1.5 h-7 bg-indigo-600 rounded shadow-sm"></span>
                   Spare and Accessories
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   {/* Spare modules - Quantity only */}
-                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-gray-50'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
                     <div className="font-bold mb-4 flex justify-between items-center">
-                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Spare modules (3% of total modules)</span>
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>Spare modules (3% of total modules)</span>
                     </div>
                     <div>
-                      <label className={`block text-xs font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Quantity</label>
+                      <label className={`block text-xs font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Quantity</label>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -3409,7 +3618,7 @@ export default function EnhancedCart() {
                             const next = Math.max(0, current - 1);
                             setDisplayFormData({ ...displayFormData, spareModulesQty: next });
                           }}
-                          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                          className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}
                         >
                           -
                         </button>
@@ -3421,7 +3630,7 @@ export default function EnhancedCart() {
                             const val = parseInt(e.target.value, 10);
                             setDisplayFormData({ ...displayFormData, spareModulesQty: isNaN(val) || val < 0 ? 0 : val });
                           }}
-                          className={`flex-1 text-center py-2 rounded-lg border-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white'}`}
+                          className={`flex-1 text-center py-2 rounded-lg border-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         />
                         <button
                           type="button"
@@ -3439,23 +3648,23 @@ export default function EnhancedCart() {
                   </div>
 
                   {/* Spare PSU - With name and quantity */}
-                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-gray-50'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
                     <div className="font-bold mb-2 flex justify-between items-center">
-                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Spare PSU</span>
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>Spare PSU</span>
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Name</label>
+                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Name</label>
                         <input
                           type="text"
                           value={displayFormData?.sparePSUName ?? ''}
                           onChange={(e) => setDisplayFormData({ ...displayFormData, sparePSUName: e.target.value })}
-                          className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
+                          className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-white border-gray-300 text-gray-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30'}`}
                           placeholder="e.g., Spare PSU"
                         />
                       </div>
                       <div>
-                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-200'}`}>Quantity</label>
+                        <label className={`block text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Quantity</label>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -3464,7 +3673,7 @@ export default function EnhancedCart() {
                               const next = Math.max(0, current - 1);
                               setDisplayFormData({ ...displayFormData, sparePSUQty: next });
                             }}
-                            className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-400 text-white hover:bg-slate-700'}`}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg border text-lg font-bold ${isDarkMode ? 'border-white/20 text-white hover:bg-white/10' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}
                           >
                             -
                           </button>
@@ -3476,7 +3685,7 @@ export default function EnhancedCart() {
                               const val = parseInt(e.target.value, 10);
                               setDisplayFormData({ ...displayFormData, sparePSUQty: isNaN(val) || val < 0 ? 0 : val });
                             }}
-                            className={`flex-1 text-center py-2 rounded-lg border-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-slate-800 border-slate-400 text-white'}`}
+                            className={`flex-1 text-center py-2 rounded-lg border-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800 border-white/20 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                           />
                           <button
                             type="button"
@@ -3495,21 +3704,21 @@ export default function EnhancedCart() {
                   </div>
 
                   {/* Main Power 3-phase Cable - Info only */}
-                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-gray-50'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
                     <div className="font-bold mb-2 flex justify-between items-center">
-                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Main Power 3-phase Cable</span>
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>Main Power 3-phase Cable</span>
                     </div>
-                    <p className={isDarkMode ? 'text-xs text-gray-300' : 'text-xs text-gray-200'}>
+                    <p className={isDarkMode ? 'text-xs text-gray-300' : 'text-xs text-gray-700'}>
                       Connect to the nearby power distribution room (as per site requirement).
                     </p>
                   </div>
 
                   {/* Fibre Cable from Control Room - Info only */}
-                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-slate-900/70'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-slate-500'}`}>
+                  <div className={`${isDarkMode ? 'bg-gray-900/60' : 'bg-gray-50'} rounded-lg p-3 border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
                     <div className="font-bold mb-2 flex justify-between items-center">
-                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-100'}>Fibre Cable from Control Room</span>
+                      <span className={isDarkMode ? 'text-gray-200' : 'text-gray-900'}>Fibre Cable from Control Room</span>
                     </div>
-                    <p className={isDarkMode ? 'text-xs text-gray-300' : 'text-xs text-gray-200'}>
+                    <p className={isDarkMode ? 'text-xs text-gray-300' : 'text-xs text-gray-700'}>
                       As per site requirement.
                     </p>
                   </div>
@@ -3709,10 +3918,10 @@ export default function EnhancedCart() {
               
               {/* Price Calculation Preview - EDITABLE */}
               <div className={`mt-6 p-5 rounded-xl border-2 shadow-lg ${
-                isDarkMode ? 'bg-gray-900/30 border-white/10' : 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-500'
+                isDarkMode ? 'bg-gray-900/30 border-white/10' : 'bg-white border-gray-200'
               }`}>
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-gray-200' : 'text-white'}`}>
+                  <h4 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>
                     <span className="w-1.5 h-7 bg-emerald-600 rounded shadow-sm"></span>
                     <Settings className="w-5 h-5" />
                     Price Calculation Preview (Editable)
@@ -4225,7 +4434,7 @@ export default function EnhancedCart() {
 
             {/* Footer Actions */}
             <div className={`flex justify-end gap-3 px-6 py-5 border-t-2 flex-shrink-0 ${
-              isDarkMode ? 'border-white/10 bg-gray-900/80' : 'border-slate-600 bg-gradient-to-r from-slate-800 to-slate-900'
+              isDarkMode ? 'border-white/10 bg-gray-900/80' : 'border-slate-600 bg-white from-slate-800 to-slate-900'
             }`}>
               <button
                 type="button"
@@ -4243,7 +4452,7 @@ export default function EnhancedCart() {
                 onClick={handleSaveDisplayEdit}
                 className="px-6 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all"
               >
-                💾 Save Changes
+               Save Changes
               </button>
             </div>
           </div>

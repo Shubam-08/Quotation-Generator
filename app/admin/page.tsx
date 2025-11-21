@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Plus, X, Upload, FileText, Image as ImageIcon, Award, Zap, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { getApplicationFromIpRatings, getApplicationFromIpRating } from "@/lib/ipRatingUtils";
+import { useToast } from "@/context/ToastContext";
 
 interface IpRatingPrice {
   rating: string;
@@ -47,6 +48,7 @@ interface Product {
 export default function AdminDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { showToast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -558,6 +560,7 @@ export default function AdminDashboard() {
         setProducts(prev => [...prev, data]);
       }
 
+      showToast(editingProduct ? "Product updated successfully" : "Product created successfully", "success");
       handleCloseModal();
     } catch (err) {
       setError("An error occurred");
@@ -581,14 +584,14 @@ export default function AdminDashboard() {
         // Revert on error
         fetchProducts();
         const data = await response.json();
-        alert(data.error || "Failed to delete product");
+        showToast(data.error || "Failed to delete product", "error");
       }
     } catch (err) {
       // Revert on error
       fetchProducts();
-      alert("An error occurred while deleting");
+      showToast("An error occurred while deleting", "error");
     }
-  }, []);
+  }, [showToast]);
 
   // Inline price editing handlers
   const handleStartInlineEdit = (productId: string, ipIndex: number, currentPriceInUSD: number) => {
@@ -601,7 +604,7 @@ export default function AdminDashboard() {
     const newPriceUSD = parseFloat(editPriceValue);
     
     if (isNaN(newPriceUSD) || newPriceUSD < 0) {
-      alert("Please enter a valid price (0 or greater)");
+      showToast("Please enter a valid price (0 or greater)", "error");
       return;
     }
 
@@ -626,7 +629,7 @@ export default function AdminDashboard() {
 
       if (!updateResponse.ok) {
         const errorData = await updateResponse.json();
-        alert(errorData.error || "Failed to update price");
+        showToast(errorData.error || "Failed to update price", "error");
         setSavingPrice(false);
         return;
       }
@@ -644,7 +647,7 @@ export default function AdminDashboard() {
       setSavingPrice(false);
     } catch (err) {
       console.error('Error updating price:', err);
-      alert('An error occurred while updating the price');
+      showToast('An error occurred while updating the price', 'error');
       setSavingPrice(false);
     }
   };
