@@ -1729,7 +1729,7 @@ export default function EnhancedCart() {
 
           // Controller 2:
           // - If any of name / qty / price are present, render a row (with N/A for missing pieces)
-          // - If completely empty but Controller 1 exists, render an explicit "Controller 2: N/A" row
+          // - If completely empty, always render an explicit "Controller 2: N/A" row
           const hasController2Name = !!(asAny.controller2Name && String(asAny.controller2Name).trim() !== '');
           const hasController2Qty = typeof asAny.controller2Qty === 'number' && asAny.controller2Qty > 0;
           const hasController2Price = typeof asAny.controller2Price === 'number' && asAny.controller2Price > 0;
@@ -1742,7 +1742,7 @@ export default function EnhancedCart() {
               qty: hasController2Qty ? String(asAny.controller2Qty) : 'N/A',
               price: controller2PriceConverted,
             });
-          } else if (hasController1Any) {
+          } else {
             spareRows.push({
               label: 'Controller 2: N/A',
               qty: 'N/A',
