@@ -192,6 +192,21 @@ export const renderFormFields = (
                 className={inputClass}
               />
             </div>
+            <div className="flex-1">
+              <label className={labelSmallClass}>Cabinet Weight (kg)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="e.g., 15"
+                value={variant.cabinetWeight ?? ""}
+                onChange={(e) => {
+                  const updated = [...(formData.cabinetMaterialVariants || [])];
+                  updated[index] = { ...updated[index], cabinetWeight: e.target.value === "" ? undefined : Number(e.target.value) };
+                  setFormData({ ...formData, cabinetMaterialVariants: updated });
+                }}
+                className={inputClass}
+              />
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -208,7 +223,7 @@ export const renderFormFields = (
         <button
           type="button"
           onClick={() => {
-            const updated = [...(formData.cabinetMaterialVariants || []), { material: "", price: "" }];
+            const updated = [...(formData.cabinetMaterialVariants || []), { material: "", price: "", cabinetWeight: "" }];
             setFormData({ ...formData, cabinetMaterialVariants: updated });
           }}
           className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-semibold transition-colors"
@@ -245,14 +260,17 @@ export const renderFormFields = (
           <label className={labelClass}>2. Pixel Configuration</label>
           <input
             type="text"
-            placeholder="e.g., SMD2121"
-            value={formData.moduleSpecs?.pixelConfiguration || ""}
+            placeholder="Auto-copied from Screen Resolution"
+            value={formData.moduleSpecs?.pixelConfiguration || formData.totalResolution || ""}
             onChange={(e) => setFormData({ 
               ...formData, 
               moduleSpecs: { ...formData.moduleSpecs, pixelConfiguration: e.target.value }
             })}
             className={inputClass}
           />
+          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            💡 Auto-synced from Screen Resolution (Total Resolution)
+          </p>
         </div>
         <div>
           <label className={labelClass}>3. Module Resolution</label>
@@ -396,16 +414,19 @@ export const renderFormFields = (
         </div>
         <div>
           <label className={labelClass}>8. Maintenance</label>
-          <input
-            type="text"
-            placeholder="e.g., Front/Rear"
+          <select
             value={formData.cabinetSpecs?.maintenance || ""}
             onChange={(e) => setFormData({ 
               ...formData, 
               cabinetSpecs: { ...formData.cabinetSpecs, maintenance: e.target.value }
             })}
             className={inputClass}
-          />
+          >
+            <option value="" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Select Maintenance</option>
+            <option value="Front" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Front</option>
+            <option value="Back" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Back</option>
+            <option value="Front/Back" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Front/Back</option>
+          </select>
         </div>
       </div>
     </div>
@@ -416,24 +437,18 @@ export const renderFormFields = (
       <div className="grid grid-cols-3 gap-4">
         <div>
           <label className={labelClass}>1. Brightness Control</label>
-          <input
-            type="text"
-            placeholder="e.g., Manual/Auto"
+          <select
             value={formData.screenParams?.brightnessControl || ""}
             onChange={(e) => setFormData({ 
               ...formData, 
               screenParams: { ...formData.screenParams, brightnessControl: e.target.value }
             })}
             className={inputClass}
-          />
-          {renderSuggestionChips(
-            screenParamSuggestions?.brightnessControl,
-            (val) =>
-              setFormData({
-                ...formData,
-                screenParams: { ...formData.screenParams, brightnessControl: val },
-              })
-          )}
+          >
+            <option value="" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Select Option</option>
+            <option value="Automatic" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Automatic</option>
+            <option value="Manual" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Manual</option>
+          </select>
         </div>
         <div>
           <label className={labelClass}>2. White Balance Brightness</label>
@@ -626,24 +641,19 @@ export const renderFormFields = (
         </div>
         <div>
           <label className={labelClass}>11. Refresh Rate</label>
-          <input
-            type="text"
-            placeholder="e.g., 3840Hz"
+          <select
             value={formData.screenParams?.refreshRate || ""}
             onChange={(e) => setFormData({ 
               ...formData, 
               screenParams: { ...formData.screenParams, refreshRate: e.target.value }
             })}
             className={inputClass}
-          />
-          {renderSuggestionChips(
-            screenParamSuggestions?.refreshRate,
-            (val) =>
-              setFormData({
-                ...formData,
-                screenParams: { ...formData.screenParams, refreshRate: val },
-              })
-          )}
+          >
+            <option value="" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>Select Refresh Rate</option>
+            <option value="1920" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>1920 Hz</option>
+            <option value="3840" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>3840 Hz</option>
+            <option value="7740" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>7740 Hz</option>
+          </select>
         </div>
         <div>
           <label className={labelClass}>12. Input Voltage</label>

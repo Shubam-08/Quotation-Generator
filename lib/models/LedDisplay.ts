@@ -16,7 +16,8 @@ const LedDisplaySchema = new mongoose.Schema(
     // Cabinet Material Variants (for displays with same specs but different materials)
     cabinetMaterialVariants: [{
       material: { type: String, required: true }, // Die Cast Aluminium, Aluminium, Mild Steel
-      price: { type: Number, required: true } // Price per sqm for this material variant
+      price: { type: Number, required: true }, // Price per sqm for this material variant
+      cabinetWeight: { type: Number } // Cabinet weight in kg for this material variant
     }],
     
     // Module Specifications

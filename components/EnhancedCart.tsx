@@ -238,10 +238,27 @@ export default function EnhancedCart() {
     return controllerTotal;
   };
 
-  // Calculate subtotal: screen prices + controller prices
+  // Helper to compute CMS totals for summary (per display, in selected currency)
+  const computeCmsTotal = (item: CartItem): number => {
+    const asAny = item as any;
+
+    if (!asAny.cmsInclude || String(asAny.cmsInclude).toLowerCase() !== 'yes') {
+      return 0;
+    }
+
+    const years = asAny.cmsLicenseYears || 3;
+    const priceMap: { [key: number]: number } = { 1: 125, 3: 375, 5: 625, 7: 875 };
+    const cmsPriceUSD = priceMap[years] || 375;
+
+    // Convert CMS license price from USD to selected currency
+    return convertPrice(cmsPriceUSD);
+  };
+
+  // Calculate subtotal: screen prices + controller prices + CMS prices
   const screenSubtotal = cart.reduce((sum, item) => sum + computeItemTotal(item), 0);
   const controllerSubtotal = cart.reduce((sum, item) => sum + computeControllerTotal(item), 0);
-  const subtotal = screenSubtotal + controllerSubtotal;
+  const cmsSubtotal = cart.reduce((sum, item) => sum + computeCmsTotal(item), 0);
+  const subtotal = screenSubtotal + controllerSubtotal + cmsSubtotal;
   const discountAmount = (subtotal * discount) / 100;
   const total = subtotal - discountAmount;
   const canDownload = userInfo.email && userInfo.mobile && userInfo.project;
@@ -277,12 +294,44 @@ export default function EnhancedCart() {
       return trimmedName ? `${trimmedName} - ${qty}` : String(qty);
     };
 
-    // Auto-sync MS Structure Area from Price Calculation
+    // Auto-sync MS Structure Area from Price Calculation (use same suggested-size logic)
     const widM = parseFloat(displayFormData?.requiredLength ?? '0');
     const heiM = parseFloat(displayFormData?.requiredWidth ?? '0');
     const hasWid = !isNaN(widM) && widM > 0;
     const hasHei = !isNaN(heiM) && heiM > 0;
-    const areaSqm = hasWid && hasHei ? widM * heiM : 0;
+
+    let areaSqm = 0;
+    if (hasWid && hasHei && (displayFormData as any)?.cabinetSpecs?.cabinetSize) {
+      const sizeStr: string = String((displayFormData as any).cabinetSpecs.cabinetSize);
+      const match = sizeStr.match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+      if (match) {
+        const cabWidMm = parseFloat(match[1]);
+        const cabHeiMm = parseFloat(match[2]);
+        if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+          const cabWidM = cabWidMm / 1000;
+          const cabHeiM = cabHeiMm / 1000;
+          const cabsWid = widM / cabWidM;
+          const cabsHei = heiM / cabHeiM;
+
+          const customRound = (v: number) => {
+            const dec = v - Math.floor(v);
+            return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+          };
+
+          const roundedW = customRound(cabsWid);
+          const roundedH = customRound(cabsHei);
+
+          const sugWid = roundedW * cabWidM;
+          const sugHei = roundedH * cabHeiM;
+          areaSqm = sugWid * sugHei;
+        }
+      }
+    }
+
+    // Fallback: if we could not derive area from cabinet size, use width×height.
+    if (areaSqm <= 0 && hasWid && hasHei) {
+      areaSqm = widM * heiM;
+    }
 
     const updates: Partial<CartItem> = {
       category: displayFormData.category,
@@ -311,7 +360,7 @@ export default function EnhancedCart() {
       // CMS with license duration
       cmsInclude: (displayFormData as any).cmsInclude,
       cmsLicenseYears: (displayFormData as any).cmsLicenseYears,
-      // MS Structure - auto-synced from area
+      // MS Structure - auto-synced from suggested-size area (matches Price Calculation / PDF)
       msStructureSqm: areaSqm > 0 ? areaSqm : undefined,
     };
 
@@ -1543,7 +1592,7 @@ export default function EnhancedCart() {
 
           isFirstSlice = false;
           startIndex += rowsThisPage;
-          currentY += sliceHeight + 10; // small gap before next slice
+          currentY += sliceHeight + 5; // minimal gap before quotation table
         }
 
         // Draw new QUOTATION table with 7 columns, including spare & accessories as additional rows
@@ -1565,7 +1614,41 @@ export default function EnhancedCart() {
             ? String(asAny.suggestedSize)
             : requestSizeM;
           const cabinetCount = asAny.cabinetRequired != null ? String(asAny.cabinetRequired) : 'N/A';
-          const areaSqm = hasWid && hasHei ? (widM * heiM) : 0;
+
+          // Area (sqm) for PDF: match the Price Calculation panel logic based on suggested size / cabinet arrangement.
+          // Try to derive area from cabinet size and rounded cabinet arrangement; fallback to width×height if needed.
+          let areaSqm = 0;
+          if (hasWid && hasHei && asAny.cabinetSpecs?.cabinetSize) {
+            const sizeStr: string = String(asAny.cabinetSpecs.cabinetSize);
+            const match = sizeStr.match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+            if (match) {
+              const cabWidMm = parseFloat(match[1]);
+              const cabHeiMm = parseFloat(match[2]);
+              if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+                const cabWidM = cabWidMm / 1000;
+                const cabHeiM = cabHeiMm / 1000;
+                const cabsWid = widM / cabWidM;
+                const cabsHei = heiM / cabHeiM;
+
+                const customRound = (v: number) => {
+                  const dec = v - Math.floor(v);
+                  return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+                };
+
+                const roundedW = customRound(cabsWid);
+                const roundedH = customRound(cabsHei);
+
+                const sugWid = roundedW * cabWidM;
+                const sugHei = roundedH * cabHeiM;
+                areaSqm = sugWid * sugHei;
+              }
+            }
+          }
+
+          // Fallback: if we could not derive area from cabinet size, use width×height.
+          if (areaSqm <= 0 && hasWid && hasHei) {
+            areaSqm = widM * heiM;
+          }
           const qty = (item.quantity ?? 1);
           const totalConv = computeItemTotalConverted(item);
           const totalText = totalConv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1575,12 +1658,11 @@ export default function EnhancedCart() {
           const spareRows: SpareRow[] = [];
 
           const rawSpareModules = asAny.spareModules;
-          if (rawSpareModules) {
-            spareRows.push({
-              label: 'Spare modules (3% of total modules)',
-              qty: String(rawSpareModules),
-            });
-          }
+          // Always show Spare Modules row; default to N/A when not provided
+          spareRows.push({
+            label: 'Spare modules (3% of total modules)',
+            qty: rawSpareModules != null && rawSpareModules !== '' ? String(rawSpareModules) : 'N/A',
+          });
 
           const parseNameQty = (raw: string | undefined | null) => {
             if (!raw) return { name: '', qty: '' };
@@ -1595,50 +1677,72 @@ export default function EnhancedCart() {
           };
 
           const { name: psuName, qty: psuQty } = parseNameQty(asAny.sparePSU);
-          if (asAny.sparePSU) {
-            spareRows.push({
-              label: psuName ? `Spare PSU: ${psuName}` : 'Spare PSU',
-              qty: psuQty || String(asAny.sparePSU),
-            });
-          }
+          // Always show Spare PSU row; default to N/A when not provided
+          spareRows.push({
+            label: psuName ? `Spare PSU: ${psuName}` : 'Spare PSU',
+            qty:
+              (psuQty && psuQty.trim() !== '')
+                ? psuQty
+                : (asAny.sparePSU != null && String(asAny.sparePSU).trim() !== ''
+                    ? String(asAny.sparePSU)
+                    : 'N/A'),
+          });
 
           const rawReceiving = asAny.spareReceivingCard;
-          if (rawReceiving) {
-            spareRows.push({
-              label: 'Spare receiving card',
-              qty: String(rawReceiving),
-            });
-          }
+          // Always show Spare Receiving Card row; default to N/A when not provided
+          spareRows.push({
+            label: 'Spare receiving card',
+            qty: rawReceiving != null && rawReceiving !== '' ? String(rawReceiving) : 'N/A',
+          });
 
           const { name: pkgName, qty: pkgQty } = parseNameQty(asAny.package);
-          if (asAny.package) {
-            spareRows.push({
-              label: pkgName ? `Package: ${pkgName}` : 'Package',
-              qty: pkgQty || String(asAny.package),
-            });
-          }
+          // Always show Package row; default to N/A when not provided
+          spareRows.push({
+            label: pkgName ? `Package: ${pkgName}` : 'Package',
+            qty:
+              (pkgQty && pkgQty.trim() !== '')
+                ? pkgQty
+                : (asAny.package != null && String(asAny.package).trim() !== ''
+                    ? String(asAny.package)
+                    : 'N/A'),
+          });
 
-          // Controller 1: add row if name and quantity are provided
-          const hasController1 = !!(asAny.controller1Name || asAny.controller1Qty || asAny.controller1Price);
-          if (asAny.controller1Name && asAny.controller1Qty && asAny.controller1Qty > 0) {
+          // Controller 1: always show row; default to N/A when no value is entered
+          const hasController1Name = !!(asAny.controller1Name && String(asAny.controller1Name).trim() !== '');
+          const hasController1Qty = typeof asAny.controller1Qty === 'number' && asAny.controller1Qty > 0;
+          const hasController1Price = typeof asAny.controller1Price === 'number' && asAny.controller1Price > 0;
+          const hasController1Any = hasController1Name || hasController1Qty || hasController1Price;
+
+          if (hasController1Any) {
+            const controller1PriceConverted = hasController1Price ? convertPrice(asAny.controller1Price) : undefined;
             spareRows.push({
-              label: `Controller 1: ${asAny.controller1Name}`,
-              qty: String(asAny.controller1Qty),
-              price: asAny.controller1Price,
+              label: hasController1Name ? `Controller 1: ${asAny.controller1Name}` : 'Controller 1',
+              qty: hasController1Qty ? String(asAny.controller1Qty) : 'N/A',
+              price: controller1PriceConverted,
+            });
+          } else {
+            spareRows.push({
+              label: 'Controller 1: N/A',
+              qty: 'N/A',
             });
           }
 
           // Controller 2:
-          // - If it has proper values, show them
-          // - Otherwise, when Controller 1 exists but Controller 2 is empty, show "Controller 2: N/A"
-          const hasController2Values = asAny.controller2Name && asAny.controller2Qty && asAny.controller2Qty > 0;
-          if (hasController2Values) {
+          // - If any of name / qty / price are present, render a row (with N/A for missing pieces)
+          // - If completely empty but Controller 1 exists, render an explicit "Controller 2: N/A" row
+          const hasController2Name = !!(asAny.controller2Name && String(asAny.controller2Name).trim() !== '');
+          const hasController2Qty = typeof asAny.controller2Qty === 'number' && asAny.controller2Qty > 0;
+          const hasController2Price = typeof asAny.controller2Price === 'number' && asAny.controller2Price > 0;
+          const hasController2Any = hasController2Name || hasController2Qty || hasController2Price;
+
+          if (hasController2Any) {
+            const controller2PriceConverted = hasController2Price ? convertPrice(asAny.controller2Price) : undefined;
             spareRows.push({
-              label: `Controller 2: ${asAny.controller2Name}`,
-              qty: String(asAny.controller2Qty),
-              price: asAny.controller2Price,
+              label: hasController2Name ? `Controller 2: ${asAny.controller2Name}` : 'Controller 2',
+              qty: hasController2Qty ? String(asAny.controller2Qty) : 'N/A',
+              price: controller2PriceConverted,
             });
-          } else if (hasController1) {
+          } else if (hasController1Any) {
             spareRows.push({
               label: 'Controller 2: N/A',
               qty: 'N/A',
@@ -1671,11 +1775,12 @@ export default function EnhancedCart() {
           if (asAny.cmsInclude && String(asAny.cmsInclude).toLowerCase() === 'yes') {
             const years = asAny.cmsLicenseYears || 3;
             const priceMap: { [key: number]: number } = { 1: 125, 3: 375, 5: 625, 7: 875 };
-            const cmsPrice = priceMap[years] || 375;
+            const cmsPriceUSD = priceMap[years] || 375;
+            const cmsPriceConverted = convertPrice(cmsPriceUSD);
             spareRows.push({
               label: `CMS (Content Management System) - ${years} Year License`,
               qty: '1',
-              price: cmsPrice,
+              price: cmsPriceConverted,
             });
           }
 
@@ -1704,7 +1809,7 @@ export default function EnhancedCart() {
           const totalRowsHeight = mainRowHeight + spareRowHeight * firstTableSpareRows.length;
           const totalTableHeight = headerHeight + totalRowsHeight;
 
-          // Page break if needed (relaxed so QUOTATION can stay on first page when possible)
+          // Page break if needed, using the same bottomMargin convention as the spec/details box
           if (currentY + totalTableHeight > pageHeight - bottomMargin) {
             doc.addPage();
             currentY = 40;
@@ -1723,14 +1828,15 @@ export default function EnhancedCart() {
           doc.setTextColor(0, 0, 0);
 
           // Column widths (7 columns)
+          // Slightly reduce Type & Screen Info, increase Price column width.
           const colWidths = [
             tableWidth * 0.06,  // Item (narrower)
             tableWidth * 0.18,  // Equipment Name
-            tableWidth * 0.25,  // Type
-            tableWidth * 0.25,  // Screen Info
+            tableWidth * 0.22,  // Type (slightly reduced)
+            tableWidth * 0.22,  // Screen Info (slightly reduced)
             tableWidth * 0.08,  // Quantity
             tableWidth * 0.08,  // Area
-            tableWidth * 0.10   // Price (wider)
+            tableWidth * 0.16   // Price (wider)
           ];
 
           const columnHeaders = ['Item', 'Equipment Name', 'Type', 'Screen Info', 'Quantity', 'Area', 'Price'];
@@ -1815,7 +1921,7 @@ export default function EnhancedCart() {
             item.sku || 'N/A', // Equipment Name - SKU
             `Request Size (Ft)\nRequest Size (M)\nSuggested Size (M)\nCabinet Arrangement\nScreen Resolution`, // Type (labels only)
             `${requestSizeFt}\n${requestSizeM}\n${suggestedSizeM}\n${cabinetArrangementValueLine}\n${screenResolutionValueLine}`, // Screen Info (values only)
-            areaSqm > 0 ? fmt(areaSqm) : 'N/A', // Quantity in sqm
+            String(qty), // Quantity: number of screens selected
             areaSqm > 0 ? `${fmt(areaSqm)} m²` : 'N/A', // Area
             `${pdfCurrency} ${totalText}` // Total Price
           ];
@@ -1888,19 +1994,47 @@ export default function EnhancedCart() {
             doc.text(spare.qty, qtyCenterX, rowCenterY, { align: 'center' });
             colX += colWidths[4];
 
-            // Column 5: Area - leave blank
+            // Column 5: Area
+            // For specific spare/controller items, show "Unit"; otherwise leave blank.
+            {
+              const areaCenterX = colX + colWidths[5] / 2;
+              const label = spare.label || '';
+              const isUnitAreaItem =
+                label.startsWith('Spare modules (3% of total modules)') ||
+                label.startsWith('Spare PSU') ||
+                label.startsWith('Spare receiving card') ||
+                label.startsWith('Package') ||
+                label.startsWith('Controller 1') ||
+                label.startsWith('Controller 2');
+
+              if (isUnitAreaItem) {
+                doc.text('Unit', areaCenterX, rowCenterY, { align: 'center' });
+              }
+            }
             colX += colWidths[5];
 
-            // Column 6: Price - show if spare has price.
-            // If quantity is numeric, display total = unit price * quantity.
-            if (spare.price !== undefined) {
+            // Column 6: Price
+            // For specific spare items, always show "Included".
+            // Otherwise, if a numeric price exists, show the calculated total.
+            {
               const priceCenterX = colX + colWidths[6] / 2;
-              const rawQty = spare.qty != null ? String(spare.qty) : '';
-              const qtyNumber = parseFloat(rawQty.split(' ')[0]);
-              const unitPrice = spare.price;
-              const totalPrice = !isNaN(qtyNumber) ? unitPrice * qtyNumber : unitPrice;
-              const priceText = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              doc.text(priceText, priceCenterX, rowCenterY, { align: 'center' });
+              const label = spare.label || '';
+              const isIncludedItem =
+                label.startsWith('Spare modules (3% of total modules)') ||
+                label.startsWith('Spare PSU') ||
+                label.startsWith('Spare receiving card') ||
+                label.startsWith('Package');
+
+              if (isIncludedItem) {
+                doc.text('Included', priceCenterX, rowCenterY, { align: 'center' });
+              } else if (spare.price !== undefined) {
+                const rawQty = spare.qty != null ? String(spare.qty) : '';
+                const qtyNumber = parseFloat(rawQty.split(' ')[0]);
+                const unitPrice = spare.price;
+                const totalPrice = !isNaN(qtyNumber) ? unitPrice * qtyNumber : unitPrice;
+                const priceText = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                doc.text(priceText, priceCenterX, rowCenterY, { align: 'center' });
+              }
             }
           }
 
@@ -1932,14 +2066,15 @@ export default function EnhancedCart() {
             doc.setTextColor(0, 0, 0);
 
             // Column widths (reuse same proportions as first table)
+            // Slightly reduce Type & Screen Info, increase Price column width.
             const extraColWidths = [
               extraTableWidth * 0.06,  // Item (narrower)
               extraTableWidth * 0.18,  // Equipment Name
-              extraTableWidth * 0.25,  // Type
-              extraTableWidth * 0.25,  // Screen Info
+              extraTableWidth * 0.22,  // Type (slightly reduced)
+              extraTableWidth * 0.22,  // Screen Info (slightly reduced)
               extraTableWidth * 0.08,  // Quantity
               extraTableWidth * 0.08,  // Area
-              extraTableWidth * 0.10,  // Price (wider)
+              extraTableWidth * 0.16,  // Price (wider)
             ];
             const extraColumnHeaders = ['Item', 'Equipment Name', 'Type', 'Screen Info', 'Quantity', 'Area', 'Price'];
 
@@ -2015,22 +2150,49 @@ export default function EnhancedCart() {
               doc.text(sanitizePdfText(spare.label), mergedTextX, rowCenterY, { align: 'left' });
               colX += mergedWidth;
 
-              // Quantity + Area merged visually: center text across both columns
+              // Quantity + Area merged visually
+              // Quantity shown from spare.qty, Area shown as 'Unit' for specific items.
               const mergedQtyWidth = extraColWidths[4] + extraColWidths[5];
-              const qtyCenterX = colX + mergedQtyWidth / 2;
-              doc.text(sanitizePdfText(spare.qty), qtyCenterX, rowCenterY, { align: 'center' });
+              const qtyAreaCenterX = colX + mergedQtyWidth / 2;
+              const label = spare.label || '';
+              const isUnitAreaItem =
+                label.startsWith('Spare modules (3% of total modules)') ||
+                label.startsWith('Spare PSU') ||
+                label.startsWith('Spare receiving card') ||
+                label.startsWith('Package') ||
+                label.startsWith('Controller 1') ||
+                label.startsWith('Controller 2');
+
+              // Render as "<qty> / Unit" for unit-based items, otherwise just qty.
+              const qtyAreaText = isUnitAreaItem
+                ? `${sanitizePdfText(spare.qty)} / Unit`
+                : sanitizePdfText(spare.qty);
+
+              doc.text(qtyAreaText, qtyAreaCenterX, rowCenterY, { align: 'center' });
               colX += mergedQtyWidth;
               
-              // Total Price column - show if spare has price.
-              // If quantity is numeric, display total = unit price * quantity.
-              if (spare.price !== undefined) {
+              // Total Price column
+              // For specific spare items, always show "Included".
+              // Otherwise, if a numeric price exists, show the calculated total.
+              {
                 const priceCenterX = colX + extraColWidths[6] / 2;
-                const rawQty = spare.qty != null ? String(spare.qty) : '';
-                const qtyNumber = parseFloat(rawQty.split(' ')[0]);
-                const unitPrice = spare.price;
-                const totalPrice = !isNaN(qtyNumber) ? unitPrice * qtyNumber : unitPrice;
-                const priceText = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                doc.text(priceText, priceCenterX, rowCenterY, { align: 'center' });
+                const label = spare.label || '';
+                const isIncludedItem =
+                  label.startsWith('Spare modules (3% of total modules)') ||
+                  label.startsWith('Spare PSU') ||
+                  label.startsWith('Spare receiving card') ||
+                  label.startsWith('Package');
+
+                if (isIncludedItem) {
+                  doc.text('Included', priceCenterX, rowCenterY, { align: 'center' });
+                } else if (spare.price !== undefined) {
+                  const rawQty = spare.qty != null ? String(spare.qty) : '';
+                  const qtyNumber = parseFloat(rawQty.split(' ')[0]);
+                  const unitPrice = spare.price;
+                  const totalPrice = !isNaN(qtyNumber) ? unitPrice * qtyNumber : unitPrice;
+                  const priceText = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  doc.text(priceText, priceCenterX, rowCenterY, { align: 'center' });
+                }
               }
             }
 
@@ -4221,10 +4383,44 @@ export default function EnhancedCart() {
                           })()}
                         </div>
 
-                        {/* Area (sqm) - READ ONLY */}
+                        {/* Area (sqm) - READ ONLY - Calculated from Suggested Size */}
                         <div className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
                           <span className="font-semibold">Area (sqm):</span>
-                          <div className={`mt-1 font-bold ${isDarkMode ? 'text-gray-100' : 'text-slate-700'}`}>{areaSqm > 0 ? areaSqm.toFixed(2) : 'N/A'}</div>
+                          <div className={`mt-1 font-bold ${isDarkMode ? 'text-gray-100' : 'text-slate-700'}`}>
+                            {(() => {
+                              // Calculate area from Suggested Size instead of Request Size
+                              const sizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                              const match = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                              
+                              if (hasWid && hasHei && match) {
+                                const cabWidMm = parseFloat(match[1]);
+                                const cabHeiMm = parseFloat(match[2]);
+                                if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+                                  const cabWidM = cabWidMm / 1000;
+                                  const cabHeiM = cabHeiMm / 1000;
+                                  const cabsWid = widM / cabWidM;
+                                  const cabsHei = heiM / cabHeiM;
+                                  
+                                  const customRound = (v: number) => {
+                                    const dec = v - Math.floor(v);
+                                    return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+                                  };
+                                  
+                                  const roundedW = customRound(cabsWid);
+                                  const roundedH = customRound(cabsHei);
+                                  
+                                  // Suggested Size dimensions
+                                  const sugWid = roundedW * cabWidM;
+                                  const sugHei = roundedH * cabHeiM;
+                                  
+                                  // Area = Suggested Size (W × H)
+                                  const suggestedArea = sugWid * sugHei;
+                                  return suggestedArea.toFixed(2) + ' m²';
+                                }
+                              }
+                              return 'N/A';
+                            })()}
+                          </div>
                         </div>
 
                         {/* Price per sqm (USD) - EDITABLE */}
