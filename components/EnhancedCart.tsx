@@ -3147,9 +3147,10 @@ export default function EnhancedCart() {
                                           const lenM = lenFt * FEET_TO_METER;
                                           const widM = widFt * FEET_TO_METER;
                                           const areaSqm = lenM * widM;
-                                          let cabArea = mergedCabinetSpecs?.cabinetArea;
-                                          if (!(cabArea > 0)) {
-                                            const sizeStr = mergedCabinetSpecs?.cabinetSize || '';
+                                          // Use baseData.cabinetSpecs (which already contains mergedCabinetSpecs)
+                                          let cabArea = (baseData as any)?.cabinetSpecs?.cabinetArea as number | undefined;
+                                          if (!(typeof cabArea === 'number' && cabArea > 0)) {
+                                            const sizeStr = (baseData as any)?.cabinetSpecs?.cabinetSize || '';
                                             const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
                                             if (m) {
                                               const w = parseFloat(m[1]);
