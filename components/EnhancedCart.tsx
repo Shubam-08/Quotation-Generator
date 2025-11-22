@@ -195,6 +195,8 @@ export default function EnhancedCart() {
   });
 
   // Helper to compute the screen-only total for a single cart item (excluding controllers) in selected currency
+  // For displays, this matches the same Area(sqm) logic as the Edit LED price panel and PDF:
+  // total = Area(sqm) × price per sqm (USD) × quantity.
   const computeItemTotal = (item: CartItem): number => {
     const asAny = item as any;
 
@@ -203,18 +205,56 @@ export default function EnhancedCart() {
       return asAny.customTotalConverted;
     }
 
-    // Otherwise, calculate based on area or standard price
-    const widM = parseFloat(asAny.requiredLength ?? '0');
-    const heiM = parseFloat(asAny.requiredWidth ?? '0');
-    let totalUSD = 0;
-    if (!isNaN(widM) && !isNaN(heiM) && widM > 0 && heiM > 0) {
-      const areaSqm = widM * heiM;
-      totalUSD = areaSqm * (item.price ?? 0) * (item.quantity ?? 1);
-    } else {
-      totalUSD = (item.price ?? 0) * (item.quantity ?? 1);
+    const qty = item.quantity ?? 1;
+
+    // For LED display items, use suggested-size / cabinet-arrangement area
+    if (isDisplayItem(item)) {
+      const widM = parseFloat(asAny.requiredLength ?? '0');
+      const heiM = parseFloat(asAny.requiredWidth ?? '0');
+      const hasWid = !isNaN(widM) && widM > 0;
+      const hasHei = !isNaN(heiM) && heiM > 0;
+
+      let areaSqm = 0;
+      if (hasWid && hasHei && asAny.cabinetSpecs?.cabinetSize) {
+        const sizeStr: string = String(asAny.cabinetSpecs.cabinetSize);
+        const match = sizeStr.match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+        if (match) {
+          const cabWidMm = parseFloat(match[1]);
+          const cabHeiMm = parseFloat(match[2]);
+          if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+            const cabWidM = cabWidMm / 1000;
+            const cabHeiM = cabHeiMm / 1000;
+            const cabsWid = widM / cabWidM;
+            const cabsHei = heiM / cabHeiM;
+
+            const customRound = (v: number) => {
+              const dec = v - Math.floor(v);
+              return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+            };
+
+            const roundedW = customRound(cabsWid);
+            const roundedH = customRound(cabsHei);
+
+            const sugWid = roundedW * cabWidM;
+            const sugHei = roundedH * cabHeiM;
+            areaSqm = sugWid * sugHei;
+          }
+        }
+      }
+
+      // Fallback: width×height if we can't derive area from cabinet size
+      if (areaSqm <= 0 && hasWid && hasHei) {
+        areaSqm = widM * heiM;
+      }
+
+      if (areaSqm > 0) {
+        const totalUSD = areaSqm * (item.price ?? 0) * qty;
+        return convertPrice(totalUSD);
+      }
     }
 
-    // Convert base price to selected currency (controllers NOT included here)
+    // Non-display items or missing dimensions: fallback to simple price × qty
+    const totalUSD = (item.price ?? 0) * qty;
     return convertPrice(totalUSD);
   };
 
@@ -1016,21 +1056,61 @@ export default function EnhancedCart() {
     }
 
     // Compute total for PDF using overrides/area logic
+    // Total formula (for displays): total = Area(sqm) × Price per sqm (USD) × Quantity,
+    // where Area(sqm) matches the suggested-size / cabinet-arrangement logic used elsewhere.
     const computeItemTotalConverted = (item: CartItem): number => {
       const qty = item.quantity ?? 1;
       const overridden = (item as any).customTotalConverted;
       if (typeof overridden === 'number' && overridden > 0) return overridden;
+
       if (isDisplayItem(item)) {
-        // requiredLength and requiredWidth are now stored in METERS
-        const widM = parseFloat((item as any)?.requiredLength ?? '');
-        const heiM = parseFloat((item as any)?.requiredWidth ?? '');
-        if (!isNaN(widM) && !isNaN(heiM) && widM > 0 && heiM > 0) {
-          const areaSqm = widM * heiM;
+        const asAny = item as any;
+        // requiredLength and requiredWidth are stored in METERS
+        const widM = parseFloat(asAny.requiredLength ?? '');
+        const heiM = parseFloat(asAny.requiredWidth ?? '');
+        const hasWid = !isNaN(widM) && widM > 0;
+        const hasHei = !isNaN(heiM) && heiM > 0;
+
+        let areaSqm = 0;
+        if (hasWid && hasHei && asAny.cabinetSpecs?.cabinetSize) {
+          const sizeStr: string = String(asAny.cabinetSpecs.cabinetSize);
+          const match = sizeStr.match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+          if (match) {
+            const cabWidMm = parseFloat(match[1]);
+            const cabHeiMm = parseFloat(match[2]);
+            if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+              const cabWidM = cabWidMm / 1000;
+              const cabHeiM = cabHeiMm / 1000;
+              const cabsWid = widM / cabWidM;
+              const cabsHei = heiM / cabHeiM;
+
+              const customRound = (v: number) => {
+                const dec = v - Math.floor(v);
+                return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+              };
+
+              const roundedW = customRound(cabsWid);
+              const roundedH = customRound(cabsHei);
+
+              const sugWid = roundedW * cabWidM;
+              const sugHei = roundedH * cabHeiM;
+              areaSqm = sugWid * sugHei;
+            }
+          }
+        }
+
+        // Fallback: width × height if we cannot derive from cabinet size
+        if (areaSqm <= 0 && hasWid && hasHei) {
+          areaSqm = widM * heiM;
+        }
+
+        if (areaSqm > 0) {
           const unitUSD = (item.price ?? 0) * areaSqm;
           const unitConv = convertPrice(unitUSD);
           return unitConv * qty;
         }
       }
+
       return convertPrice(item.price ?? 0) * qty;
     };
     // Use the same total as shown in the summary (includes screens, controllers, CMS, and discount)
@@ -1305,21 +1385,46 @@ export default function EnhancedCart() {
         // Module Specifications items (5 items -> 3 left, 2 right)
         const moduleSpecItems: DisplayField[] = [
           { label: '1. Pixel Pitch', value: asAny.moduleSpecs?.pixelPitch ?? 'N/A' },
-          { label: '2. Pixel Configuration', value: asAny.moduleSpecs?.pixelConfiguration ?? 'N/A' },
+          // Match Edit LED Display: Pixel Configuration auto-synced from Screen Resolution (Total Resolution)
+          { label: '2. Pixel Configuration', value: asAny.moduleSpecs?.pixelConfiguration || asAny.totalResolution || 'N/A' },
           { label: '3. Module Resolution', value: asAny.moduleSpecs?.moduleResolution ?? 'N/A' },
           { label: '4. Module Size (mm)', value: asAny.moduleSpecs?.moduleSize ?? 'N/A' },
           { label: '5. Module Weight (kg)', value: asAny.moduleSpecs?.moduleWeight != null ? asAny.moduleSpecs.moduleWeight.toString() : 'N/A' },
         ];
 
+        // Determine selected cabinet material variant (if any) for PDF specs
+        const materialVariants = Array.isArray(asAny.cabinetMaterialVariants)
+          ? (asAny.cabinetMaterialVariants as any[])
+          : undefined;
+        const selectedMaterialName = (asAny as any).selectedCabinetMaterial as string | undefined;
+        let selectedVariant: any | undefined;
+        if (materialVariants && materialVariants.length > 0) {
+          if (selectedMaterialName) {
+            selectedVariant = materialVariants.find((v) => v.material === selectedMaterialName) || materialVariants[0];
+          } else {
+            selectedVariant = materialVariants[0];
+          }
+        }
+
+        const effectiveMaterialName: string =
+          (selectedVariant && selectedVariant.material) || asAny.cabinetSpecs?.material || 'N/A';
+        const effectiveMaterialPrice: number | undefined =
+          selectedVariant && typeof selectedVariant.price === 'number' ? selectedVariant.price : undefined;
+        const effectiveCabinetWeight: number | undefined =
+          selectedVariant && typeof selectedVariant.cabinetWeight === 'number'
+            ? selectedVariant.cabinetWeight
+            : (typeof asAny.cabinetSpecs?.cabinetWeight === 'number' ? asAny.cabinetSpecs.cabinetWeight : undefined);
+
         // Cabinet Specifications items (8 items -> 4 left, 4 right)
+        // Use the selected cabinet material variant (if present) for Material and Cabinet Weight.
         const cabinetSpecItems: DisplayField[] = [
           { label: '1. Cabinet Size (W*H)', value: asAny.cabinetSpecs?.cabinetSize ?? 'N/A' },
           { label: '2. Cabinet Resolution', value: asAny.cabinetSpecs?.cabinetResolution ?? 'N/A' },
           { label: '3. Module Quantity', value: asAny.cabinetSpecs?.moduleQuantity != null ? asAny.cabinetSpecs.moduleQuantity.toString() : 'N/A' },
           { label: '4. Pixel Density', value: asAny.cabinetSpecs?.pixelDensity ?? 'N/A' },
-          { label: '5. Cabinet Weight (kg)', value: asAny.cabinetSpecs?.cabinetWeight != null ? asAny.cabinetSpecs.cabinetWeight.toString() : 'N/A' },
+          { label: '5. Cabinet Weight (kg)', value: effectiveCabinetWeight != null ? effectiveCabinetWeight.toString() : 'N/A' },
           { label: '6. Cabinet Area (sqm)', value: asAny.cabinetSpecs?.cabinetArea != null ? asAny.cabinetSpecs.cabinetArea.toString() : 'N/A' },
-          { label: '7. Material', value: asAny.cabinetSpecs?.material ?? 'N/A' },
+          { label: '7. Material', value: effectiveMaterialName },
           { label: '8. Maintenance', value: asAny.cabinetSpecs?.maintenance ?? 'N/A' },
         ];
 
@@ -3015,9 +3120,25 @@ export default function EnhancedCart() {
                                     if (res.ok) {
                                       const list = await res.json();
                                       const match = Array.isArray(list) ? list.find((d: any) => d.sku === item.sku) : null;
-                                      if (match?.cabinetSpecs) {
-                                        const mergedCabinetSpecs = { ...match.cabinetSpecs, ...baseData.cabinetSpecs };
-                                        baseData.cabinetSpecs = mergedCabinetSpecs;
+                                      if (match) {
+                                        // Merge cabinet specs
+                                        if (match.cabinetSpecs) {
+                                          const mergedCabinetSpecs = { ...match.cabinetSpecs, ...baseData.cabinetSpecs };
+                                          baseData.cabinetSpecs = mergedCabinetSpecs;
+                                        }
+
+                                        // Limit Cabinet Material Variants to the user-selected one (if any)
+                                        if (Array.isArray(match.cabinetMaterialVariants) && match.cabinetMaterialVariants.length > 0) {
+                                          const selectedMaterial = (item as any).selectedCabinetMaterial as string | undefined;
+                                          let variants = match.cabinetMaterialVariants as any[];
+                                          if (selectedMaterial) {
+                                            const filtered = variants.filter(v => v.material === selectedMaterial);
+                                            if (filtered.length > 0) {
+                                              variants = filtered;
+                                            }
+                                          }
+                                          baseData.cabinetMaterialVariants = variants;
+                                        }
                                         // If required size present, compute initial cabinetRequired
                                         const FEET_TO_METER = 0.3048;
                                         const lenFt = parseFloat((baseData as any)?.requiredLength ?? '');
@@ -4117,7 +4238,40 @@ export default function EnhancedCart() {
                     const heiM = parseFloat(displayFormData?.requiredWidth ?? '0');
                     const hasWid = !isNaN(widM) && widM > 0;
                     const hasHei = !isNaN(heiM) && heiM > 0;
-                    const areaSqm = hasWid && hasHei ? widM * heiM : 0;
+
+                    // Area (sqm) in the price panel should match the suggested-size / cabinet-arrangement logic
+                    // used for the PDF and Area(sqm) display.
+                    let areaSqm = 0;
+                    const cabSizeStr = (displayFormData as any)?.cabinetSpecs?.cabinetSize || '';
+                    const match = String(cabSizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                    if (hasWid && hasHei && match) {
+                      const cabWidMm = parseFloat(match[1]);
+                      const cabHeiMm = parseFloat(match[2]);
+                      if (!isNaN(cabWidMm) && !isNaN(cabHeiMm) && cabWidMm > 0 && cabHeiMm > 0) {
+                        const cabWidM = cabWidMm / 1000;
+                        const cabHeiM = cabHeiMm / 1000;
+                        const cabsWid = widM / cabWidM;
+                        const cabsHei = heiM / cabHeiM;
+
+                        const customRound = (v: number) => {
+                          const dec = v - Math.floor(v);
+                          return dec <= 0.5 ? Math.floor(v) : Math.ceil(v);
+                        };
+
+                        const roundedW = customRound(cabsWid);
+                        const roundedH = customRound(cabsHei);
+
+                        const sugWid = roundedW * cabWidM;
+                        const sugHei = roundedH * cabHeiM;
+                        areaSqm = sugWid * sugHei;
+                      }
+                    }
+
+                    // Fallback: width×height if we can't derive area from cabinet size
+                    if (areaSqm <= 0 && hasWid && hasHei) {
+                      areaSqm = widM * heiM;
+                    }
+
                     const pricePerSqm = displayFormData.price ?? 0;
                     const unitPriceUSD = areaSqm * pricePerSqm;
                     const unitPriceConverted = convertPrice(unitPriceUSD);
