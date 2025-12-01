@@ -31,7 +31,7 @@ export default function Footer() {
               />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed">
-              The modern way to generate professional quotations. Fast, accurate, and effortless.
+              The modern way to generate professional quotations. Fast and effortless.
             </p>
             <div className="flex items-center gap-2 bg-yellow-400/10 px-3 py-1.5 rounded-full border border-yellow-400/30 w-fit">
               <Sparkles size={14} className="text-yellow-400" />
@@ -107,7 +107,12 @@ export default function Footer() {
         <span className="break-all">ankit.mittal@qliteglobal.com</span>
       </a>
 
-      <p className="text-gray-400 text-sm mt-2 flex items-start gap-2">
+      <a
+        href="https://maps.app.goo.gl/tXPhYiyo1ErTYkP19"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-gray-400 text-sm mt-2 flex items-start gap-2 hover:text-yellow-400 transition-colors"
+      >
         <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-yellow-400" />
         <span className="leading-relaxed">
           Qlite Electronics Controls Private Limited<br />
@@ -115,7 +120,7 @@ export default function Footer() {
           Indra Nagar, Electronic City Phase I,<br />
           Electronic City, Bengaluru, Karnataka 560100
         </span>
-      </p>
+      </a>
     </li>
 
     {/* Gulf Contact */}

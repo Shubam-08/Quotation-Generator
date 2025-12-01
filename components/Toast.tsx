@@ -1981,7 +1981,7 @@ export default function EnhancedCart() {
                   <div className={`w-12 h-12 border-4 rounded-full animate-spin mb-4 ${
                     isDarkMode ? 'border-white/10 border-t-blue-500' : 'border-gray-200 border-t-blue-500'
                   }`}></div>
-                  <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading compatible drivers...</p>
+                  <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading drivers...</p>
                 </div>
               ) : availableDrivers.length === 0 ? (
                 <div className="text-center py-12">

@@ -301,7 +301,11 @@ export default function EnhancedCart() {
   const subtotal = screenSubtotal + controllerSubtotal + cmsSubtotal;
   const discountAmount = (subtotal * discount) / 100;
   const total = subtotal - discountAmount;
-  const canDownload = userInfo.email && userInfo.mobile && userInfo.project;
+  const canDownload =
+    !!userInfo.email &&
+    !!userInfo.mobile &&
+    !!userInfo.project &&
+    !!userInfo.company;
   const totalItems = cart.reduce((sum, item) => sum + (item.quantity ?? 1), 0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2656,14 +2660,14 @@ export default function EnhancedCart() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 py-3">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+        <div className="mb-6">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
             <div className="flex items-center gap-3 sm:gap-4">
               <Link 
                 href="/products"
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm hover:shadow-md ${
                   isDarkMode 
                     ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20' 
                     : 'bg-white hover:bg-gray-50 text-gray-900 border border-gray-200 shadow-sm'
@@ -2678,10 +2682,12 @@ export default function EnhancedCart() {
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <ShoppingCart className="w-7 h-7 text-yellow-400" />
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-400 shadow-lg">
+                <ShoppingCart className="w-6 h-6 text-white" />
+              </div>
               <div>
-                <h1 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <h1 className={`text-2xl sm:text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   My Quotations
                   {cart.length > 0 && (
                     <span className="ml-2 bg-yellow-400 text-black px-2 py-0.5 rounded-full text-xs font-bold">
@@ -2689,7 +2695,7 @@ export default function EnhancedCart() {
                     </span>
                   )}
                 </h1>
-                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                   Review and generate quotations
                 </p>
               </div>
@@ -2699,10 +2705,12 @@ export default function EnhancedCart() {
 
         {cart.length === 0 ? (
           /* Empty Cart State */
-          <div className={`rounded-xl p-8 sm:p-12 text-center ${
+          <div className={`rounded-2xl p-12 sm:p-16 text-center ${
             isDarkMode ? 'bg-gray-900/50 border border-white/10' : 'bg-white border border-gray-200 shadow-sm'
           }`}>
-            <Package className={`w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+            <div className="inline-flex p-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 mb-6">
+              <Package className={`w-16 h-16 sm:w-20 sm:h-20 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+            </div>
             <h2 className={`text-xl sm:text-2xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               No Products Added Yet
             </h2>
@@ -2711,18 +2719,18 @@ export default function EnhancedCart() {
             </p>
             <Link
               href="/products"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-lg transition-all"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               <ShoppingCart className="w-5 h-5" />
               Browse Products
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Cart Items - Left Column */}
             <div className="lg:col-span-3">
               {/* Products Count Header */}
-              <div className={`mb-3 px-4 py-2 rounded-lg flex items-center justify-between ${
+              <div className={`mb-4 px-5 py-3 rounded-xl flex items-center justify-between ${
                 isDarkMode ? 'bg-gray-900/30 border border-white/5' : 'bg-gray-50 border border-gray-200'
               }`}>
                 <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -2734,7 +2742,7 @@ export default function EnhancedCart() {
                       clearCart();
                     }
                   }}
-                  className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-xs transition-all ${
+                  className={`hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-xs transition-all shadow-sm hover:shadow-md ${
                     isDarkMode 
                       ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30' 
                       : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
@@ -2746,7 +2754,7 @@ export default function EnhancedCart() {
               </div>
 
               {/* Products Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {cart.map((item) => {
                 const isDisplay = isDisplayItem(item);
                 return (
@@ -2755,7 +2763,7 @@ export default function EnhancedCart() {
                     className={`${isDisplay ? 'col-span-2' : ''}`}
                   >
                     <div
-                      className={`rounded-xl p-3 transition-all duration-200 bg-white border border-gray-200 hover:border-blue-300 shadow-md hover:shadow-lg ${
+                      className={`rounded-none p-4 transition-all duration-200 bg-white border border-gray-200 hover:border-gray-300 shadow-md hover:shadow-lg ${
                         isDarkMode ? '' : ''
                       }`}
                     >
@@ -3182,70 +3190,74 @@ export default function EnhancedCart() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex flex-col gap-2">
-                          <div className="w-20 h-20 mx-auto rounded-lg overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 shadow-sm">
-                            {(item.productImages?.length || item.images?.length) ? (
-                              <img 
-                                src={item.productImages?.[0] || item.images?.[0]} 
-                                alt={item.sku} 
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Package className="w-6 h-6 text-gray-400" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start gap-1 mb-1.5">
+                        item.isDriver ? (
+                          <div className="flex flex-col gap-3 rounded-none bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-600 px-4 py-3 shadow-sm">
+                            <div className="flex items-start justify-between gap-2 mb-1">
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-xs mb-0.5 truncate text-gray-900">
-                                  {item.sku}
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-100 border border-slate-600">
+                                    🔌 Driver
+                                  </span>
+                                  {item.series && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-slate-800 text-slate-100 border border-slate-600">
+                                      {item.series}
+                                    </span>
+                                  )}
+                                  {item.type && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-slate-900 text-slate-300 border border-slate-700">
+                                      {item.type}
+                                    </span>
+                                  )}
+                                </div>
+                                <h3 className="font-bold text-xs mb-0.5 truncate text-white">
+                                  {item.name || item.sku}
                                 </h3>
-                                <p className="text-[10px] text-gray-600">
-                                  {item.category}
-                                </p>
+                                {item.category && (
+                                  <p className="text-[10px] text-slate-300">
+                                    {item.category}
+                                  </p>
+                                )}
                               </div>
                               <button
                                 onClick={() => removeFromCart(item.cartItemId)}
-                                className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-50 text-red-600 hover:text-red-700"
-                                title="Remove"
+                                className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-500/10 text-red-300 hover:text-red-200"
+                                title="Remove Driver"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                             <div className="flex flex-wrap gap-1.5 mb-2">
                               {item.inputVoltage && item.inputVoltage !== '-' && (
-                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-slate-200 border border-slate-700">
                                   {item.inputVoltage}
                                 </span>
                               )}
-                              {item.watt && item.watt !== '-' && (
-                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                  {item.watt}W
+                              {item.outputVoltage && (
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-emerald-200 border border-slate-700">
+                                  OV: {item.outputVoltage}
                                 </span>
                               )}
-                              {item.lumen && item.lumen !== '-' && (
-                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                  {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen}lm`}
+                              {item.outputCurrent && (
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-sky-200 border border-slate-700">
+                                  OC: {item.outputCurrent}
                                 </span>
                               )}
-                              {item.beamAngle && item.beamAngle !== '-' && (
-                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
-                                  {item.beamAngle}
+                              {item.wattageRange && (
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-violet-200 border border-slate-700">
+                                  {item.wattageRange.min}-{item.wattageRange.max}W
                                 </span>
                               )}
                               {item.ipRating && item.ipRating !== 'N/A' && (
-                                <span className="inline-block bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-yellow-200">
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-teal-200 border border-slate-700">
                                   {item.ipRating}
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 shadow-sm">
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/40 border border-slate-600">
                                 <button
                                   onClick={() => decreaseQuantity(item.cartItemId)}
-                                  className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
+                                  className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-slate-800 hover:shadow text-slate-100"
                                 >
                                   <Minus className="w-3 h-3" />
                                 </button>
@@ -3259,54 +3271,156 @@ export default function EnhancedCart() {
                                   }}
                                   onFocus={() => setEditingQuantity(item.cartItemId)}
                                   onBlur={() => setEditingQuantity(null)}
-                                  className="w-10 text-center font-bold text-xs outline-none bg-transparent text-gray-900"
+                                  className="w-10 text-center font-bold text-xs outline-none bg-transparent text-yellow-300"
                                 />
                                 <button
                                   onClick={() => increaseQuantity(item.cartItemId)}
-                                  className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
+                                  className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-slate-800 hover:shadow text-slate-100"
                                 >
                                   <Plus className="w-3 h-3" />
                                 </button>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] text-gray-500">
+                                <p className="text-[10px] text-slate-300">
                                   {formatPrice(item.price ?? 0)} × {item.quantity}
                                 </p>
-                                <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                <p className="text-sm font-bold text-slate-100">
                                   {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
                                 </p>
                               </div>
                             </div>
-                            {!item.isDriver && !isDisplay && (
-                              <button
-                                onClick={() => fetchDriversForProduct(item)}
-                                className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 border border-blue-200 transition-all text-xs font-bold shadow-sm hover:shadow"
-                              >
-                                <Zap className="w-3.5 h-3.5" />
-                                Add Driver
-                              </button>
-                            )}
-                            {!item.isDriver && !isDisplay && getDriversForProduct(item.cartItemId).length > 0 && (
-                              <div className="mt-2 pt-2 border-t border-gray-200">
-                                <p className="text-[10px] font-bold text-gray-700 mb-1.5">🔌 Drivers:</p>
-                                {getDriversForProduct(item.cartItemId).map((driver) => (
-                                  <div key={driver.cartItemId} className="flex items-center justify-between gap-1 mb-1.5 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-[10px] font-bold text-blue-900 truncate">{driver.name}</p>
-                                      <p className="text-[9px] text-blue-700">Qty: {driver.quantity}</p>
-                                    </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-row gap-4 items-stretch">
+                            <div className="flex-shrink-0 w-40 h-40 md:w-48 md:h-48 rounded-none overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 shadow-sm">
+                              {(item.productImages?.length || item.images?.length) ? (
+                                <img 
+                                  src={item.productImages?.[0] || item.images?.[0]} 
+                                  alt={item.sku} 
+                                  className="w-full h-full object-contain p-2"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="w-8 h-8 text-slate-400" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 flex flex-col justify-between min-w-0">
+                              <div>
+                                <div className="flex justify-between items-start gap-1 mb-1.5">
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-bold text-xs mb-0.5 truncate text-gray-900">
+                                      {item.sku}
+                                    </h3>
+                                    <p className="text-[10px] text-gray-600 truncate">
+                                      {item.category}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => removeFromCart(item.cartItemId)}
+                                    className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-50 text-red-600 hover:text-red-700"
+                                    title="Remove"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                  {item.inputVoltage && item.inputVoltage !== '-' && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
+                                      {item.inputVoltage}
+                                    </span>
+                                  )}
+                                  {item.watt && item.watt !== '-' && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      {item.watt}W
+                                    </span>
+                                  )}
+                                  {item.lumen && item.lumen !== '-' && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                      {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen}lm`}
+                                    </span>
+                                  )}
+                                  {item.beamAngle && item.beamAngle !== '-' && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                      {item.beamAngle}
+                                    </span>
+                                  )}
+                                  {item.ipRating && item.ipRating !== 'N/A' && (
+                                    <span className="inline-block bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-yellow-200">
+                                      {item.ipRating}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 shadow-sm">
                                     <button
-                                      onClick={() => removeFromCart(driver.cartItemId)}
-                                      className="p-1 rounded-md hover:bg-red-100 text-red-600 transition-all"
+                                      onClick={() => decreaseQuantity(item.cartItemId)}
+                                      className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
                                     >
-                                      <X className="w-3 h-3" />
+                                      <Minus className="w-3 h-3" />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={item.quantity}
+                                      onChange={(e) => {
+                                        const value = parseInt(e.target.value) || 1;
+                                        updateQuantity(item.cartItemId, value);
+                                      }}
+                                      onFocus={() => setEditingQuantity(item.cartItemId)}
+                                      onBlur={() => setEditingQuantity(null)}
+                                      className="w-10 text-center font-bold text-xs outline-none bg-transparent text-gray-900"
+                                    />
+                                    <button
+                                      onClick={() => increaseQuantity(item.cartItemId)}
+                                      className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
+                                    >
+                                      <Plus className="w-3 h-3" />
                                     </button>
                                   </div>
-                                ))}
+                                  <div className="text-right">
+                                    <p className="text-[10px] text-gray-500">
+                                      {formatPrice(item.price ?? 0)} × {item.quantity}
+                                    </p>
+                                    <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                      {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
+                                    </p>
+                                  </div>
+                                </div>
+                                {!item.isDriver && !isDisplay && (
+                                  <button
+                                    onClick={() => fetchDriversForProduct(item)}
+                                    className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 border border-blue-200 transition-all text-xs font-bold shadow-sm hover:shadow"
+                                  >
+                                    <Zap className="w-3.5 h-3.5" />
+                                    Add Driver
+                                  </button>
+                                )}
+                                {!item.isDriver && !isDisplay && getDriversForProduct(item.cartItemId).length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-gray-200">
+                                    <p className="text-[10px] font-bold text-gray-700 mb-1.5">🔌 Drivers:</p>
+                                    {getDriversForProduct(item.cartItemId).map((driver) => (
+                                      <div key={driver.cartItemId} className="flex items-center justify-between gap-1 mb-1.5 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[10px] font-bold text-blue-900 truncate">{driver.name}</p>
+                                          <p className="text-[9px] text-blue-700">Qty: {driver.quantity}</p>
+                                        </div>
+                                        <button
+                                          onClick={() => removeFromCart(driver.cartItemId)}
+                                          className="p-1 rounded-md hover:bg-red-100 text-red-600 transition-all"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </div>
-                        </div>
+                        )
                       )}
                     </div>
                   </div>
@@ -3334,11 +3448,11 @@ export default function EnhancedCart() {
 
             {/* Summary - Right Column */}
             <div className="lg:col-span-1">
-              <div className={`rounded-lg p-4 sticky top-6 ${
-                isDarkMode ? 'bg-gray-900/50 border border-white/10' : 'bg-white border border-gray-200 shadow-sm'
+              <div className={`rounded-2xl p-6 sticky top-6 ${
+                isDarkMode ? 'bg-gray-900/50 border border-white/10 shadow-xl' : 'bg-white border border-gray-200 shadow-xl'
               }`}>
-                <div className="flex items-center justify-between mb-4 gap-3">
-                  <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <div className="flex items-center justify-between mb-6 gap-3">
+                  <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                     Summary
                   </h2>
                   <button
@@ -3375,20 +3489,21 @@ export default function EnhancedCart() {
                 </div>
 
                 {/* Contact Details */}
-                <div className="mb-4">
-                  <h3 className={`text-xs font-bold uppercase tracking-wide mb-3 ${
+                <div className="mb-6">
+                  <h3 className={`text-xs font-bold uppercase tracking-wider mb-4 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
-                    Your Details
+                    Client's Detail
                   </h3>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3.5">
                     <div>
                       <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
                         isDarkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
                         <Mail className="w-3.5 h-3.5" />
                         Email
+                        <span className="text-red-400 ml-0.5">*</span>
                       </label>
                       <input
                         type="email"
@@ -3396,10 +3511,10 @@ export default function EnhancedCart() {
                         value={userInfo.email}
                         onChange={handleChange}
                         placeholder="your@email.com"
-                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                         }`}
                       />
                     </div>
@@ -3410,6 +3525,7 @@ export default function EnhancedCart() {
                       }`}>
                         <Phone className="w-3.5 h-3.5" />
                         Mobile
+                        <span className="text-red-400 ml-0.5">*</span>
                       </label>
                       <input
                         type="tel"
@@ -3417,10 +3533,10 @@ export default function EnhancedCart() {
                         value={userInfo.mobile}
                         onChange={handleChange}
                         placeholder="+1234567890"
-                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                         }`}
                       />
                     </div>
@@ -3431,6 +3547,7 @@ export default function EnhancedCart() {
                       }`}>
                         <Briefcase className="w-3.5 h-3.5" />
                         Attn (Name)
+                        <span className="text-red-400 ml-0.5">*</span>
                       </label>
                       <input
                         type="text"
@@ -3438,10 +3555,10 @@ export default function EnhancedCart() {
                         value={userInfo.project}
                         onChange={handleChange}
                         placeholder="Contact person name"
-                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                         }`}
                       />
                     </div>
@@ -3452,6 +3569,7 @@ export default function EnhancedCart() {
                       }`}>
                         <Briefcase className="w-3.5 h-3.5" />
                         Company
+                        <span className="text-red-400 ml-0.5">*</span>
                       </label>
                       <input
                         type="text"
@@ -3459,10 +3577,10 @@ export default function EnhancedCart() {
                         value={userInfo.company}
                         onChange={handleChange}
                         placeholder="Company name"
-                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                         }`}
                       />
                     </div>
@@ -3480,10 +3598,10 @@ export default function EnhancedCart() {
                         value={userInfo.subject}
                         onChange={handleChange}
                         placeholder="e.g., Quotation"
-                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                         }`}
                       />
                     </div>
@@ -3501,10 +3619,10 @@ export default function EnhancedCart() {
                         value={userInfo.invoiceNo}
                         onChange={handleChange}
                         placeholder="e.g., QT-12345678"
-                        className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none ${
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
                           isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400'
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                         }`}
                       />
                     </div>
@@ -3536,22 +3654,22 @@ export default function EnhancedCart() {
                 </div>
 
                 {/* Final Total */}
-                <div className={`p-3 rounded-lg mb-4 ${
-                  isDarkMode ? 'bg-yellow-400/10 border border-yellow-400/30' : 'bg-yellow-50 border border-yellow-200'
+                <div className={`p-4 rounded-xl mb-6 ${
+                  isDarkMode ? 'bg-gradient-to-br from-yellow-400/10 to-orange-400/10 border border-yellow-400/30 shadow-lg' : 'bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-300 shadow-md'
                 }`}>
                   <div className="flex justify-between items-center">
-                    <span className={`text-xs font-semibold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                    <span className={`text-sm font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
                       Final Total
                     </span>
-                    <span className={`text-xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                    <span className={`text-2xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
                       {currencyInfo.symbol} {total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
 
                 {/* Discount Slider */}
-                <div className="mb-4">
-                  <h3 className={`text-xs font-bold uppercase tracking-wide mb-3 ${
+                <div className="mb-6">
+                  <h3 className={`text-xs font-bold uppercase tracking-wider mb-4 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
                     💎 Apply Discount
@@ -4899,7 +5017,7 @@ export default function EnhancedCart() {
                   <div className={`w-12 h-12 border-4 rounded-full animate-spin mb-4 ${
                     isDarkMode ? 'border-white/10 border-t-blue-500' : 'border-gray-200 border-t-blue-500'
                   }`}></div>
-                  <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading compatible drivers...</p>
+                  <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading drivers...</p>
                 </div>
               ) : availableDrivers.length === 0 ? (
                 <div className="text-center py-12">
@@ -5105,13 +5223,13 @@ export default function EnhancedCart() {
                                   IP Rating ≥ 65 ({outdoor.length} driver{outdoor.length !== 1 ? 's' : ''})
                                 </p>
                               </div>
-                            </div>
+                            </div> 
                             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
                               {outdoor.map((driver) => (
                                 <div
                                   key={driver._id}
                                   className={`p-3 rounded-lg border transition-all cursor-pointer ${
-                                    isDarkMode 
+                                    isDarkMode
                                       ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800' 
                                       : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
                                   }`}

@@ -8,7 +8,6 @@ import { useCurrency } from '@/context/CurrencyContext';
 import CurrencySelector from '@/components/CurrencySelector';
 import CurrencyInfo from '@/components/CurrencyInfo';
 import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Sparkles, Sun, Moon, FileText, Download, File, Award, ChevronLeft, ChevronRight, Plus, Minus, Settings } from 'lucide-react';
-import CartButton from '@/components/CartButton';
 import { getApplicationFromIpRating } from '@/lib/ipRatingUtils';
 
 type IpRatingPrice = {
@@ -485,7 +484,6 @@ export default function ProductsPage() {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-gray-50'}`}>
-      <CartButton />
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}

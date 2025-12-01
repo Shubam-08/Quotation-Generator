@@ -3,10 +3,14 @@
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
-import { LogOut, User, ShieldCheck, KeyRound } from "lucide-react";
+import { LogOut, User, ShieldCheck, KeyRound, ShoppingCart } from "lucide-react";
+import { useCart } from "@/context/CartContext";
 
 export default function Navbar() {
   const { data: session, status } = useSession();
+  const { cart } = useCart();
+
+  const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
   return (
     <nav className="bg-black border-b border-white/10">
@@ -23,9 +27,6 @@ export default function Navbar() {
                 priority
               />
             </Link>
-            <span className="bg-yellow-400/10 text-yellow-400 text-xs px-2.5 py-1 rounded-full border border-yellow-400/30 font-semibold tracking-wide">
-              BETA
-            </span>
           </div>
 
           <div className="flex items-center gap-4">
@@ -34,6 +35,17 @@ export default function Navbar() {
               className="text-white hover:text-yellow-400 px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
               Products
+            </Link>
+
+            <Link href="/cart" aria-label="View Cart">
+              <div className="relative flex items-center justify-center text-white hover:text-yellow-400 px-2 py-2 rounded-md transition-colors">
+                <ShoppingCart size={20} />
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-2 bg-yellow-400 text-black text-[10px] font-bold rounded-full min-w-[18px] h-4 px-1 flex items-center justify-center leading-none">
+                    {totalItems}
+                  </span>
+                )}
+              </div>
             </Link>
 
             {status === "loading" ? (
