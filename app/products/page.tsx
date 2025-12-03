@@ -27,10 +27,16 @@ type CabinetMaterialVariant = {
   price: number;
 };
 
+type PriceVariant = {
+  channels?: number;
+  size?: string;
+  price: number;
+};
+
 type Product = {
   _id: string;
   sku: string;
-  name: string;
+  name?: string; // Made optional for lighting controls
   category: string;
   categoryFilter?: string;
   application?: string;
@@ -49,6 +55,22 @@ type Product = {
   ipRatings?: IpRatingPrice[];
   voltageVariants?: VoltageVariant[];
   cabinetMaterialVariants?: CabinetMaterialVariant[];
+  // Lighting control specific
+  productImage?: string;
+  productCode?: string;
+  productName?: string;
+  description?: string;
+  priceVariants?: PriceVariant[];
+  controlType?: string;
+  protocol?: string;
+  channels?: number;
+  loadCapacity?: string;
+  outputVoltage?: string;
+  dimmingRange?: string;
+  mounting?: string;
+  connectivity?: string;
+  compatibility?: string;
+  // Common fields
   images?: string[];
   productImages?: string[];
   datasheets?: string[];
@@ -174,6 +196,7 @@ export default function ProductsPage() {
   const [selectedBeamAngles, setSelectedBeamAngles] = useState<Record<string, string>>({});
   const [selectedLumens, setSelectedLumens] = useState<Record<string, string>>({});
   const [selectedCabinetMaterials, setSelectedCabinetMaterials] = useState<Record<string, number>>({});
+  const [selectedPriceVariants, setSelectedPriceVariants] = useState<Record<string, number>>({});
   // For LED displays: user-entered required square feet (no calculations yet)
   const [requiredSqft, setRequiredSqft] = useState<Record<string, string>>({});
   const [requiredLength, setRequiredLength] = useState<Record<string, string>>({});
@@ -601,8 +624,8 @@ export default function ProductsPage() {
                     : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
               }`}
             >
-              <Package className="w-4 h-4" />
-           Lighting Controls
+             <Package className="w-4 h-4" />
+            Lighting Controls 
             </button>
           </div>       
         </div>
@@ -742,6 +765,27 @@ export default function ProductsPage() {
                     {filterOptions.categories.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
+
+                {/* SKU - Only for lighting controls */}
+                {productType === 'lighting-controls' && (
+                  <div>
+                    <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>SKU</label>
+                    <select
+                      value={filters.sku}
+                      onChange={e => handleFilterChange('sku', e.target.value)}
+                      className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
+                        isDarkMode
+                          ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                          : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
+                      }`}
+                    >
+                      <option value="">All Models</option>
+                      {filterOptions.skus.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                )}
 
                 {/* LED Lights Filters */}
                 {productType === 'led-lights' && (
@@ -904,68 +948,6 @@ export default function ProductsPage() {
                     </div>
                   </>
                 )}
-
-                {/* Lighting Controls Filters */}
-                {productType === 'lighting-controls' && (
-                  <>
-                    {/* Control Type */}
-                    <div>
-                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Control Type</label>
-                      <select 
-                        value={controlFilters.controlType} 
-                        onChange={e => setControlFilters(prev => ({ ...prev, controlType: e.target.value }))} 
-                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                          isDarkMode 
-                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                        }`}
-                      >
-                        <option value="">All Control Types</option>
-                        {filterOptions.controlTypes.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
-                    </div>
-
-                    {/* Protocol */}
-                    <div>
-                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Protocol</label>
-                      <select 
-                        value={controlFilters.protocol} 
-                        onChange={e => setControlFilters(prev => ({ ...prev, protocol: e.target.value }))} 
-                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                          isDarkMode 
-                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                        }`}
-                      >
-                        <option value="">All Protocols</option>
-                        {filterOptions.protocols.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
-                    </div>
-
-                    {/* Application */}
-                    <div>
-                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Application</label>
-                      <select 
-                        value={controlFilters.application} 
-                        onChange={e => setControlFilters(prev => ({ ...prev, application: e.target.value }))} 
-                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                          isDarkMode 
-                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                        }`}
-                      >
-                        <option value="">All Applications</option>
-                        {filterOptions.controlApplications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
           )}
@@ -1061,11 +1043,9 @@ export default function ProductsPage() {
                         </th>
                       ))}
                       {productType === 'lighting-controls' && [
-                        { label: 'Model', key: 'sku' },
+                        { label: 'SKU', key: 'sku' },
+                        { label: 'Product Name', key: 'productName' },
                         { label: 'Category', key: 'category' },
-                        { label: 'Control Type', key: 'controlType' },
-                        { label: 'Protocol', key: 'protocol' },
-                        { label: 'Application', key: 'application' },
                         { label: 'Price', key: 'price' },
                         { label: 'Files', key: 'files' },
                         { label: 'Action', key: 'action' }
@@ -1550,6 +1530,282 @@ export default function ProductsPage() {
                         );
                       }
 
+                      // Custom layout for Lighting Controls
+                      if (productType === 'lighting-controls') {
+                        // Calculate price based on selected variant
+                        let displayPrice = p.price || 0;
+                        let selectedVariant = null;
+                        
+                        if (p.priceVariants && p.priceVariants.length > 0) {
+                          const selectedIdx = selectedPriceVariants[p._id] ?? 0;
+                          selectedVariant = p.priceVariants[selectedIdx];
+                          displayPrice = selectedVariant?.price || p.price || 0;
+                        }
+                        
+                        const cartItemId = `${p._id}_${selectedVariant?.channels || 'default'}_${selectedVariant?.size || 'default'}_lighting-control`;
+                        // Check if THIS SPECIFIC variant is in cart
+                        const isInCart = cart.some(item => item.cartItemId === cartItemId);
+                        
+                        return (
+                          <tr key={p._id} className={`transition-colors ${
+                            isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+                          }`}>
+                            <td className="px-4 py-4 text-center">
+                              {/* Prioritize productImage, then fall back to productImages/images */}
+                              {(p.productImage || p.productImages?.length || p.images?.length) ? (
+                                <img 
+                                  src={p.productImage || p.productImages?.[0] || p.images?.[0]} 
+                                  alt={p.productName || p.sku} 
+                                  className={`w-32 h-24 md:w-40 md:h-32 object-contain rounded-2xl border-2 shadow-sm mx-auto ${
+                                    isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white'
+                                  }`}
+                                />
+                              ) : (
+                                <div className={`w-32 h-24 md:w-40 md:h-32 rounded-2xl flex items-center justify-center mx-auto ${
+                                  isDarkMode ? 'bg-gray-800' : 'bg-gray-100'
+                                }`}>
+                                  <Package className={`w-8 h-8 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                                </div>
+                              )}
+                            </td>
+                            <td className={`px-4 py-4 text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              <div className="flex flex-col gap-1 min-w-[8rem] max-w-[10rem] whitespace-nowrap">
+                                <span className="text-base leading-tight break-keep">{p.sku}</span>
+                                {selectedVariant?.channels && (
+                                  <span className={`text-[11px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    {selectedVariant.channels} Channel{selectedVariant.channels > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className={`px-4 py-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              <div className="flex flex-col gap-1 max-w-[18rem]">
+                                <span className="text-sm font-medium line-clamp-1">{p.productName || '-'}</span>
+                                {p.description && (
+                                  <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'} line-clamp-2`}>
+                                    {p.description}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="inline-block bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+                                {p.category}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4">
+                              {p.priceVariants && p.priceVariants.length > 0 ? (
+                                <div className="flex flex-col gap-2 min-w-[140px]">
+                                  <select
+                                    value={selectedPriceVariants[p._id] ?? 0}
+                                    onChange={(e) => {
+                                      const newIdx = parseInt(e.target.value);
+                                      setSelectedPriceVariants(prev => ({
+                                        ...prev,
+                                        [p._id]: newIdx
+                                      }));
+                                    }}
+                                    className={`w-full px-3 py-2 rounded-lg text-xs font-medium cursor-pointer outline-none border transition-colors ${
+                                      isDarkMode
+                                        ? 'bg-black border-white/20 text-white hover:border-yellow-400/50 focus:border-yellow-400'
+                                        : 'bg-white border-gray-300 text-gray-900 hover:border-yellow-400 focus:border-yellow-500'
+                                    }`}
+                                  >
+                                    {p.priceVariants.map((variant: PriceVariant, idx: number) => (
+                                      <option key={idx} value={idx}>
+                                        {variant.size || 'Standard'}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <div className="text-base font-bold text-yellow-400">
+                                    {formatPrice(displayPrice)}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-base font-bold text-yellow-400">
+                                  {formatPrice(p.price)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              {(p.datasheets?.length || p.certifications?.length || p.bisApproval?.length || p.isoCertificate?.length) ? (
+                                <div className="relative group">
+                                  <button className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                    isDarkMode 
+                                      ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30' 
+                                      : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300'
+                                  }`}>
+                                    <File size={14} />
+                                    <span>View Files</span>
+                                    <ChevronDown size={12} className="group-hover:translate-y-0.5 transition-transform" />
+                                  </button>
+                                  
+                                  {/* Dropdown Menu */}
+                                  <div className={`absolute left-0 top-full mt-1 w-48 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 ${
+                                    isDarkMode 
+                                      ? 'bg-gray-800 border border-white/20' 
+                                      : 'bg-white border border-gray-200'
+                                  }`}>
+                                    <div className="py-2">
+                                      {p.datasheets?.map((url, idx) => (
+                                        <a
+                                          key={`ds-${idx}`}
+                                          href={url}
+                                          download
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => handleFileDownload(e, url)}
+                                          className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                            isDarkMode 
+                                              ? 'text-gray-300 hover:bg-blue-500/20 hover:text-blue-400' 
+                                              : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                          }`}
+                                          title="Click to download datasheet"
+                                        >
+                                          <FileText size={16} className="text-blue-500" />
+                                          <span className="font-medium">Datasheet</span>
+                                          <Download size={12} className="ml-auto opacity-50" />
+                                        </a>
+                                      ))}
+                                      {p.certifications?.map((url, idx) => (
+                                        <a
+                                          key={`cert-${idx}`}
+                                          href={url}
+                                          download
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => handleFileDownload(e, url)}
+                                          className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                            isDarkMode 
+                                              ? 'text-gray-300 hover:bg-green-500/20 hover:text-green-400' 
+                                              : 'text-gray-700 hover:bg-green-50 hover:text-green-700'
+                                          }`}
+                                          title="Click to download certificate"
+                                        >
+                                          <Award size={16} className="text-green-500" />
+                                          <span className="font-medium">Certificate</span>
+                                          <Download size={12} className="ml-auto opacity-50" />
+                                        </a>
+                                      ))}
+                                      {p.bisApproval?.map((url, idx) => (
+                                        <a
+                                          key={`bis-${idx}`}
+                                          href={url}
+                                          download
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => handleFileDownload(e, url)}
+                                          className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                            isDarkMode 
+                                              ? 'text-gray-300 hover:bg-orange-500/20 hover:text-orange-400' 
+                                              : 'text-gray-700 hover:bg-orange-50 hover:text-orange-700'
+                                          }`}
+                                          title="Click to download BIS Approval"
+                                        >
+                                          <Award size={16} className="text-orange-500" />
+                                          <span className="font-medium">BIS Approval</span>
+                                          <Download size={12} className="ml-auto opacity-50" />
+                                        </a>
+                                      ))}
+                                      {p.isoCertificate?.map((url, idx) => (
+                                        <a
+                                          key={`iso-${idx}`}
+                                          href={url}
+                                          download
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => handleFileDownload(e, url)}
+                                          className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                                            isDarkMode 
+                                              ? 'text-gray-300 hover:bg-teal-500/20 hover:text-teal-400' 
+                                              : 'text-gray-700 hover:bg-teal-50 hover:text-teal-700'
+                                          }`}
+                                          title="Click to download ISO Certificate"
+                                        >
+                                          <Award size={16} className="text-teal-500" />
+                                          <span className="font-medium">ISO Certificate</span>
+                                          <Download size={12} className="ml-auto opacity-50" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className={`text-xs italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>No files</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              {isInCart ? (
+                                // Show increment/decrement controls when item is in cart
+                                <div className="flex items-center gap-2">
+                                  <button 
+                                    onClick={() => {
+                                      const currentQuantity = cart.find(item => item.cartItemId === cartItemId)?.quantity || 0;
+                                      if (currentQuantity <= 1) {
+                                        removeFromCart(cartItemId);
+                                      } else {
+                                        decreaseQuantity(cartItemId);
+                                      }
+                                    }}
+                                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
+                                      isDarkMode 
+                                        ? 'bg-gray-800 hover:bg-gray-700 text-white border border-white/20' 
+                                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
+                                    }`}
+                                  >
+                                    <Minus size={16} />
+                                  </button>
+                                  <span className={`min-w-[40px] text-center font-bold text-sm ${
+                                    isDarkMode ? 'text-white' : 'text-gray-900'
+                                  }`}>
+                                    {cart.find(item => item.cartItemId === cartItemId)?.quantity || 0}
+                                  </span>
+                                  <button 
+                                    onClick={() => increaseQuantity(cartItemId)}
+                                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
+                                      isDarkMode 
+                                        ? 'bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-400 border border-yellow-400/30' 
+                                        : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border border-yellow-300'
+                                    }`}
+                                  >
+                                    <Plus size={16} />
+                                  </button>
+                                </div>
+                              ) : (
+                                // Show Add to Cart button when item is not in cart
+                                <button
+                                  onClick={() => {
+                                    if (addingProductId !== cartItemId) {
+                                      setAddingProductId(cartItemId);
+                                      const productToAdd = {
+                                        ...p,
+                                        price: displayPrice,
+                                        selectedVariant: selectedVariant,
+                                        cartItemId,
+                                        // Flag so cart UI knows this is a lighting control item
+                                        isLightingControl: true,
+                                      } as any;
+                                      
+                                      addToCart(productToAdd);
+                                      setTimeout(() => setAddingProductId(null), 500);
+                                    }
+                                  }}
+                                  disabled={addingProductId === cartItemId}
+                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                    addingProductId === cartItemId
+                                    ? 'bg-blue-500 text-white cursor-wait'
+                                    : 'bg-yellow-400 hover:bg-yellow-500 text-black hover:scale-105'
+                                  }`}
+                                >
+                                  <ShoppingCart className="w-4 h-4" />
+                                  {addingProductId === cartItemId ? 'Adding...' : 'Add to Cart'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      }
+
                       // Default layout for LED Lights and Lighting Controls
                       return (
                         <tr key={p._id} className={`transition-colors ${
@@ -1561,12 +1817,12 @@ export default function ProductsPage() {
                               <img 
                                 src={p.productImages?.[0] || p.images?.[0]} 
                                 alt={p.sku} 
-                                className={`w-16 h-16 object-cover rounded-lg border-2 mx-auto ${
+                                className={`w-20 h-20 md:w-24 md:h-24 object-contain rounded-lg border-2 mx-auto ${
                                   isDarkMode ? 'border-white/10' : 'border-gray-200'
                                 }`}
                               />
                             ) : (
-                              <div className={`w-16 h-16 rounded-lg flex items-center justify-center mx-auto ${
+                              <div className={`w-20 h-20 md:w-24 md:h-24 rounded-lg flex items-center justify-center mx-auto ${
                                 isDarkMode ? 'bg-gray-800' : 'bg-gray-100'
                               }`}>
                                 <Package className={`w-6 h-6 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />

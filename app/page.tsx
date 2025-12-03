@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { 
-  ShoppingCart, 
-  Zap, 
-  FileText, 
+import {
+  ShoppingCart,
+  Zap,
+  FileText,
   ArrowRight,
   CheckCircle,
   TrendingUp,
@@ -73,7 +73,7 @@ export default function HomePage() {
       <section className="relative min-h-[90vh] flex items-center px-6 py-20">
         {/* Animated gradient orbs */}
         <div className="absolute inset-0 overflow-hidden">
-         {/*  <div className="absolute top-1/4 -left-48 w-96 h-96 bg-yellow-400/20 rounded-full blur-3xl animate-pulse"></div>
+          {/*  <div className="absolute top-1/4 -left-48 w-96 h-96 bg-yellow-400/20 rounded-full blur-3xl animate-pulse"></div>
          <div className="absolute bottom-1/4 -right-48 w-96 h-96 bg-yellow-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>*/}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-yellow-400/5 rounded-full blur-3xl"></div>
         </div>
@@ -121,7 +121,7 @@ export default function HomePage() {
                     </Link>
                     .
                   </p>
-                  
+
                 </div>
               </div>
             </div>
@@ -203,7 +203,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      
+
       {/* Features Grid */}
       <section className="py-6 pb-10 px-6 bg-gradient-to-b from-black via-gray-900/50 to-black">
         <div className="max-w-6xl mx-auto">

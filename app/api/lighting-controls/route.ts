@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category') || '';
     const controlType = searchParams.get('controlType') || '';
     const protocol = searchParams.get('protocol') || '';
+    const sku = searchParams.get('sku') || '';
     
     let query: any = {};
     
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
     if (category) query.category = category;
     if (controlType) query.controlType = controlType;
     if (protocol) query.protocol = protocol;
+    if (sku) query.sku = sku;
     
     const controls = await LightingControl.find(query).sort({ createdAt: -1 });
     
@@ -44,6 +46,19 @@ export async function POST(request: NextRequest) {
     await dbConnect();
     
     const body = await request.json();
+    
+    // Validation: Either base price or price variants must be provided
+    const hasBasePrice = body.price && body.price > 0;
+    const hasVariants = body.priceVariants && body.priceVariants.length > 0 && 
+                       body.priceVariants.some((v: any) => v.price > 0);
+    
+    if (!hasBasePrice && !hasVariants) {
+      return NextResponse.json(
+        { error: 'Please provide either a base price or at least one price variant' },
+        { status: 400 }
+      );
+    }
+    
     const control = await LightingControl.create(body);
     
     return NextResponse.json(control, { status: 201 });
@@ -65,6 +80,18 @@ export async function PUT(request: NextRequest) {
     
     if (!_id) {
       return NextResponse.json({ error: 'Control ID is required' }, { status: 400 });
+    }
+    
+    // Validation: Either base price or price variants must be provided
+    const hasBasePrice = updateData.price && updateData.price > 0;
+    const hasVariants = updateData.priceVariants && updateData.priceVariants.length > 0 && 
+                       updateData.priceVariants.some((v: any) => v.price > 0);
+    
+    if (!hasBasePrice && !hasVariants) {
+      return NextResponse.json(
+        { error: 'Please provide either a base price or at least one price variant' },
+        { status: 400 }
+      );
     }
     
     const control = await LightingControl.findByIdAndUpdate(_id, updateData, { new: true });

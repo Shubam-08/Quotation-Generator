@@ -20,6 +20,7 @@ import { useToast } from '@/context/ToastContext';
 interface Product {
   _id: string;
   sku?: string;
+  productName?: string;
   category?: string;
   description?: string;
   application?: string;
@@ -3312,6 +3313,11 @@ export default function EnhancedCart() {
                                     <h3 className="font-bold text-xs mb-0.5 truncate text-gray-900">
                                       {item.sku}
                                     </h3>
+                                    {item.productName && (
+                                      <p className="text-[10px] text-gray-700 mb-0.5 leading-snug">
+                                        {item.productName}
+                                      </p>
+                                    )}
                                     <p className="text-[10px] text-gray-600 truncate">
                                       {item.category}
                                     </p>
@@ -3325,6 +3331,16 @@ export default function EnhancedCart() {
                                   </button>
                                 </div>
                                 <div className="flex flex-wrap gap-1.5 mb-2">
+                                  {(item as any).selectedVariant?.channels && (
+                                    <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-indigo-500 to-blue-500 text-white border border-indigo-600 shadow-sm">
+                                      {(item as any).selectedVariant.channels} Channel{(item as any).selectedVariant.channels > 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                  {(item as any).selectedVariant?.size && (
+                                    <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-slate-600 to-slate-700 text-white border border-slate-700 shadow-sm">
+                                      {(item as any).selectedVariant.size}
+                                    </span>
+                                  )}
                                   {item.inputVoltage && item.inputVoltage !== '-' && (
                                     <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
                                       {item.inputVoltage}
@@ -3389,7 +3405,7 @@ export default function EnhancedCart() {
                                     </p>
                                   </div>
                                 </div>
-                                {!item.isDriver && !isDisplay && (
+                                {!item.isDriver && !isDisplay && !(item as any).isLightingControl && (
                                   <button
                                     onClick={() => fetchDriversForProduct(item)}
                                     className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 border border-blue-200 transition-all text-xs font-bold shadow-sm hover:shadow"
@@ -3398,7 +3414,7 @@ export default function EnhancedCart() {
                                     Add Driver
                                   </button>
                                 )}
-                                {!item.isDriver && !isDisplay && getDriversForProduct(item.cartItemId).length > 0 && (
+                                {!item.isDriver && !isDisplay && !(item as any).isLightingControl && getDriversForProduct(item.cartItemId).length > 0 && (
                                   <div className="mt-2 pt-2 border-t border-gray-200">
                                     <p className="text-[10px] font-bold text-gray-700 mb-1.5">🔌 Drivers:</p>
                                     {getDriversForProduct(item.cartItemId).map((driver) => (
@@ -3606,26 +3622,7 @@ export default function EnhancedCart() {
                       />
                     </div>
 
-                    <div>
-                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
-                        <FileText className="w-3.5 h-3.5" />
-                        Invoice No
-                      </label>
-                      <input
-                        type="text"
-                        name="invoiceNo"
-                        value={userInfo.invoiceNo}
-                        onChange={handleChange}
-                        placeholder="e.g., QT-12345678"
-                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
-                          isDarkMode 
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20' 
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                        }`}
-                      />
-                    </div>
+                    
 
                     {/* Address Selector */}
                     <div>
@@ -3650,6 +3647,28 @@ export default function EnhancedCart() {
                         <option value="delhi">India - Delhi</option>
                       </select>
                     </div>
+
+                    <div>
+                      <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        <FileText className="w-3.5 h-3.5" />
+                        Quotation No
+                      </label>
+                      <input
+                        type="text"
+                        name="invoiceNo"
+                        value={userInfo.invoiceNo}
+                        onChange={handleChange}
+                        placeholder="e.g., QT-12345678"
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
+                          isDarkMode 
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20' 
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                        }`}
+                      />
+                    </div>
+                    
                   </div>
                 </div>
 

@@ -5,10 +5,23 @@ const LightingControlSchema = new mongoose.Schema(
   {
     sku: { type: String, required: true },
     category: { type: String, required: true },
+    // Basic product information
+    productImage: { type: String }, // Main product image
+    productCode: { type: String }, // Made optional since SKU serves the same purpose
+    productName: { type: String, required: true }, // Product name for display
     description: { type: String },
     
-    // Control-specific fields (to be defined later)
-    // Placeholder fields for now
+    // Price variants based on specifications
+    priceVariants: [{
+      channels: { type: Number }, // Number of channels for this variant
+      size: { type: String }, // Size specification for this variant
+      price: { type: Number, required: true }, // Price for this variant in USD
+    }],
+    price: { type: Number, default: 0 }, // Base price in USD (for backward compatibility)
+    images: { type: [String], default: [] },
+    productImages: { type: [String], default: [] },
+    
+    // Control-specific fields
     controlType: { type: String }, // e.g., "Dimmer", "Switch", "Controller", "Sensor"
     protocol: { type: String }, // e.g., "DMX512", "DALI", "0-10V", "Zigbee", "WiFi"
     channels: { type: Number }, // Number of channels
@@ -22,10 +35,6 @@ const LightingControlSchema = new mongoose.Schema(
     ipRating: { type: String }, // e.g., "IP20", "IP44"
     application: { type: String }, // e.g., "Residential", "Commercial", "Industrial"
     
-    price: { type: Number, default: 0 }, // Base price in USD
-    images: { type: [String], default: [] },
-    productImages: { type: [String], default: [] },
-    
     // File attachments
     datasheets: { type: [String], default: [] },
     certifications: { type: [String], default: [] },
@@ -35,4 +44,9 @@ const LightingControlSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.models.LightingControl || mongoose.model("LightingControl", LightingControlSchema);
+// Delete cached model to ensure schema changes take effect
+if (mongoose.models.LightingControl) {
+  delete mongoose.models.LightingControl;
+}
+
+export default mongoose.model("LightingControl", LightingControlSchema);

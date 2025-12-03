@@ -35,6 +35,8 @@ type Product = {
   suggestedSize?: string;
   cabinetArrangementWidth?: number;
   cabinetArrangementHeight?: number;
+  // Lighting control specific fields
+  selectedVariant?: any;
 };
 
 type Driver = {
@@ -95,36 +97,50 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   }, [cart]);
 
   const addToCart = (product: Product, quantity: number = 1) => {
-    // Get IP rating as string for comparison
-    const productIpRating = Array.isArray(product.ipRating) 
-      ? product.ipRating[0] 
-      : product.ipRating;
+    // Use provided cartItemId if available (for lighting controls with variants), otherwise generate one
+    let cartItemId: string;
     
-    // Get voltage and watt for unique identification
-    const productVoltage = product.inputVoltage || 'default';
-    const productWatt = product.watt || 'default';
-    
-    // Get beam angle for unique identification
-    const productBeamAngle = product.beamAngle || 'default';
-    
-    // Get lumen for unique identification
-    const productLumen = product.lumen || 'default';
-    
-    // For LED displays, include dimensions in the unique ID to allow multiple sizes of same product
-    const dimensionKey = (product.requiredLength && product.requiredWidth) 
-      ? `_${product.requiredLength}x${product.requiredWidth}` 
-      : '';
-    
-    // For LED displays, include cabinet material in the unique ID
-    const materialKey = (product as any).selectedCabinetMaterial 
-      ? `_${(product as any).selectedCabinetMaterial.replace(/\s+/g, '')}` 
-      : '';
-    
-    // Create unique cart item ID based on product ID + IP rating + voltage + watt + beam angle + lumen + dimensions + material
-    const cartItemId = `${product._id}_${productIpRating || 'default'}_${productVoltage}_${productWatt}_${productBeamAngle}_${productLumen}${dimensionKey}${materialKey}`;
+    if ((product as any).cartItemId) {
+      // Use the pre-generated cartItemId from the product page
+      cartItemId = (product as any).cartItemId;
+    } else {
+      // Generate cartItemId for LED lights and other products
+      // Get IP rating as string for comparison
+      const productIpRating = Array.isArray(product.ipRating) 
+        ? product.ipRating[0] 
+        : product.ipRating;
+      
+      // Get voltage and watt for unique identification
+      const productVoltage = product.inputVoltage || 'default';
+      const productWatt = product.watt || 'default';
+      
+      // Get beam angle for unique identification
+      const productBeamAngle = product.beamAngle || 'default';
+      
+      // Get lumen for unique identification
+      const productLumen = product.lumen || 'default';
+      
+      // For LED displays, include dimensions in the unique ID to allow multiple sizes of same product
+      const dimensionKey = (product.requiredLength && product.requiredWidth) 
+        ? `_${product.requiredLength}x${product.requiredWidth}` 
+        : '';
+      
+      // For LED displays, include cabinet material in the unique ID
+      const materialKey = (product as any).selectedCabinetMaterial 
+        ? `_${(product as any).selectedCabinetMaterial.replace(/\s+/g, '')}` 
+        : '';
+      
+      // Create unique cart item ID based on product ID + IP rating + voltage + watt + beam angle + lumen + dimensions + material
+      cartItemId = `${product._id}_${productIpRating || 'default'}_${productVoltage}_${productWatt}_${productBeamAngle}_${productLumen}${dimensionKey}${materialKey}`;
+    }
     
     // Check if this specific combination already exists
     const exists = cart.find(item => item.cartItemId === cartItemId);
+    
+    // Get IP rating for toast messages
+    const productIpRating = Array.isArray(product.ipRating) 
+      ? product.ipRating[0] 
+      : product.ipRating;
     
     if (exists) {
       const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
@@ -155,8 +171,19 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       dimension: product.dimension || '-',
       cutOut: product.cutOut || '-',
       ipRating: productIpRating || 'N/A',
-      images: product.images || [],
-      productImages: product.productImages || [],
+      // Ensure we always pass some image data to the cart, even if the
+      // product only has a single `productImage` string (common for
+      // lighting controls).
+      images: (product as any).images && (product as any).images.length
+        ? (product as any).images
+        : ((product as any).productImage
+          ? [(product as any).productImage]
+          : []),
+      productImages: (product as any).productImages && (product as any).productImages.length
+        ? (product as any).productImages
+        : ((product as any).productImage
+          ? [(product as any).productImage]
+          : []),
       quantity: validQuantity,
       cartItemId: cartItemId
     };

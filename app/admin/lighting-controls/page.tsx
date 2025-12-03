@@ -10,7 +10,15 @@ interface LightingControl {
   _id: string;
   sku: string;
   category: string;
+  productImage?: string;
+  productCode: string;
+  productName: string;
   description?: string;
+  priceVariants?: {
+    channels?: number;
+    size?: string;
+    price: number;
+  }[];
   controlType?: string;
   protocol?: string;
   channels?: number;
@@ -69,6 +77,16 @@ export default function LightingControlsAdmin() {
     e.preventDefault();
     setError("");
 
+    // Validation: Either base price or price variants must be provided
+    const hasBasePrice = formData.price && formData.price > 0;
+    const hasVariants = formData.priceVariants && formData.priceVariants.length > 0 && 
+                       formData.priceVariants.some(v => v.price > 0);
+    
+    if (!hasBasePrice && !hasVariants) {
+      setError("Please provide either a base price or at least one price variant");
+      return;
+    }
+
     try {
       const url = "/api/lighting-controls";
       const method = editingControl ? "PUT" : "POST";
@@ -80,7 +98,11 @@ export default function LightingControlsAdmin() {
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) throw new Error("Failed to save control");
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("API Error:", errorData);
+        throw new Error(errorData.details || errorData.error || "Failed to save control");
+      }
 
       showToast(editingControl ? "Control updated successfully" : "Control created successfully", "success");
       await fetchControls();
@@ -89,7 +111,7 @@ export default function LightingControlsAdmin() {
       setFormData({});
     } catch (error) {
       console.error("Error saving control:", error);
-      setError("Failed to save control");
+      setError(error instanceof Error ? error.message : "Failed to save control");
     }
   };
 
@@ -281,6 +303,28 @@ export default function LightingControlsAdmin() {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700">Product Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.productName || ""}
+                      onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700">Product Image</label>
+                    <input
+                      type="text"
+                      placeholder="Enter image URL"
+                      value={formData.productImage || ""}
+                      onChange={(e) => setFormData({ ...formData, productImage: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-semibold mb-2 text-gray-700">Description</label>
                     <textarea
                       value={formData.description || ""}
@@ -290,39 +334,94 @@ export default function LightingControlsAdmin() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Control Type</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Dimmer, Switch"
-                        value={formData.controlType || ""}
-                        onChange={(e) => setFormData({ ...formData, controlType: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Protocol</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., DMX512, DALI"
-                        value={formData.protocol || ""}
-                        onChange={(e) => setFormData({ ...formData, protocol: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900"
-                      />
-                    </div>
-                  </div>
-
+                  
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Price (USD) *</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700">
+                      Base Price (USD) {formData.priceVariants && formData.priceVariants.length > 0 ? "(Optional)" : "*"}
+                    </label>
                     <input
                       type="number"
                       step="0.01"
-                      required
+                      required={!formData.priceVariants || formData.priceVariants.length === 0}
                       value={formData.price || ""}
                       onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900"
                     />
+                    {formData.priceVariants && formData.priceVariants.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">Base price is optional when variants are defined. Variants will be used for pricing.</p>
+                    )}
+                  </div>
+
+                  {/* Price Variants Section */}
+                  <div>
+                    <div className="flex justify-between items-center mb-3">
+                      <label className="text-sm font-semibold text-gray-700">
+                        Price Variants {!formData.price || formData.price === 0 ? "*" : "(Optional)"}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentVariants = formData.priceVariants || [];
+                          setFormData({ 
+                            ...formData, 
+                            priceVariants: [...currentVariants, { channels: undefined, size: '', price: 0 }]
+                          });
+                        }}
+                        className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium"
+                      >
+                        Add Variant
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-600 mb-2">
+                      Add different prices based on channels and/or size specifications
+                    </div>
+                    
+                    {formData.priceVariants && formData.priceVariants.length > 0 && (
+                      <div className="space-y-2">
+                        {formData.priceVariants.map((variant, index) => (
+                          <div key={index} className="flex gap-2 items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex-1">
+                              <input
+                                type="text"
+                                placeholder="Size (e.g., Small, Medium, Large)"
+                                value={variant.size || ""}
+                                onChange={(e) => {
+                                  const newVariants = [...(formData.priceVariants || [])];
+                                  newVariants[index] = { ...variant, size: e.target.value };
+                                  setFormData({ ...formData, priceVariants: newVariants });
+                                }}
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-gray-900 text-sm"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="Price (USD)"
+                                value={variant.price || ""}
+                                onChange={(e) => {
+                                  const newVariants = [...(formData.priceVariants || [])];
+                                  newVariants[index] = { ...variant, price: parseFloat(e.target.value) || 0 };
+                                  setFormData({ ...formData, priceVariants: newVariants });
+                                }}
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-gray-900 text-sm"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newVariants = [...(formData.priceVariants || [])];
+                                newVariants.splice(index, 1);
+                                setFormData({ ...formData, priceVariants: newVariants });
+                              }}
+                              className="p-1 bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
