@@ -97,7 +97,6 @@ export async function PUT(req: Request) {
         { status: 400 }
       );
     }
-
     await product.save();
 
     return NextResponse.json({

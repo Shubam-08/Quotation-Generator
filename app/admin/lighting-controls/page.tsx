@@ -205,8 +205,8 @@ export default function LightingControlsAdmin() {
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">SKU</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Control Type</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Protocol</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Ok</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Ok</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Price (USD)</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
               </tr>

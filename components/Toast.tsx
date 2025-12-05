@@ -290,21 +290,21 @@ export default function EnhancedCart() {
     // Add a blank row for spacing
     currentRow++;
     
-    // Contact No
-    worksheet.getRow(currentRow).getCell(9).value = `Contact No: ${userInfo.mobile || ''}`;
-    worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
-    worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
+    // Contact No - use column 8 for better alignment
+    worksheet.getRow(currentRow).getCell(8).value = `Contact No: ${userInfo.mobile || ''}`;
+    worksheet.getRow(currentRow).getCell(8).font = { bold: true, size: 9 };
+    worksheet.getRow(currentRow).getCell(8).alignment = { horizontal: 'right', vertical: 'middle' };
     currentRow++;
 
      // Invoice No
-    worksheet.getRow(currentRow).getCell(9).value = `Invoice No: ${userInfo.invoiceNo || ''}`;
-    worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
-    worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
+    worksheet.getRow(currentRow).getCell(8).value = `Invoice No: ${userInfo.invoiceNo || ''}`;
+    worksheet.getRow(currentRow).getCell(8).font = { bold: true, size: 9 };
+    worksheet.getRow(currentRow).getCell(8).alignment = { horizontal: 'right', vertical: 'middle' };
     
     // Date
-    worksheet.getRow(currentRow).getCell(9).value = `Date: ${currentDate}`;
-    worksheet.getRow(currentRow).getCell(9).font = { bold: true, size: 9 };
-    worksheet.getRow(currentRow).getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
+    worksheet.getRow(currentRow).getCell(8).value = `Date: ${currentDate}`;
+    worksheet.getRow(currentRow).getCell(8).font = { bold: true, size: 9 };
+    worksheet.getRow(currentRow).getCell(8).alignment = { horizontal: 'right', vertical: 'middle' };
     currentRow++;
     
    
