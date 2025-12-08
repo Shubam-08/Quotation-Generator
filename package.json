@@ -9,7 +9,9 @@
     "setup": "node scripts/setup-env.js",
     "create-admin": "node scripts/create-admin.js",
     "change-password": "node scripts/change-password.js",
-    "convert-to-usd": "node scripts/convert-inr-to-usd.js"
+    "convert-to-usd": "node scripts/convert-inr-to-usd.js",
+    "verify-seo": "node scripts/verify-seo.js",
+    "verify-seo-prod": "node scripts/verify-seo-production.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

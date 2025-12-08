@@ -9,6 +9,7 @@ import CurrencySelector from '@/components/CurrencySelector';
 import CurrencyInfo from '@/components/CurrencyInfo';
 import { Search, Filter, X, ChevronDown, ChevronUp, Package, ShoppingCart, Sparkles, Sun, Moon, FileText, Download, File, Award, ChevronLeft, ChevronRight, Plus, Minus, Settings } from 'lucide-react';
 import { getApplicationFromIpRating } from '@/lib/ipRatingUtils';
+import ProductStructuredData from '@/components/ProductStructuredData';
 
 type IpRatingPrice = {
   rating: string;
@@ -507,6 +508,8 @@ export default function ProductsPage() {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-gray-50'}`}>
+      {/* SEO: Structured Data for Products */}
+      <ProductStructuredData products={products} />
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}

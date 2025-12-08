@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     title: "QLite Global | Instant Quotation Automation",
     description:
       "QLite Global enables instant product quotation generation with smart automation tools. Create, manage, and send quotes within minutes.",
-    url: "https://www.qliteglobal.com",
+    url: "https://quotation.qrpixeldesign.com",
     siteName: "QLite Global",
     images: [
       {
@@ -85,11 +85,11 @@ export const metadata: Metadata = {
   },
   verification: {
     // Add your verification codes here when available
-    // google: "your-google-verification-code",
+    // google: "abc123xyz456",
     // yandex: "your-yandex-verification-code",
     // bing: "your-bing-verification-code",
   },
-  metadataBase: new URL("https://www.qliteglobal.com"),
+  metadataBase: new URL("https://quotation.qrpixeldesign.com"),
   alternates: {
     canonical: "/",
   },
