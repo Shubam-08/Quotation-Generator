@@ -442,7 +442,15 @@ export default function ProductsPage() {
   };
 
   useEffect(() => { fetchFilterOptions(); }, [productType]);
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  
+  // Debounced fetch to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 300); // Wait 300ms after user stops typing
+    
+    return () => clearTimeout(timer);
+  }, [fetchProducts]);
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));

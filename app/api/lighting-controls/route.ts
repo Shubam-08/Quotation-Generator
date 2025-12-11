@@ -31,7 +31,10 @@ export async function GET(request: NextRequest) {
     
     const controls = await LightingControl.find(query).sort({ createdAt: -1 });
     
-    return NextResponse.json(controls);
+    const response = NextResponse.json(controls);
+    // Cache for 5 minutes, revalidate in background
+    response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    return response;
   } catch (error: any) {
     console.error('Error fetching lighting controls:', error);
     return NextResponse.json(

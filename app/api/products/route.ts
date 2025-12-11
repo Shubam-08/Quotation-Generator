@@ -235,9 +235,16 @@ export async function GET(req: Request) {
       });
     }
 
-    return NextResponse.json(products);
+    const response = NextResponse.json(products);
+    // Cache for 5 minutes, revalidate in background
+    response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    return response;
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+// Enable edge runtime for faster response times
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic'; // Ensure fresh data when filters change

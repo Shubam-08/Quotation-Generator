@@ -49,5 +49,17 @@ const ProductSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Add indexes for faster queries
+ProductSchema.index({ category: 1 });
+ProductSchema.index({ categoryFilter: 1 });
+ProductSchema.index({ sku: 1 });
+ProductSchema.index({ application: 1 });
+ProductSchema.index({ inputVoltage: 1 });
+ProductSchema.index({ watt: 1 });
+ProductSchema.index({ beamAngle: 1 });
+// Compound index for common filter combinations
+ProductSchema.index({ category: 1, watt: 1 });
+ProductSchema.index({ categoryFilter: 1, application: 1 });
+
 // ✅ No unique constraint at all
 export default mongoose.models.Product || mongoose.model("Product", ProductSchema);

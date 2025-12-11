@@ -31,7 +31,10 @@ export async function GET(request: NextRequest) {
     
     const displays = await LedDisplay.find(query).sort({ createdAt: -1 });
     
-    return NextResponse.json(displays);
+    const response = NextResponse.json(displays);
+    // Cache for 5 minutes, revalidate in background
+    response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    return response;
   } catch (error: any) {
     console.error('Error fetching LED displays:', error);
     return NextResponse.json(

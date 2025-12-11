@@ -125,6 +125,7 @@ export default function EnhancedCart() {
   const isAdmin = session?.user?.role === 'admin';
 
   const [userInfo, setUserInfo] = useState({ email: '', mobile: '', project: '', company: '', subject: '', invoiceNo: '' });
+  const [autoInvoiceNo, setAutoInvoiceNo] = useState('');
   const [showError, setShowError] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
@@ -310,6 +311,90 @@ export default function EnhancedCart() {
   const subtotal = screenSubtotal + controllerSubtotal + cmsSubtotal;
   const discountAmount = (subtotal * discount) / 100;
   const total = subtotal - discountAmount;
+
+  // --- Auto Quotation Number Generation ---
+  const getProductCodeForCart = () => {
+    const hasDisplays = cart.some(item => !item.isDriver && isDisplayItem(item));
+    const hasLightingControls = cart.some(item => (item as any).isLightingControl);
+
+    if (hasDisplays) return 'PLD'; // LED Displays
+    if (hasLightingControls) return 'LCS'; // Lighting Controls
+    return 'LF'; // Default: LED Lights
+  };
+
+  const getCountryCodeForAddress = () => {
+    switch (selectedAddress) {
+      case 'bahrain':
+        return 'BH';
+      case 'uae':
+        return 'UAE';
+      case 'bangalore':
+      case 'delhi':
+        return 'IN';
+      default:
+        return 'BH';
+    }
+  };
+
+  const formatDateForQuote = (date: Date) => {
+    const yy = String(date.getFullYear()).slice(-2);
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yy}${mm}${dd}`;
+  };
+
+  // Read current serial without incrementing (for on-screen preview)
+  const getCurrentSerial = () => {
+    if (typeof window === 'undefined') return '001';
+
+    try {
+      const storageKey = 'qlite-quote-serial-global';
+      const currentRaw = window.localStorage.getItem(storageKey);
+      const current = currentRaw ? parseInt(currentRaw, 10) : 1;
+      const safe = isNaN(current) || current <= 0 ? 1 : current;
+      return String(safe).padStart(3, '0');
+    } catch {
+      return '001';
+    }
+  };
+
+  // Allocate the next serial and persist it (for exports only)
+  const allocateNextSerial = () => {
+    if (typeof window === 'undefined') return '001';
+
+    try {
+      const storageKey = 'qlite-quote-serial-global';
+      const currentRaw = window.localStorage.getItem(storageKey);
+      const current = currentRaw ? parseInt(currentRaw, 10) : 0;
+      const next = isNaN(current) ? 1 : current + 1;
+      window.localStorage.setItem(storageKey, String(next));
+      return String(next).padStart(3, '0');
+    } catch {
+      // Fallback if localStorage fails
+      return '001';
+    }
+  };
+
+  const generateQuotationNumber = (serial: string) => {
+    const companyCode = 'QL';
+    const productCode = getProductCodeForCart();
+    const countryCode = getCountryCodeForAddress();
+    const today = new Date();
+    const datePart = formatDateForQuote(today);
+    return `${companyCode}/${productCode}/${countryCode}/${datePart}/${serial}`;
+  };
+
+  // Auto-fill & update quotation number when cart type or address change,
+  // using the CURRENT serial without incrementing it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const currentSerial = getCurrentSerial();
+    const newQuote = generateQuotationNumber(currentSerial);
+    setAutoInvoiceNo(newQuote);
+    setUserInfo(prev => ({ ...prev, invoiceNo: newQuote }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAddress, cart.length]);
   const canDownload =
     !!userInfo.email &&
     !!userInfo.mobile &&
@@ -542,6 +627,11 @@ export default function EnhancedCart() {
 
     if (!canDownload) { setShowError(true); return; }
 
+    // Allocate next serial ONLY when exporting and update quotation number
+    const nextSerial = allocateNextSerial();
+    const exportQuoteNo = generateQuotationNumber(nextSerial);
+    setUserInfo(prev => ({ ...prev, invoiceNo: exportQuoteNo }));
+
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Cart');
 
@@ -604,7 +694,7 @@ export default function EnhancedCart() {
     worksheet.getRow(currentRow).getCell(contactColumn).font = { bold: true, size: 9 };
     worksheet.getRow(currentRow).getCell(contactColumn).alignment = { horizontal: 'right', vertical: 'middle' };
     currentRow++;
-    
+
     // Quotation No
     worksheet.getRow(currentRow).getCell(contactColumn).value = `Quotation No: ${userInfo.invoiceNo || ''}`;
     worksheet.getRow(currentRow).getCell(contactColumn).font = { bold: true, size: 9 };
@@ -1222,6 +1312,11 @@ export default function EnhancedCart() {
 
     if (!canDownload) { setShowError(true); return; }
 
+    // Allocate next serial ONLY when exporting and update quotation number
+    const nextSerial = allocateNextSerial();
+    const exportQuoteNo = generateQuotationNumber(nextSerial);
+    setUserInfo(prev => ({ ...prev, invoiceNo: exportQuoteNo }));
+
     // Decide PDF orientation:
     // - If there are any LED display items, keep portrait (existing layout)
     // - If there are only LED lights (no displays), use landscape for a wider table
@@ -1400,7 +1495,7 @@ export default function EnhancedCart() {
     doc.text('Quotation No:', rightColX, rightY);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
-    doc.text(userInfo.invoiceNo || '', rightColX + rightLabelWidth, rightY);
+    doc.text(exportQuoteNo || userInfo.invoiceNo || '', rightColX + rightLabelWidth, rightY);
 
     const pdfCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
 
@@ -2884,8 +2979,8 @@ export default function EnhancedCart() {
                 <Link
                   href="/register"
                   className={`flex-1 px-4 py-3 rounded-lg font-semibold text-center transition-colors ${isDarkMode
-                      ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
+                    ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
                     }`}
                 >
                   Register
@@ -2917,8 +3012,8 @@ export default function EnhancedCart() {
               <Link
                 href="/products"
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm hover:shadow-md ${isDarkMode
-                    ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                    : 'bg-white hover:bg-gray-50 text-gray-900 border border-gray-200 shadow-sm'
+                  ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                  : 'bg-white hover:bg-gray-50 text-gray-900 border border-gray-200 shadow-sm'
                   }`}
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -2989,8 +3084,8 @@ export default function EnhancedCart() {
                     }
                   }}
                   className={`hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-xs transition-all shadow-sm hover:shadow-md ${isDarkMode
-                      ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30'
-                      : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
+                    ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30'
+                    : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
                     }`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -3695,8 +3790,8 @@ export default function EnhancedCart() {
                   }
                 }}
                 className={`w-full sm:hidden mt-3 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${isDarkMode
-                    ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30'
-                    : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
+                  ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30'
+                  : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
                   }`}
               >
                 <Trash2 className="w-4 h-4" />
@@ -3725,8 +3820,8 @@ export default function EnhancedCart() {
                       }
                     }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all ${isDarkMode
-                        ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                        : 'bg-gray-800 hover:bg-gray-900 text-white border border-gray-700'
+                      ? 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                      : 'bg-gray-800 hover:bg-gray-900 text-white border border-gray-700'
                       }`}
                     title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                   >
@@ -3766,8 +3861,8 @@ export default function EnhancedCart() {
                         onChange={handleChange}
                         placeholder="your@email.com"
                         className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${isDarkMode
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                           }`}
                       />
                     </div>
@@ -3786,8 +3881,8 @@ export default function EnhancedCart() {
                         onChange={handleChange}
                         placeholder="+1234567890"
                         className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${isDarkMode
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                           }`}
                       />
                     </div>
@@ -3806,8 +3901,8 @@ export default function EnhancedCart() {
                         onChange={handleChange}
                         placeholder="Contact person name"
                         className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${isDarkMode
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                           }`}
                       />
                     </div>
@@ -3826,8 +3921,8 @@ export default function EnhancedCart() {
                         onChange={handleChange}
                         placeholder="Company name"
                         className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${isDarkMode
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                           }`}
                       />
                     </div>
@@ -3845,8 +3940,8 @@ export default function EnhancedCart() {
                         onChange={handleChange}
                         placeholder="e.g., Quotation"
                         className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${isDarkMode
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                           }`}
                       />
                     </div>
@@ -3864,8 +3959,8 @@ export default function EnhancedCart() {
                         value={selectedAddress}
                         onChange={(e) => setSelectedAddress(e.target.value as 'bahrain' | 'uae' | 'bangalore' | 'delhi')}
                         className={`w-full px-3 py-2 rounded-md text-xs transition-all outline-none cursor-pointer ${isDarkMode
-                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400'
-                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400'
+                          ? 'bg-black border border-white/20 text-white focus:border-yellow-400'
+                          : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400'
                           }`}
                       >
                         <option value="bahrain">Bahrain</option>
@@ -3888,8 +3983,8 @@ export default function EnhancedCart() {
                         onChange={handleChange}
                         placeholder="e.g., QT-12345678"
                         className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${isDarkMode
-                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                           }`}
                       />
                     </div>
@@ -3917,16 +4012,16 @@ export default function EnhancedCart() {
                     💎 Apply Discount
                   </h3>
                   <div className={`p-4 rounded-xl border ${isDarkMode
-                      ? 'bg-gradient-to-br from-gray-900 to-gray-800 border-yellow-400/40 shadow-xl shadow-yellow-400/10'
-                      : 'bg-gradient-to-br from-white to-yellow-50/30 border-yellow-400/50 shadow-xl'
+                    ? 'bg-gradient-to-br from-gray-900 to-gray-800 border-yellow-400/40 shadow-xl shadow-yellow-400/10'
+                    : 'bg-gradient-to-br from-white to-yellow-50/30 border-yellow-400/50 shadow-xl'
                     }`}>
                     <div className="flex items-center justify-between mb-4">
                       <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         Discount Rate
                       </span>
                       <div className={`px-4 py-1.5 rounded-lg font-bold text-lg transition-all ${isDarkMode
-                          ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50 shadow-lg shadow-yellow-400/20'
-                          : 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white border border-yellow-500 shadow-lg'
+                        ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/50 shadow-lg shadow-yellow-400/20'
+                        : 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white border border-yellow-500 shadow-lg'
                         }`}>
                         {discount}%
                       </div>
@@ -3948,8 +4043,8 @@ export default function EnhancedCart() {
 
                     {discount > 0 && (
                       <div className={`p-3 rounded-lg mb-3 border-l-4 transition-all ${isDarkMode
-                          ? 'bg-green-500/10 border-green-400 shadow-md shadow-green-400/10'
-                          : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500 shadow-md'
+                        ? 'bg-green-500/10 border-green-400 shadow-md shadow-green-400/10'
+                        : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500 shadow-md'
                         }`}>
                         <div className="flex items-center justify-between">
                           <span className={`text-sm font-semibold ${isDarkMode ? 'text-green-300' : 'text-green-700'}`}>
@@ -3965,8 +4060,8 @@ export default function EnhancedCart() {
                     <button
                       onClick={() => setShowContactPopup(true)}
                       className={`w-full py-2.5 px-4 rounded-lg font-bold text-sm transition-all border-2 ${isDarkMode
-                          ? 'bg-white text-black border-white hover:bg-gray-100 hover:shadow-lg'
-                          : 'bg-black text-white border-black hover:bg-gray-800 hover:shadow-xl'
+                        ? 'bg-white text-black border-white hover:bg-gray-100 hover:shadow-lg'
+                        : 'bg-black text-white border-black hover:bg-gray-800 hover:shadow-xl'
                         }`}
                     >
                       Request Custom Quotation
@@ -3975,8 +4070,8 @@ export default function EnhancedCart() {
 
                   {showError && (
                     <div className={`mt-3 p-2 rounded-md flex items-start gap-2 ${isDarkMode
-                        ? 'bg-red-500/10 border border-red-500/30 text-red-400'
-                        : 'bg-red-50 border border-red-200 text-red-700'
+                      ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                      : 'bg-red-50 border border-red-200 text-red-700'
                       }`}>
                       <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                       <span className="text-[10px]">Fill all fields to download</span>
@@ -3989,8 +4084,8 @@ export default function EnhancedCart() {
                   <button
                     onClick={() => setShowTermsModal(true)}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-all ${isDarkMode
-                        ? 'bg-gray-700 hover:bg-gray-600 text-white border border-white/20'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white border border-white/20'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
                       }`}
                   >
                     <Settings className="w-4 h-4" />
@@ -4670,8 +4765,8 @@ export default function EnhancedCart() {
                             }}
                             disabled={!priceEditUnlocked}
                             className={`w-full px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isDarkMode
-                                ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
-                                : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                              ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                              : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
                               }`}
                             placeholder="Width in meters"
                           />
@@ -4728,8 +4823,8 @@ export default function EnhancedCart() {
                             }}
                             disabled={!priceEditUnlocked}
                             className={`w-full px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isDarkMode
-                                ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
-                                : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                              ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                              : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
                               }`}
                             placeholder="Height in meters"
                           />
@@ -4796,8 +4891,8 @@ export default function EnhancedCart() {
                                 value={(displayFormData as any)?.suggestedSize ?? autoValue ?? ''}
                                 onChange={(e) => setDisplayFormData({ ...displayFormData, suggestedSize: e.target.value })}
                                 className={`mt-1 w-full px-2 py-1.5 rounded border text-xs ${isDarkMode
-                                    ? 'bg-gray-800 border-white/20 text-white'
-                                    : 'bg-white border-gray-300 text-gray-900'
+                                  ? 'bg-gray-800 border-white/20 text-white'
+                                  : 'bg-white border-gray-300 text-gray-900'
                                   }`}
                                 placeholder={autoValue || 'Enter suggested size'}
                               />
@@ -4858,8 +4953,8 @@ export default function EnhancedCart() {
                                 value={manualVal ?? autoValue ?? ''}
                                 onChange={(e) => setDisplayFormData({ ...displayFormData, totalResolution: e.target.value })}
                                 className={`mt-1 w-full px-2 py-1.5 rounded border text-xs ${isDarkMode
-                                    ? 'bg-gray-800 border-white/20 text-white'
-                                    : 'bg-white border-gray-300 text-gray-900'
+                                  ? 'bg-gray-800 border-white/20 text-white'
+                                  : 'bg-white border-gray-300 text-gray-900'
                                   }`}
                                 placeholder={autoValue || 'Enter screen resolution'}
                               />
@@ -4943,8 +5038,8 @@ export default function EnhancedCart() {
                             }}
                             disabled={!priceEditUnlocked}
                             className={`w-full px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isDarkMode
-                                ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
-                                : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                              ? `bg-gray-800 border-white/20 text-white ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
+                              : `bg-white border-gray-300 text-gray-900 ${!priceEditUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`
                               }`}
                             placeholder="Price per sqm"
                           />
@@ -5023,8 +5118,8 @@ export default function EnhancedCart() {
                                       }}
                                       onWheel={(e) => e.currentTarget.blur()}
                                       className={`w-12 px-1 py-0.5 rounded border text-[10px] outline-none ${isDarkMode
-                                          ? 'bg-black border-white/20 text-white focus:border-yellow-400'
-                                          : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                        ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                        : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
                                         }`}
                                     />
                                     <span className="text-gray-500">×</span>
@@ -5044,8 +5139,8 @@ export default function EnhancedCart() {
                                       }}
                                       onWheel={(e) => e.currentTarget.blur()}
                                       className={`w-12 px-1 py-0.5 rounded border text-[10px] outline-none ${isDarkMode
-                                          ? 'bg-black border-white/20 text-white focus:border-yellow-400'
-                                          : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
+                                        ? 'bg-black border-white/20 text-white focus:border-yellow-400'
+                                        : 'bg-white border-gray-300 text-gray-900 focus:border-yellow-500'
                                         }`}
                                     />
                                   </div>
@@ -5086,8 +5181,8 @@ export default function EnhancedCart() {
                                   onWheel={(e) => e.currentTarget.blur()}
                                   onChange={(e) => setDisplayFormData({ ...displayFormData, customTotalConverted: parseFloat(e.target.value) || 0, customTotalManuallyEdited: true })}
                                   className={`flex-1 px-2 py-1.5 rounded border text-xs [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isDarkMode
-                                      ? 'bg-gray-800 border-white/20 text-white'
-                                      : 'bg-white border-gray-300 text-gray-900'
+                                    ? 'bg-gray-800 border-white/20 text-white'
+                                    : 'bg-white border-gray-300 text-gray-900'
                                     }`}
                                 />
                               </div>
@@ -5115,8 +5210,8 @@ export default function EnhancedCart() {
                 type="button"
                 onClick={handleCloseDisplayEdit}
                 className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${isDarkMode
-                    ? 'bg-transparent border-2 border-white/20 text-gray-200 hover:bg-white/10'
-                    : 'bg-white border-2 border-gray-400 text-gray-700 hover:bg-gray-50 shadow-sm'
+                  ? 'bg-transparent border-2 border-white/20 text-gray-200 hover:bg-white/10'
+                  : 'bg-white border-2 border-gray-400 text-gray-700 hover:bg-gray-50 shadow-sm'
                   }`}
               >
                 Cancel
@@ -5177,8 +5272,8 @@ export default function EnhancedCart() {
                       value={driverSearchTerm}
                       onChange={(e) => setDriverSearchTerm(e.target.value)}
                       className={`w-full pl-10 pr-10 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                          ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                         }`}
                     />
                     {driverSearchTerm && (
@@ -5250,8 +5345,8 @@ export default function EnhancedCart() {
                           <button
                             onClick={() => setDriverSearchTerm('')}
                             className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${isDarkMode
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white'
                               }`}
                           >
                             Clear Search
@@ -5288,8 +5383,8 @@ export default function EnhancedCart() {
                                 <div
                                   key={driver._id}
                                   className={`p-3 rounded-lg border transition-all cursor-pointer ${isDarkMode
-                                      ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800'
-                                      : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
+                                    ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800'
+                                    : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
                                     }`}
                                   onClick={() => handleAddDriver(driver)}
                                 >
@@ -5419,8 +5514,8 @@ export default function EnhancedCart() {
                                 <div
                                   key={driver._id}
                                   className={`p-3 rounded-lg border transition-all cursor-pointer ${isDarkMode
-                                      ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800'
-                                      : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
+                                    ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800'
+                                    : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
                                     }`}
                                   onClick={() => handleAddDriver(driver)}
                                 >
@@ -5578,8 +5673,8 @@ export default function EnhancedCart() {
                       }))
                     }
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-blue-500'
+                      ? 'bg-gray-800 border border-white/20 text-white focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 focus:border-blue-500'
                       }`}
                   >
                     <option value="lights">LED Lights</option>
@@ -5684,8 +5779,8 @@ export default function EnhancedCart() {
                     onChange={(e) => setTermsAndConditions(prev => ({ ...prev, deliveryLocation: e.target.value }))}
                     placeholder="e.g., DDP Bahrain"
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                       }`}
                   />
                 </div>
@@ -5701,8 +5796,8 @@ export default function EnhancedCart() {
                     onChange={(e) => setTermsAndConditions(prev => ({ ...prev, deliveryTime: e.target.value }))}
                     placeholder="e.g., 8-10 Weeks"
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                       }`}
                   />
                 </div>
@@ -5718,8 +5813,8 @@ export default function EnhancedCart() {
                     onChange={(e) => setTermsAndConditions(prev => ({ ...prev, paymentTerms: e.target.value }))}
                     placeholder="e.g., 50% advance and balance 50% on delivery"
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                       }`}
                   />
                 </div>
@@ -5735,8 +5830,8 @@ export default function EnhancedCart() {
                     onChange={(e) => setTermsAndConditions(prev => ({ ...prev, productMake: e.target.value }))}
                     placeholder="e.g., Qlite UK make"
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                       }`}
                   />
                 </div>
@@ -5752,8 +5847,8 @@ export default function EnhancedCart() {
                     onChange={(e) => setTermsAndConditions(prev => ({ ...prev, validityDays: e.target.value }))}
                     placeholder="e.g., 45 days"
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                       }`}
                   />
                 </div>
@@ -5769,8 +5864,8 @@ export default function EnhancedCart() {
                     onChange={(e) => setTermsAndConditions(prev => ({ ...prev, vatNote: e.target.value }))}
                     placeholder="e.g., VAT will charged as per applicable government regulations"
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                       }`}
                   />
                 </div>
@@ -5786,8 +5881,8 @@ export default function EnhancedCart() {
                     onChange={(e) => setTermsAndConditions(prev => ({ ...prev, salesPersonName: e.target.value }))}
                     placeholder="Enter your name (will appear in closing)"
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                       }`}
                   />
                   <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>
@@ -5825,8 +5920,8 @@ export default function EnhancedCart() {
                 <button
                   onClick={() => setShowTermsModal(false)}
                   className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${isDarkMode
-                      ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
                     }`}
                 >
                   Cancel
