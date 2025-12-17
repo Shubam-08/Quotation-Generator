@@ -169,19 +169,28 @@ export default function Footer() {
               {/* Help Resources */}
               <div className="space-y-2">
                 <a 
-                  href="mailto:sales@qliteglobal.com?subject=Support Request"
+                  href="mailto:sales@qliteglobal.com?subject=Support Request&cc=shubam@qliteglobal.com"
                   className="flex items-center gap-2 text-gray-400 hover:text-yellow-400 text-sm transition-colors group"
-                >
+                 >
                   <Mail className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   Get Help
                 </a>
                 <a 
-                  href="mailto:sales@qliteglobal.com?subject=Report Issue"
+                  href="mailto:sales@qliteglobal.com?subject=Report Issue&cc=shubam@qliteglobal.com"
                   className="flex items-center gap-2 text-gray-400 hover:text-yellow-400 text-sm transition-colors group"
-                >
+                 >
                   <Shield className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   Report Issue
                 </a>
+                <p className="text-xs text-gray-300 mt-4">
+                  <span className="text-yellow-400 font-semibold">Systems &amp; Technical Support</span> | 
+                  <a 
+                    href="mailto:shubam@qliteglobal.com" 
+                    className="ml-1 text-gray-300 hover:text-yellow-400 transition-colors"
+                  >
+                    shubam@qliteglobal.com
+                  </a>
+                </p>
               </div>
             </div>
           </div>
@@ -193,8 +202,8 @@ export default function Footer() {
             <div className="text-sm text-gray-400 text-center md:text-left">
               © {new Date().getFullYear()} <span className="text-white font-semibold">Qlite Global</span>. All rights reserved.
             </div>
-            
-            <div className="flex items-center gap-6 text-sm">
+
+            <div className="flex items-center justify-center md:justify-end gap-6 text-sm">
               <Link 
                 href="/privacy" 
                 className="text-gray-400 hover:text-yellow-400 transition-colors"
