@@ -4,7 +4,7 @@
 
 ### 1. **Title** (59 characters)
 ```
-QLite Global | Automatic Quotation Generator
+Qlite Global | Automatic Quotation Generator
 ```
 
 ### 2. **Description** (158 characters)
@@ -40,7 +40,7 @@ Generate professional product quotations in minutes. QLite Global helps business
 
 ### 6. **Twitter Card**
 - **Card Type**: summary_large_image
-- **Title**: QLite Global | Automatic Quotation Generator
+- **Title**: Qlite Global | Automatic Quotation Generator
 - **Description**: Generate professional product quotations in minutes with smart automation tools.
 - **Image**: `/og-image.png`
 - **Creator**: @qliteglobal

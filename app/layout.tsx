@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 // ✅ Focused metadata for quotation platform
 export const metadata: Metadata = {
-  title: "QLite Global | Automatic Quotation Generator",
+  title: "Qlite Global | Automatic Quotation Generator",
   description:
     "Generate professional product quotations in minutes. QLite Global helps businesses automate pricing, proposals, and client management efficiently.",
   keywords: [
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     shortcut: "/favicon.ico",
   },
   openGraph: {
-    title: "QLite Global | Instant Quotation Automation",
+    title: "Qlite Global | Instant Quotation Automation",
     description:
       "QLite Global enables instant product quotation generation with smart automation tools. Create, manage, and send quotes within minutes.",
     url: "https://quotation.qrpixeldesign.com",
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "QLite Global | Automatic Quotation Generator",
+    title: "Qlite Global | Automatic Quotation Generator",
     description:
       "Generate professional product quotations in minutes with smart automation tools.",
     images: ["/og-image.png"],
@@ -104,6 +104,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <Script
           id="organization-structured-data"
           type="application/ld+json"
