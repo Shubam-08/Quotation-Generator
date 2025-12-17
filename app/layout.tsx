@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Qlite Global | Automatic Quotation Generator",
   description:
-    "Generate professional product quotations in minutes. QLite Global helps businesses automate pricing, proposals, and client management efficiently.",
+    "Generate professional product quotations in minutes. Qlite Global helps businesses automate pricing, proposals, and client management efficiently.",
   keywords: [
     "automatic quotation generator",
     "quotation software",
@@ -35,9 +35,9 @@ export const metadata: Metadata = {
     "LED lighting quotation",
     "business proposal tool",
   ],
-  authors: [{ name: "QLite Global" }],
-  creator: "QLite Global",
-  publisher: "QLite Global",
+  authors: [{ name: "Qlite Global" }],
+  creator: "Qlite Global",
+  publisher: "Qlite Global",
   robots: {
     index: true,
     follow: true,
@@ -62,15 +62,15 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Qlite Global | Instant Quotation Automation",
     description:
-      "QLite Global enables instant product quotation generation with smart automation tools. Create, manage, and send quotes within minutes.",
+      "Qlite Global enables instant product quotation generation with smart automation tools. Create, manage, and send quotes within minutes.",
     url: "https://quotation.qrpixeldesign.com",
-    siteName: "QLite Global",
+    siteName: "Qlite Global",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "QLite Global - Automatic Quotation Generator",
+        alt: "Qlite Global - Automatic Quotation Generator",
       },
     ],
     locale: "en_US",
@@ -113,7 +113,7 @@ export default function RootLayout({
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
-            name: "QLite Global",
+            name: "Qlite Global",
             url: "https://quotation.qrpixeldesign.com",
             logo: "https://quotation.qrpixeldesign.com/logo.jpg",
           })}

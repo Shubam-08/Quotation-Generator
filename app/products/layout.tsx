@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'LED Products & Lighting Controls | QLite Global Quotation',
+  title: 'LED Products & Lighting Controls | Qlite Global Quotation',
   description: 'Browse our complete catalog of LED lights, LED displays, lighting controls, and drivers. Get instant quotations for commercial and industrial lighting solutions.',
   keywords: [
     'LED lights',
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     'smart lighting controls',
   ],
   openGraph: {
-    title: 'LED Products & Lighting Controls | QLite Global',
+    title: 'LED Products & Lighting Controls | Qlite Global',
     description: 'Browse our complete catalog of LED lights, LED displays, lighting controls, and drivers. Get instant quotations.',
     type: 'website',
   },
