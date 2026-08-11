@@ -2,10 +2,18 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
+    // Basic identity
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ["admin", "user"], default: "user" },
+
+    // Professional / audit fields collected at registration
+    mobile: { type: String, required: true },
+    companyName: { type: String, required: true },
+    department: { type: String, required: true },
+    role: { type: String, required: true },
+    country: { type: String, required: true },
+    city: { type: String, required: true },
   },
   { timestamps: true }
 );

@@ -9,6 +9,12 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    mobile: "",
+    companyName: "",
+    department: "",
+    role: "",
+    country: "",
+    city: "",
     password: "",
     confirmPassword: "",
   });
@@ -18,6 +24,23 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // Frontend validation: all fields must be filled
+    if (
+      !formData.name ||
+      !formData.email ||
+      !formData.mobile ||
+      !formData.companyName ||
+      !formData.department ||
+      !formData.role ||
+      !formData.country ||
+      !formData.city ||
+      !formData.password ||
+      !formData.confirmPassword
+    ) {
+      setError("Please fill in all fields before creating your account.");
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
@@ -39,6 +62,12 @@ export default function RegisterPage() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          mobile: formData.mobile,
+          companyName: formData.companyName,
+          department: formData.department,
+          role: formData.role,
+          country: formData.country,
+          city: formData.city,
         }),
       });
 
@@ -99,6 +128,134 @@ export default function RegisterPage() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
               placeholder="you@example.com"
             />
+          </div>
+
+          <div>
+            <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-2">
+              Mobile Number
+            </label>
+            <input
+              id="mobile"
+              type="tel"
+              value={formData.mobile}
+              onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+              placeholder="+91 98765 43210"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
+              Company Name
+            </label>
+            <input
+              id="companyName"
+              type="text"
+              value={formData.companyName}
+              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+              placeholder="QLite Global"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
+                Department
+              </label>
+              <select
+                id="department"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+              >
+                <option value="">Select department</option>
+                <option value="sales">Sales</option>
+                <option value="marketing">Marketing</option>
+                <option value="finance">Finance</option>
+                <option value="operations">Operations</option>
+                <option value="it">IT</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
+                Role
+              </label>
+              <input
+                id="role"
+                type="text"
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                placeholder="Sales Executive, Manager, etc."
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
+                Country
+              </label>
+              <select
+                id="country"
+                value={formData.country}
+                onChange={(e) =>
+                  setFormData({ ...formData, country: e.target.value, city: "" })
+                }
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+              >
+                <option value="">Select country</option>
+                <option value="india">India</option>
+                <option value="uae">UAE</option>
+                <option value="usa">USA</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
+                City / Territory
+              </label>
+              <select
+                id="city"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                disabled={!formData.country}
+              >
+                <option value="">Select city</option>
+                {formData.country === "india" && (
+                  <>
+                    <option value="mumbai">Mumbai</option>
+                    <option value="delhi">Delhi</option>
+                    <option value="bangalore">Bangalore</option>
+                    <option value="chennai">Chennai</option>
+                  </>
+                )}
+                {formData.country === "uae" && (
+                  <>
+                    <option value="dubai">Dubai</option>
+                    <option value="abu_dhabi">Abu Dhabi</option>
+                    <option value="sharjah">Sharjah</option>
+                  </>
+                )}
+                {formData.country === "usa" && (
+                  <>
+                    <option value="new_york">New York</option>
+                    <option value="los_angeles">Los Angeles</option>
+                    <option value="chicago">Chicago</option>
+                  </>
+                )}
+              </select>
+            </div>
           </div>
 
           <div>

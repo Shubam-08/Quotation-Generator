@@ -8,12 +8,22 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
 
-    const { name, email, password, role } = await req.json();
+    const {
+      name,
+      email,
+      password,
+      mobile,
+      companyName,
+      department,
+      role,
+      country,
+      city,
+    } = await req.json();
 
     // Validate input
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !mobile || !companyName || !department || !role || !country || !city) {
       return NextResponse.json(
-        { error: "Name, email, and password are required" },
+        { error: "All fields are required" },
         { status: 400 }
       );
     }
@@ -35,7 +45,12 @@ export async function POST(req: Request) {
       name,
       email,
       password: hashedPassword,
+      mobile,
+      companyName,
+      department,
       role: role || "user",
+      country,
+      city,
     });
 
     await newUser.save();
