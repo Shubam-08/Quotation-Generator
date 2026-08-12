@@ -31,7 +31,12 @@ interface Product {
   lumen?: string;
   beamAngle?: string;
   dimension?: string;
+  cct?: string;
   cutOut?: string;
+  dimming?: string;
+  accessories?: string;
+  finish?: string;
+  reflectorFinish?: string;
   ipRatings?: IpRatingPrice[]; // New structure with individual prices
   ipRating?: string[]; // Legacy field for backward compatibility
   voltageVariants?: VoltageVariant[]; // Voltage variants with watt and price
@@ -1234,6 +1239,76 @@ export default function AdminDashboard() {
                     <p className="mt-1 text-xs text-gray-500">
                       💡 Select from existing beam angles or type a new one. Existing: {uniqueBeamAngles.length > 0 ? uniqueBeamAngles.join(', ') : 'None yet'}
                     </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Dimension</label>
+                    <input 
+                      type="text"
+                      value={formData.dimension || ''}
+                      onChange={(e) => setFormData({...formData, dimension: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cut Out</label>
+                    <input 
+                      type="text"
+                      value={formData.cutOut || ''}
+                      onChange={(e) => setFormData({...formData, cutOut: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">CCT</label>
+                    <input 
+                      type="text"
+                      value={formData.cct || ''}
+                      onChange={(e) => setFormData({...formData, cct: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Dimming</label>
+                    <input 
+                      type="text"
+                      value={formData.dimming || ''}
+                      onChange={(e) => setFormData({...formData, dimming: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Accessories</label>
+                    <input 
+                      type="text"
+                      value={formData.accessories || ''}
+                      onChange={(e) => setFormData({...formData, accessories: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Finish</label>
+                    <input 
+                      type="text"
+                      value={formData.finish || ''}
+                      onChange={(e) => setFormData({...formData, finish: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Reflector Finish</label>
+                    <input 
+                      type="text"
+                      value={formData.reflectorFinish || ''}
+                      onChange={(e) => setFormData({...formData, reflectorFinish: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                    />
                   </div>
 
                   <div className="col-span-2">

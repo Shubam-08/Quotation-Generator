@@ -17,7 +17,12 @@ type Product = {
   beamAngle?: string;
   application?: string;
   dimension?: string;
+  cct?: string;
   cutOut?: string;
+  dimming?: string;
+  accessories?: string;
+  finish?: string;
+  reflectorFinish?: string;
   ipRating?: string | string[]; // Support both single string and array for backward compatibility
   images?: string[];
   productImages?: string[];

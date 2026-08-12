@@ -188,6 +188,7 @@ export default function ProductsPage() {
   // Product type state
   const [productType, setProductType] = useState<'led-lights' | 'led-displays' | 'lighting-controls'>('led-lights');
 
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2163,7 +2164,8 @@ export default function ProductsPage() {
                             )}
                           </td>
                           <td className="px-4 py-4">
-                            {isInCart ? (
+                            <div className="flex items-center gap-2">
+                              {isInCart ? (
                               // Show increment/decrement controls when item is in cart
                               <div className="flex items-center gap-2">
                                 <button 
@@ -2233,6 +2235,13 @@ export default function ProductsPage() {
                                 {addingProductId === cartItemId ? 'Adding...' : 'Add to Cart'}
                               </button>
                             )}
+                            <button
+                              onClick={() => setSelectedProduct(p)}
+                              className="flex items-center gap-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-sm font-medium cursor-pointer transition-all"
+                            >
+                              Details
+                            </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2366,6 +2375,79 @@ export default function ProductsPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-xl p-6 max-w-md w-full shadow-2xl border border-gray-700">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-white font-bold text-lg">
+                {selectedProduct.sku}
+              </h2>
+              <button
+                onClick={() => setSelectedProduct(null)}
+                className="text-gray-400 hover:text-white text-2xl cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Specs Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Category', value: selectedProduct.category },
+                { label: 'Application', value: selectedProduct.application },
+                { label: 'Wattage', value: selectedProduct.watt ? selectedProduct.watt + 'W' : null },
+                { label: 'Lumen', value: selectedProduct.lumen },
+                { label: 'Beam Angle', value: selectedProduct.beamAngle },
+                { label: 'Input Voltage', value: selectedProduct.inputVoltage },
+                { label: 'Dimension', value: selectedProduct.dimension },
+                { label: 'Cut Out', value: selectedProduct.cutOut },
+                { label: 'CCT', value: selectedProduct.cct },
+                {
+                  label: 'IP Rating',
+                  value: (() => {
+                    if (selectedProduct.ipRating && 
+                        selectedProduct.ipRating.length > 0) {
+                      return Array.isArray(selectedProduct.ipRating)
+                        ? selectedProduct.ipRating.join(', ')
+                        : selectedProduct.ipRating;
+                    }
+                    if (selectedProduct.ipRatings && 
+                        selectedProduct.ipRatings.length > 0) {
+                      return selectedProduct.ipRatings
+                        .map((r: any) => r.rating)
+                        .join(', ');
+                    }
+                    return null;
+                  })()
+                },
+                { label: 'Dimming', value: selectedProduct.dimming },
+                { label: 'Accessories', value: selectedProduct.accessories },
+                { label: 'Finish', value: selectedProduct.finish },
+                { label: 'Reflector Finish', value: selectedProduct.reflectorFinish },
+              ]
+                .filter(spec => spec.value && spec.value !== '-' && spec.value !== '')
+                .map((spec, index) => (
+                  <div key={index} className="bg-gray-800 rounded-lg p-3">
+                    <p className="text-gray-400 text-xs mb-1">{spec.label}</p>
+                    <p className="text-white text-sm font-medium">{spec.value}</p>
+                  </div>
+                ))
+              }
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedProduct(null)}
+              className="mt-4 w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm cursor-pointer transition-all"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
