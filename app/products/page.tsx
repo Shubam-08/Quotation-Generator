@@ -2406,7 +2406,6 @@ export default function ProductsPage() {
                 { label: 'Beam Angle', value: selectedProduct.beamAngle },
                 { label: 'Input Voltage', value: selectedProduct.inputVoltage },
                 { label: 'Dimension', value: selectedProduct.dimension },
-                { label: 'Cut Out', value: selectedProduct.cutOut },
                 { label: 'CCT', value: selectedProduct.cct },
                 {
                   label: 'IP Rating',

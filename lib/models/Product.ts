@@ -14,7 +14,6 @@ const ProductSchema = new mongoose.Schema(
     beamAngle: { type: String },
     dimension: { type: String },
     cct: { type: String, default: '' },
-    cutOut: { type: String },
     dimming: { type: String, default: '' },
     accessories: { type: String, default: '' },
     finish: { type: String, default: '' },

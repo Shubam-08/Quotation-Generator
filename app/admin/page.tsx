@@ -32,7 +32,6 @@ interface Product {
   beamAngle?: string;
   dimension?: string;
   cct?: string;
-  cutOut?: string;
   dimming?: string;
   accessories?: string;
   finish?: string;
@@ -1247,16 +1246,6 @@ export default function AdminDashboard() {
                       type="text"
                       value={formData.dimension || ''}
                       onChange={(e) => setFormData({...formData, dimension: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cut Out</label>
-                    <input 
-                      type="text"
-                      value={formData.cutOut || ''}
-                      onChange={(e) => setFormData({...formData, cutOut: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
                     />
                   </div>

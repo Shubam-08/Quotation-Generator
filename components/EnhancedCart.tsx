@@ -963,31 +963,50 @@ export default function EnhancedCart() {
           // LED PRODUCT
           const row1Index = currentRowIndex;
           const row1 = worksheet.getRow(row1Index);
-          row1.height = 110;
+          
+          const specCount = [
+            item.category, (item as any).type, item.watt,
+            (item as any).dimension, (item as any).beamAngle,
+            (item as any).lumen, item.ipRating,
+            item.inputVoltage, (item as any).cct,
+            (item as any).dimming, (item as any).accessories,
+            (item as any).finish, (item as any).reflectorFinish
+          ].filter(v => v && v !== '-' && v !== '').length;
+
+          const rowHeight = Math.max(60, specCount * 15);
+          row1.height = rowHeight;
 
           // 1. S.No.
           row1.getCell(1).value = serialNumber;
 
           // 2. Description
-          row1.getCell(2).value = {
-            richText: [
-              { text: 'Category: ', font: { bold: true, size: 9 } },
-              { text: `${item.category ?? '-'}\n`, font: { bold: false, size: 9 } },
-              { text: 'Type: ', font: { bold: true, size: 9 } },
-              { text: `${item.type ?? '-'}\n`, font: { bold: false, size: 9 } },
-              { text: 'Wattage: ', font: { bold: true, size: 9 } },
-              { text: `${item.watt ? item.watt + 'W' : '-'}\n`, font: { bold: false, size: 9 } },
-              { text: 'Dimension: ', font: { bold: true, size: 9 } },
-              { text: `${item.dimension ?? '-'}\n`, font: { bold: false, size: 9 } },
-              { text: 'Beam Angle: ', font: { bold: true, size: 9 } },
-              { text: `${item.beamAngle ?? '-'}\n`, font: { bold: false, size: 9 } },
-              { text: 'Lumen: ', font: { bold: true, size: 9 } },
-              { text: `${item.lumen ?? '-'}\n`, font: { bold: false, size: 9 } },
-              { text: 'IP Rating: ', font: { bold: true, size: 9 } },
-              { text: `${Array.isArray(item.ipRating) ? item.ipRating.join(', ') : item.ipRating ?? '-'}`, font: { bold: false, size: 9 } },
-            ]
+          const specLines: any[] = [];
+          const addSpec = (label: string, value: any, isLast = false) => {
+            const val = Array.isArray(value) ? value.join(', ') : value;
+            if (val && val !== '-' && val !== '') {
+              specLines.push({ text: label, font: { bold: true, size: 9 } });
+              specLines.push({ text: `${val}${isLast ? '' : '\n'}`, font: { bold: false, size: 9 } });
+            }
           };
-          row1.getCell(2).alignment = { wrapText: true, vertical: 'middle', horizontal: 'left' };
+
+          addSpec('Category: ', item.category);
+          addSpec('Type: ', (item as any).type);
+          addSpec('Wattage: ', item.watt ? item.watt + 'W' : null);
+          addSpec('Dimension: ', (item as any).dimension);
+          addSpec('Beam Angle: ', (item as any).beamAngle);
+          addSpec('Lumen: ', (item as any).lumen);
+          addSpec('IP Rating: ', Array.isArray(item.ipRating) ? item.ipRating.join(', ') : item.ipRating);
+          addSpec('Input Voltage: ', item.inputVoltage);
+          addSpec('CCT: ', (item as any).cct);
+          addSpec('Dimming: ', (item as any).dimming);
+          addSpec('Accessories: ', (item as any).accessories);
+          addSpec('Finish: ', (item as any).finish);
+          addSpec('Reflector Finish: ', (item as any).reflectorFinish, true);
+
+          row1.getCell(2).value = { richText: specLines };
+          row1.getCell(2).alignment = {
+            wrapText: true, vertical: 'top', horizontal: 'left'
+          };
 
           // 3. Model No.
           row1.getCell(3).value = item.sku ?? 'N/A';
@@ -1013,7 +1032,7 @@ export default function EnhancedCart() {
             cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
             if (col === 2) {
-              cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+              cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
             } else {
               cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             }
@@ -1048,7 +1067,7 @@ export default function EnhancedCart() {
       }
 
       // SECTION 4 - TOTAL ROW
-      const totalRowIndex = currentRowIndex + 1;
+      const totalRowIndex = currentRowIndex;
       const totalRow = worksheet.getRow(totalRowIndex);
 
       // Merge cols 6-7 for label, put value in 8
@@ -1064,10 +1083,20 @@ export default function EnhancedCart() {
       totalRow.getCell(8).border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
       // SECTION 5 - TERMS AND CONDITIONS
-      const termsStartRow = totalRowIndex + 3; // 2 blank rows
+      const termsStartRow = totalRowIndex + 1; // 2 blank rows
       worksheet.getRow(termsStartRow).getCell(1).value = 'Terms and Conditions:';
       worksheet.getRow(termsStartRow).getCell(1).font = { bold: true, size: 11, underline: true };
       worksheet.mergeCells(termsStartRow, 1, termsStartRow, 8);
+
+      for (let col = 1; col <= 8; col++) {
+        const cell = worksheet.getRow(termsStartRow).getCell(col);
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      }
 
       const terms = [
         `1. The prices quoted on ${termsAndConditions.deliveryLocation}.`,
@@ -1086,6 +1115,16 @@ export default function EnhancedCart() {
         row.getCell(1).alignment = { wrapText: true, vertical: 'middle' };
         worksheet.mergeCells(rowNum, 1, rowNum, 8);
         row.height = 25;
+
+        for (let col = 1; col <= 8; col++) {
+          const cell = worksheet.getRow(rowNum).getCell(col);
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        }
       });
 
       // Set print options
@@ -2533,6 +2572,26 @@ export default function EnhancedCart() {
 
       } else {
         // ORIGINAL FORMAT FOR LED LIGHTS (and mixed carts)
+        const getSpecText = (item: any): string => {
+          const specs: string[] = [];
+          if (item.category) specs.push(`Category: ${item.category}`);
+          if (item.type) specs.push(`Type: ${item.type}`);
+          if (item.watt) specs.push(`Wattage: ${item.watt}W`);
+          if (item.dimension) specs.push(`Dimension: ${item.dimension}`);
+          if (item.beamAngle) specs.push(`Beam Angle: ${item.beamAngle}`);
+          if (item.lumen) specs.push(`Lumen: ${item.lumen}`);
+          const ip = Array.isArray(item.ipRating) 
+            ? item.ipRating.join(', ') : item.ipRating;
+          if (ip) specs.push(`IP Rating: ${ip}`);
+          if (item.inputVoltage) specs.push(`Input Voltage: ${item.inputVoltage}`);
+          if (item.cct) specs.push(`CCT: ${item.cct}`);
+          if (item.dimming) specs.push(`Dimming: ${item.dimming}`);
+          if (item.accessories) specs.push(`Accessories: ${item.accessories}`);
+          if (item.finish) specs.push(`Finish: ${item.finish}`);
+          if (item.reflectorFinish) specs.push(`Reflector Finish: ${item.reflectorFinish}`);
+          return specs.join('\n');
+        };
+
         const rows = organizedCart.map((item, index) => {
           if (item.isDriver) {
             // Driver row - all specs in one large merged cell
@@ -2601,10 +2660,9 @@ export default function EnhancedCart() {
             // LED Product row - normal format
             return [
               index + 1,
-              // Description with all specs
-              `Category: ${item.category ?? '-'}\nType: ${item.type ?? '-'}\nWattage: ${item.watt ? item.watt + 'W' : '-'}\nDimension: ${item.dimension ?? '-'}\nBeam Angle: ${item.beamAngle ?? '-'}\nLumen: ${item.lumen ?? '-'}\nIP Rating: ${Array.isArray(item.ipRating) ? item.ipRating.join(', ') : item.ipRating ?? '-'}`,
+              getSpecText(item),
               item.sku ?? 'N/A',
-              '', // Image column
+              '',
               'Nos',
               item.quantity ?? 1,
               convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -2670,9 +2728,9 @@ export default function EnhancedCart() {
                 data.cell.styles.fontStyle = 'bold';
                 data.cell.styles.minCellHeight = 30; // Smaller height for drivers
               } else {
-                const imgInnerH = (rowHeights[idx] || 46);
-                const desired = imgInnerH + cellPadding.top + cellPadding.bottom;
-                data.cell.styles.minCellHeight = Math.max(data.cell.styles.minCellHeight || 0, desired, 52);
+                const lineCount = getSpecText(organizedCart[idx]).split('\n').length;
+                const dynamicHeight = Math.max(52, lineCount * 12);
+                data.cell.styles.minCellHeight = dynamicHeight;
               }
             }
           },
@@ -2683,35 +2741,37 @@ export default function EnhancedCart() {
               if (!item) return;
 
               if (data.column.index === 1 && !item?.isDriver) {
-                const specs = [
-                  { label: 'Category: ', value: item.category ?? '-' },
-                  { label: 'Type: ', value: (item as any).type ?? '-' },
-                  { label: 'Wattage: ', value: item.watt ? item.watt + 'W' : '-' },
-                  { label: 'Dimension: ', value: (item as any).dimension ?? '-' },
-                  { label: 'Beam Angle: ', value: (item as any).beamAngle ?? '-' },
-                  { label: 'Lumen: ', value: (item as any).lumen ?? '-' },
-                  { label: 'IP Rating: ', value: Array.isArray(item.ipRating) ? item.ipRating.join(', ') : (item as any).ipRating ?? '-' },
-                ];
-                
+                const specLines = getSpecText(item).split('\n');
+
                 // Clear the auto-rendered text by drawing white rect
                 (doc as any).setFillColor(255, 255, 255);
                 doc.rect(data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1, 'F');
-                
+
                 let textY = data.cell.y + 8;
                 const textX = data.cell.x + 3;
-                
-                specs.forEach(({ label, value }) => {
-                  // Draw bold label
-                  doc.setFont('helvetica', 'bold');
-                  doc.setFontSize(8);
-                  doc.setTextColor(0, 0, 0);
-                  doc.text(label, textX, textY);
-                  const labelWidth = doc.getTextWidth(label);
-                  
-                  // Draw normal value
-                  doc.setFont('helvetica', 'normal');
-                  doc.text(value, textX + labelWidth, textY);
-                  textY += 10;
+
+                specLines.forEach((line) => {
+                  const colonIndex = line.indexOf(':');
+                  if (colonIndex !== -1) {
+                    const label = line.substring(0, colonIndex + 1) + ' ';
+                    const value = line.substring(colonIndex + 1).trim();
+                    // Draw bold label
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(8);
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(label, textX, textY);
+                    const labelWidth = doc.getTextWidth(label);
+                    
+                    // Draw normal value
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(value, textX + labelWidth, textY);
+                  } else {
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(8);
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(line, textX, textY);
+                  }
+                  textY += 12; // Adjust Y for next line
                 });
               }
 
@@ -2864,7 +2924,7 @@ export default function EnhancedCart() {
           doc.setFont('helvetica', 'bold');
           const centerX = doc.internal.pageSize.width / 2;
           const centerY = doc.internal.pageSize.height / 2;
-          doc.text('DRAFT', centerX, centerY, { 
+          doc.text('DRAFT', centerX, centerY, {
             align: 'center',
             angle: 45
           });
@@ -4056,8 +4116,8 @@ export default function EnhancedCart() {
                         setQuotationType('draft');
                       }}
                       className={`flex-1 py-2 rounded-md text-sm font-semibold border transition-all cursor-pointer
-                        ${quotationType === 'draft' 
-                          ? 'bg-orange-500 text-white border-orange-500' 
+                        ${quotationType === 'draft'
+                          ? 'bg-orange-500 text-white border-orange-500'
                           : 'bg-white text-gray-600 border-gray-300'}`}
                     >
                       Draft
@@ -4070,8 +4130,8 @@ export default function EnhancedCart() {
                         setQuotationType('final');
                       }}
                       className={`flex-1 py-2 rounded-md text-sm font-semibold border transition-all cursor-pointer
-                        ${quotationType === 'final' 
-                          ? 'bg-green-600 text-white border-green-600' 
+                        ${quotationType === 'final'
+                          ? 'bg-green-600 text-white border-green-600'
                           : 'bg-white text-gray-600 border-gray-300'}`}
                     >
                       Final

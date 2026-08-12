@@ -18,7 +18,6 @@ type Product = {
   application?: string;
   dimension?: string;
   cct?: string;
-  cutOut?: string;
   dimming?: string;
   accessories?: string;
   finish?: string;
