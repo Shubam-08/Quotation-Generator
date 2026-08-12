@@ -20,6 +20,7 @@ export async function GET(req: Request) {
       userName: 1,
       userRole: 1,
       createdAt: 1,
+      status: 1,
     })
       .sort({ createdAt: -1 })
       .lean();

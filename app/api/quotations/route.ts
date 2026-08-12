@@ -25,7 +25,22 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     // Expect frontend to send the generated quotationNumber
-    const { quotationNumber, clientName, clientEmail, products, totalPrice, pdfUrl } = body;
+    const { 
+      quotationNumber, 
+      clientName, 
+      clientEmail, 
+      products, 
+      totalPrice, 
+      pdfUrl, 
+      status,
+      userDepartment,
+      userCountry,
+      userMobile,
+      userCompanyName
+    } = body;
+
+    console.log('Received status from frontend:', status);
+    console.log('Full body received:', body);
 
     if (!quotationNumber || !clientName) {
       return NextResponse.json(
@@ -41,19 +56,20 @@ export async function POST(req: Request) {
 
     const newQuotation = await Quotation.create({
       clientName,
-      clientEmail,
+      clientEmail: clientEmail || '',
       products,
       totalPrice,
       pdfUrl,
       quotationNumber,
+      status: status || 'final',
       userId: user._id,
       userName: user.name,
       userEmail: user.email,
       userRole: user.role,
-      userDepartment: user.department,
-      userCountry: user.country,
-      userMobile: user.mobile,
-      userCompanyName: user.companyName,
+      userDepartment: userDepartment || '',
+      userCountry: userCountry || '',
+      userMobile: userMobile || '',
+      userCompanyName: userCompanyName || '',
     });
 
     return NextResponse.json(newQuotation, { status: 201 });

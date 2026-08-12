@@ -18,15 +18,17 @@ const quotationSchema = new mongoose.Schema({
 
   // Snapshot of user registration info at time of quotation creation
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  userName: { type: String, required: true },
-  userEmail: { type: String, required: true },
-  userRole: { type: String, required: true },
-  userDepartment: { type: String, required: true },
-  userCountry: { type: String, required: true },
-  userMobile: { type: String, required: true },
-  userCompanyName: { type: String, required: true },
+  userName: { type: String, default: '' },
+  userEmail: { type: String, default: '' },
+  userRole: { type: String, default: '' },
+  userDepartment: { type: String, default: '' },
+  userCountry: { type: String, default: '' },
+  userMobile: { type: String, default: '' },
+  userCompanyName: { type: String, default: '' },
 
   createdAt: { type: Date, default: Date.now },
+  status: { type: String, enum: ['draft', 'final'], default: 'final' },
 });
 
-export default mongoose.models.Quotation || mongoose.model("Quotation", quotationSchema);
+delete mongoose.models['Quotation'];
+export default mongoose.model("Quotation", quotationSchema);

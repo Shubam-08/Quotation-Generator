@@ -10,6 +10,7 @@ interface AdminQuotation {
   userName: string;
   userRole: string;
   createdAt?: string;
+  status?: string;
 }
 
 export default function AdminQuotationsPage() {
@@ -78,6 +79,7 @@ export default function AdminQuotationsPage() {
                 <th className="px-4 py-2 text-left font-semibold text-gray-700">User Name</th>
                 <th className="px-4 py-2 text-left font-semibold text-gray-700">User Role</th>
                 <th className="px-4 py-2 text-left font-semibold text-gray-700">Created At</th>
+                <th className="px-4 py-2 text-left font-semibold text-gray-700">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -94,6 +96,17 @@ export default function AdminQuotationsPage() {
                   </td>
                   <td className="px-4 py-2 text-gray-500 text-xs">
                     {q.createdAt ? new Date(q.createdAt).toLocaleString() : "-"}
+                  </td>
+                  <td className="px-4 py-2">
+                    {q.status === 'draft' ? (
+                      <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
+                        Draft
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                        Final
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
