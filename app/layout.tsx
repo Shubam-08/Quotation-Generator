@@ -105,6 +105,15 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            document.addEventListener('wheel', function(e) {
+              if (document.activeElement.type === 'number') {
+                document.activeElement.blur();
+              }
+            }, { passive: false });
+          `
+        }} />
         <Script
           id="organization-structured-data"
           type="application/ld+json"
