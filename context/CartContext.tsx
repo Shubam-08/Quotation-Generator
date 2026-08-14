@@ -17,6 +17,7 @@ type Product = {
   beamAngle?: string;
   application?: string;
   dimension?: string;
+  wattageVariants?: { watt: number; lumen: string; dimension: string; }[];
   cct?: string;
   dimming?: string;
   accessories?: string;

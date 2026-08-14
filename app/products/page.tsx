@@ -202,8 +202,10 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [selectedIpRatings, setSelectedIpRatings] = useState<Record<string, string>>({});
+  const [selectedWattVariants, setSelectedWattVariants] = useState<Record<string, number>>({});
 
   const [selectedBeamAngles, setSelectedBeamAngles] = useState<Record<string, string>>({});
+  const [selectedCcts, setSelectedCcts] = useState<Record<string, string>>({});
   const [selectedLumens, setSelectedLumens] = useState<Record<string, string>>({});
   const [selectedCabinetMaterials, setSelectedCabinetMaterials] = useState<Record<string, number>>({});
   const [selectedPriceVariants, setSelectedPriceVariants] = useState<Record<string, number>>({});
@@ -1002,7 +1004,9 @@ export default function ProductsPage() {
 
                         { label: 'Watt', key: 'watt' },
                         { label: 'Lumen', key: 'lumen' },
+                        { label: 'Dimension', key: 'dimension' },
                         { label: 'Beam Angle', key: 'beamAngle' },
+                        { label: 'CCT', key: 'cct' },
                         { label: 'IP Rating', key: 'ipRating' },
                         { label: 'Price', key: 'price' },
                         { label: 'Files', key: 'files' },
@@ -1827,10 +1831,45 @@ export default function ProductsPage() {
                             })()}
                           </td>
                           <td className={`px-4 py-4 text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {p.watt ? `${p.watt}W` : '-'}
+                            {p.wattageVariants && p.wattageVariants.length > 0 ? (
+                              <select
+                                value={selectedWattVariants[p._id] ?? 0}
+                                onChange={(e) => setSelectedWattVariants(prev => ({
+                                  ...prev, [p._id]: Number(e.target.value)
+                                }))}
+                                className={`px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer outline-none transition-colors ${
+                                  isDarkMode
+                                    ? 'bg-gray-800 border border-white/20 text-gray-300 hover:border-yellow-400/50'
+                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-yellow-400'
+                                }`}
+                              >
+                                {p.wattageVariants.map((v: any, idx: number) => (
+                                  <option key={idx} value={idx}>{v.watt}W</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                {p.watt ? `${p.watt}W` : '-'}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             {(() => {
+                              const selectedVariantIdx = selectedWattVariants[p._id] ?? 0;
+                              const currentVariant = p.wattageVariants?.[selectedVariantIdx];
+                              
+                              if (currentVariant?.lumen) {
+                                return (
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-semibold inline-block ${
+                                    isDarkMode
+                                      ? 'bg-gray-800 border border-white/20 text-gray-300'
+                                      : 'bg-white border border-gray-300 text-gray-700'
+                                  }`}>
+                                    {currentVariant.lumen}
+                                  </span>
+                                );
+                              }
+
                               if (!p.lumen || p.lumen === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
                               
                               // Parse lumen values - split by / or comma
@@ -1872,6 +1911,21 @@ export default function ProductsPage() {
                           </td>
                           <td className="px-4 py-4">
                             {(() => {
+                              const selectedIdx = selectedWattVariants[p._id] ?? 0;
+                              const currentVariant = p.wattageVariants?.[selectedIdx];
+                              const displayDimension = currentVariant?.dimension || p.dimension;
+                              
+                              return displayDimension ? (
+                                <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {displayDimension}
+                                </span>
+                              ) : (
+                                <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-4 py-4">
+                            {(() => {
                               if (!p.beamAngle || p.beamAngle === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
                               
                               // Parse beam angles - split by / or comma
@@ -1900,6 +1954,43 @@ export default function ProductsPage() {
                                   >
                                     {beamAngles.map((angle) => (
                                       <option key={angle} value={angle}>{angle}</option>
+                                    ))}
+                                  </select>
+                                );
+                              }
+                              return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
+                            })()}
+                          </td>
+                          <td className="px-4 py-4">
+                            {(() => {
+                              if (!p.cct || p.cct === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
+                              
+                              // Parse CCT - split by / or comma
+                              const ccts = p.cct.split(/[\/,]/).map((c: string) => c.trim()).filter(Boolean);
+                              
+                              if (ccts.length === 1) {
+                                return (
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-semibold inline-block ${
+                                    isDarkMode
+                                      ? 'bg-gray-800 border border-white/20 text-gray-300'
+                                      : 'bg-white border border-gray-300 text-gray-700'
+                                  }`}>
+                                    {ccts[0]}
+                                  </span>
+                                );
+                              } else if (ccts.length > 1) {
+                                return (
+                                  <select
+                                    value={selectedCcts[p._id] || ccts[0]}
+                                    onChange={(e) => setSelectedCcts(prev => ({ ...prev, [p._id]: e.target.value }))}
+                                    className={`px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer outline-none transition-colors ${
+                                      isDarkMode
+                                        ? 'bg-gray-800 border border-white/20 text-gray-300 hover:border-yellow-400/50'
+                                        : 'bg-white border border-gray-300 text-gray-700 hover:border-yellow-400'
+                                    }`}
+                                  >
+                                    {ccts.map((c: string) => (
+                                      <option key={c} value={c}>{c}</option>
                                     ))}
                                   </select>
                                 );
@@ -2123,15 +2214,21 @@ export default function ProductsPage() {
                                   const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
                                   const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
 
+                                  const ccts = p.cct ? p.cct.split(/[\/,]/).map((c: string) => c.trim()).filter(Boolean) : [];
+                                  const selectedCct = ccts.length > 1 ? (selectedCcts[p._id] || ccts[0]) : p.cct;
+
+                                  const selectedIdx = selectedWattVariants[p._id] ?? 0;
+                                  const selectedVariant = p.wattageVariants?.[selectedIdx];
+
                                   setCustomizeProduct({ ...p, price: currentPrice });
                                   setCustomSpecs({
                                     category: p.category || '',
-                                    watt: currentWatt || p.watt || '',
-                                    dimension: p.dimension || '',
+                                    watt: selectedVariant?.watt || currentWatt || p.watt || '',
+                                    dimension: selectedVariant?.dimension || p.dimension || '',
                                     beamAngle: selectedBeamAngle || p.beamAngle || '',
-                                    lumen: currentLumen || p.lumen || '',
+                                    lumen: selectedVariant?.lumen || currentLumen || p.lumen || '',
                                     ipRating: currentIpRating || '',
-                                    cct: p.cct || '',
+                                    cct: selectedCct || p.cct || '',
                                     dimming: p.dimming || '',
                                     accessories: p.accessories || '',
                                     finish: p.finish || '',

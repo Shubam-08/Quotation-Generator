@@ -36,6 +36,7 @@ interface Product {
   accessories?: string;
   finish?: string;
   reflectorFinish?: string;
+  wattageVariants?: { watt: number; lumen: string; dimension: string; }[];
   ipRatings?: IpRatingPrice[]; // New structure with individual prices
   ipRating?: string[]; // Legacy field for backward compatibility
   price: number; // Legacy field
@@ -96,6 +97,7 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(20);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [newVariant, setNewVariant] = useState({ watt: '', lumen: '', dimension: '' });
   
   // Inline editing states
   const [editingPrice, setEditingPrice] = useState<{productId: string, ipIndex: number} | null>(null);
@@ -148,6 +150,14 @@ export default function AdminDashboard() {
       .map(p => p.beamAngle)
       .filter((a): a is string => !!a && a.trim() !== '');
     return Array.from(new Set(angles)).sort();
+  }, [products]);
+
+  // Memoized unique CCTs from existing products
+  const uniqueCCTs = useMemo(() => {
+    const ccts = products
+      .map(p => p.cct)
+      .filter((a): a is string => !!a && a.trim() !== '');
+    return Array.from(new Set(ccts)).sort();
   }, [products]);
 
   // Memoized unique applications from existing products
@@ -344,7 +354,10 @@ export default function AdminDashboard() {
   const handleOpenModal = async (product?: Product) => {
     if (product) {
       setEditingProduct(product);
-      setFormData(product);
+      setFormData({
+        ...product,
+        wattageVariants: product.wattageVariants || []
+      });
       setImages(product.images || []);
       setProductImages(product.productImages || []);
       setDatasheets(product.datasheets || []);
@@ -369,7 +382,7 @@ export default function AdminDashboard() {
       setReflectorFinishCustom(product.reflectorFinish ? !REFLECTOR_FINISH_OPTIONS.includes(product.reflectorFinish) : false);
     } else {
       setEditingProduct(null);
-      setFormData({});
+      setFormData({ wattageVariants: [] });
       setImages([]);
       setProductImages([]);
       setDatasheets([]);
@@ -391,6 +404,7 @@ export default function AdminDashboard() {
     setShowModal(false);
     setEditingProduct(null);
     setFormData({});
+    setNewVariant({ watt: '', lumen: '', dimension: '' });
     setError("");
     setImages([]);
     setNewImageUrl("");
@@ -446,6 +460,7 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          wattageVariants: formData.wattageVariants || [],
           images: images,
           ipRatings: ipRatings,
           productImages: productImages,
@@ -1123,14 +1138,109 @@ export default function AdminDashboard() {
                     />
                   </div>
 
+                  <div className="col-span-2 border border-gray-200 rounded-lg p-4 mt-2">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      Wattage Variants (Watt + Lumen + Dimension)
+                    </h3>
+                    
+                    {/* Add new variant row */}
+                    <div className="flex gap-2 mb-3">
+                      <input
+                        type="text"
+                        placeholder="Watt (e.g. 5)"
+                        value={newVariant.watt}
+                        onChange={(e) => setNewVariant({...newVariant, watt: e.target.value})}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Lumen (e.g. 400lm)"
+                        value={newVariant.lumen}
+                        onChange={(e) => setNewVariant({...newVariant, lumen: e.target.value})}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Dimension (e.g. Ø63x63mm)"
+                        value={newVariant.dimension}
+                        onChange={(e) => setNewVariant({...newVariant, dimension: e.target.value})}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newVariant.watt) return;
+                          const current = formData.wattageVariants || [];
+                          setFormData({
+                            ...formData,
+                            wattageVariants: [...current, {
+                              watt: Number(newVariant.watt),
+                              lumen: newVariant.lumen,
+                              dimension: newVariant.dimension
+                            }]
+                          });
+                          setNewVariant({ watt: '', lumen: '', dimension: '' });
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    {/* Variants list */}
+                    {(formData.wattageVariants || []).length > 0 && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-gray-500 px-2">
+                          <span>Watt</span>
+                          <span>Lumen</span>
+                          <span>Dimension</span>
+                          <span></span>
+                        </div>
+                        {(formData.wattageVariants || []).map((v: any, idx: number) => (
+                          <div key={idx} className="grid grid-cols-4 gap-2 items-center bg-gray-50 rounded-lg px-2 py-2">
+                            <span className="text-sm text-gray-700">{v.watt}W</span>
+                            <span className="text-sm text-gray-700">{v.lumen || '-'}</span>
+                            <span className="text-sm text-gray-700">{v.dimension || '-'}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = (formData.wattageVariants || []).filter((_: any, i: number) => i !== idx);
+                                setFormData({...formData, wattageVariants: updated});
+                              }}
+                              className="text-red-500 hover:text-red-700 text-xs cursor-pointer justify-self-end"
+                            >
+                              ✕ Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {(formData.wattageVariants || []).length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-2">
+                        No variants added yet. Add watt + lumen + dimension combinations above.
+                      </p>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">CCT</label>
                     <input 
                       type="text"
+                      list="cct-suggestions"
                       value={formData.cct || ''}
                       onChange={(e) => setFormData({...formData, cct: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      placeholder="Select existing or type new (e.g., 3000K, 4000K)"
                     />
+                    <datalist id="cct-suggestions">
+                      {uniqueCCTs.map((cct) => (
+                        <option key={cct} value={cct} />
+                      ))}
+                    </datalist>
+                    <p className="mt-1 text-xs text-gray-500">
+                      💡 Select from existing CCTs or type a new one. Existing: {uniqueCCTs.length > 0 ? uniqueCCTs.join(', ') : 'None yet'}
+                    </p>
                   </div>
 
                   <div>

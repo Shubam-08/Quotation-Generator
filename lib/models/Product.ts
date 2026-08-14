@@ -13,6 +13,14 @@ const ProductSchema = new mongoose.Schema(
     lumen: { type: String },
     beamAngle: { type: String },
     dimension: { type: String },
+    wattageVariants: {
+      type: [{
+        watt: { type: Number, required: true },
+        lumen: { type: String, default: '' },
+        dimension: { type: String, default: '' },
+      }],
+      default: []
+    },
     cct: { type: String, default: '' },
     dimming: { type: String, default: '' },
     accessories: { type: String, default: '' },
