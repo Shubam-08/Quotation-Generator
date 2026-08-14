@@ -3699,6 +3699,31 @@ export default function EnhancedCart() {
                                         {item.ipRating}
                                       </span>
                                     )}
+                                    {item.cct && item.cct !== '-' && item.cct !== 'None' && (
+                                      <span className="inline-block bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-200">
+                                        {item.cct}
+                                      </span>
+                                    )}
+                                    {item.dimming && item.dimming !== '-' && item.dimming !== 'None' && (
+                                      <span className="inline-block bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-emerald-200">
+                                        {item.dimming}
+                                      </span>
+                                    )}
+                                    {item.accessories && item.accessories !== '-' && item.accessories !== 'None' && (
+                                      <span className="inline-block bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-200">
+                                        {item.accessories}
+                                      </span>
+                                    )}
+                                    {item.finish && item.finish !== '-' && item.finish !== 'None' && (
+                                      <span className="inline-block bg-slate-50 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-slate-200">
+                                        Finish: {item.finish}
+                                      </span>
+                                    )}
+                                    {item.reflectorFinish && item.reflectorFinish !== '-' && item.reflectorFinish !== 'None' && (
+                                      <span className="inline-block bg-zinc-50 text-zinc-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-zinc-200">
+                                        Reflector: {item.reflectorFinish}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 <div>
