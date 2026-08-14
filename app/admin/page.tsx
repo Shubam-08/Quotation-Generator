@@ -48,6 +48,11 @@ interface Product {
   isoCertificate?: string[]; // S3 uploaded ISO Certificate documents
 }
 
+const DIMMING_OPTIONS = ['None', 'DALI', '0-10V Dimming', '1-10V Dimming', 'TRIAC', 'Non Dimmable', 'DMX Controlled'];
+const ACCESSORIES_OPTIONS = ['None', 'Spike', 'Honeycomb Louvre', 'Tree Strap', 'Spread Lens', 'Cowl'];
+const FINISH_OPTIONS = ['None', 'White', 'Black', 'Silver', 'Gold'];
+const REFLECTOR_FINISH_OPTIONS = ['None', 'Chrome', 'White', 'Black', 'Silver', 'Gold', 'Dark Chrome'];
+
 export default function AdminDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -64,8 +69,10 @@ export default function AdminDashboard() {
   const [newIpRating, setNewIpRating] = useState<string>("");
   const [newIpPrice, setNewIpPrice] = useState<string>("");
   
-
-  
+  const [dimmingCustom, setDimmingCustom] = useState(false);
+  const [accessoriesCustom, setAccessoriesCustom] = useState(false);
+  const [finishCustom, setFinishCustom] = useState(false);
+  const [reflectorFinishCustom, setReflectorFinishCustom] = useState(false);
   // Auto-update application when IP ratings change
   useEffect(() => {
     if (showModal && ipRatings.length > 0) {
@@ -177,7 +184,6 @@ export default function AdminDashboard() {
       if (p.lumen?.toLowerCase().includes(term)) return true;
       if (p.beamAngle?.toLowerCase().includes(term)) return true;
       if (p.dimension?.toLowerCase().includes(term)) return true;
-      if (p.cutOut?.toLowerCase().includes(term)) return true;
       
       // Search in IP ratings (both old and new format)
       if (p.ipRating?.some(ip => ip.toLowerCase().includes(term))) return true;
@@ -357,6 +363,10 @@ export default function AdminDashboard() {
         setIpRatings([]);
       }
 
+      setDimmingCustom(product.dimming ? !DIMMING_OPTIONS.includes(product.dimming) : false);
+      setAccessoriesCustom(product.accessories ? !ACCESSORIES_OPTIONS.includes(product.accessories) : false);
+      setFinishCustom(product.finish ? !FINISH_OPTIONS.includes(product.finish) : false);
+      setReflectorFinishCustom(product.reflectorFinish ? !REFLECTOR_FINISH_OPTIONS.includes(product.reflectorFinish) : false);
     } else {
       setEditingProduct(null);
       setFormData({});
@@ -368,6 +378,10 @@ export default function AdminDashboard() {
       setBisApproval([]);
       setIsoCertificate([]);
       setIpRatings([]);
+      setDimmingCustom(false);
+      setAccessoriesCustom(false);
+      setFinishCustom(false);
+      setReflectorFinishCustom(false);
     }
     setShowModal(true);
     setError("");
@@ -383,6 +397,10 @@ export default function AdminDashboard() {
     setIpRatings([]);
     setNewIpRating("");
     setNewIpPrice("");
+    setDimmingCustom(false);
+    setAccessoriesCustom(false);
+    setFinishCustom(false);
+    setReflectorFinishCustom(false);
 
     setProductImages([]);
     setDatasheets([]);
@@ -1117,42 +1135,118 @@ export default function AdminDashboard() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Dimming</label>
-                    <input 
-                      type="text"
-                      value={formData.dimming || ''}
-                      onChange={(e) => setFormData({...formData, dimming: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-                    />
+                    <select
+                      value={dimmingCustom ? 'Custom' : (formData.dimming || 'None')}
+                      onChange={(e) => {
+                        if (e.target.value === 'Custom') {
+                          setDimmingCustom(true);
+                          setFormData({...formData, dimming: ''});
+                        } else {
+                          setDimmingCustom(false);
+                          setFormData({...formData, dimming: e.target.value === 'None' ? '' : e.target.value});
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      {DIMMING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      <option value="Custom">Custom...</option>
+                    </select>
+                    {dimmingCustom && (
+                      <input
+                        type="text"
+                        placeholder="Enter custom dimming value"
+                        value={formData.dimming || ''}
+                        onChange={(e) => setFormData({...formData, dimming: e.target.value})}
+                        className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Accessories</label>
-                    <input 
-                      type="text"
-                      value={formData.accessories || ''}
-                      onChange={(e) => setFormData({...formData, accessories: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-                    />
+                    <select
+                      value={accessoriesCustom ? 'Custom' : (formData.accessories || 'None')}
+                      onChange={(e) => {
+                        if (e.target.value === 'Custom') {
+                          setAccessoriesCustom(true);
+                          setFormData({...formData, accessories: ''});
+                        } else {
+                          setAccessoriesCustom(false);
+                          setFormData({...formData, accessories: e.target.value === 'None' ? '' : e.target.value});
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      {ACCESSORIES_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      <option value="Custom">Custom...</option>
+                    </select>
+                    {accessoriesCustom && (
+                      <input
+                        type="text"
+                        placeholder="Enter custom accessories value"
+                        value={formData.accessories || ''}
+                        onChange={(e) => setFormData({...formData, accessories: e.target.value})}
+                        className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Finish</label>
-                    <input 
-                      type="text"
-                      value={formData.finish || ''}
-                      onChange={(e) => setFormData({...formData, finish: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-                    />
+                    <select
+                      value={finishCustom ? 'Custom' : (formData.finish || 'None')}
+                      onChange={(e) => {
+                        if (e.target.value === 'Custom') {
+                          setFinishCustom(true);
+                          setFormData({...formData, finish: ''});
+                        } else {
+                          setFinishCustom(false);
+                          setFormData({...formData, finish: e.target.value === 'None' ? '' : e.target.value});
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      {FINISH_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      <option value="Custom">Custom...</option>
+                    </select>
+                    {finishCustom && (
+                      <input
+                        type="text"
+                        placeholder="Enter custom finish value"
+                        value={formData.finish || ''}
+                        onChange={(e) => setFormData({...formData, finish: e.target.value})}
+                        className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Reflector Finish</label>
-                    <input 
-                      type="text"
-                      value={formData.reflectorFinish || ''}
-                      onChange={(e) => setFormData({...formData, reflectorFinish: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-                    />
+                    <select
+                      value={reflectorFinishCustom ? 'Custom' : (formData.reflectorFinish || 'None')}
+                      onChange={(e) => {
+                        if (e.target.value === 'Custom') {
+                          setReflectorFinishCustom(true);
+                          setFormData({...formData, reflectorFinish: ''});
+                        } else {
+                          setReflectorFinishCustom(false);
+                          setFormData({...formData, reflectorFinish: e.target.value === 'None' ? '' : e.target.value});
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      {REFLECTOR_FINISH_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      <option value="Custom">Custom...</option>
+                    </select>
+                    {reflectorFinishCustom && (
+                      <input
+                        type="text"
+                        placeholder="Enter custom reflector finish value"
+                        value={formData.reflectorFinish || ''}
+                        onChange={(e) => setFormData({...formData, reflectorFinish: e.target.value})}
+                        className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    )}
                   </div>
 
                   <div className="col-span-2">

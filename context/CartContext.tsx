@@ -163,17 +163,13 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       _id: product._id,
       sku: product.sku,
       name: product.sku, // for display on sidebar
-      description: product.description || '',
       price: product.price ?? 0,
       watt: product.watt ?? 0,
-
-      type: product.type || '-',
       lumen: product.lumen || '-',
       beamAngle: product.beamAngle || '-',
       category: product.category || '-',
       application: product.application || '-',
       dimension: product.dimension || '-',
-      cutOut: product.cutOut || '-',
       ipRating: productIpRating || 'N/A',
       // Ensure we always pass some image data to the cart, even if the
       // product only has a single `productImage` string (common for

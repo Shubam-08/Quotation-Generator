@@ -39,7 +39,11 @@ type Product = {
   lumen?: string;
   beamAngle?: string;
   dimension?: string;
-  cutOut?: string;
+  cct?: string;
+  dimming?: string;
+  accessories?: string;
+  finish?: string;
+  reflectorFinish?: string;
   price: number;
   // LED display specific
   pixelPitch?: string;
@@ -172,6 +176,11 @@ const computeCabinetArrangement = (product: Product, widthMeterStr?: string, hei
   };
 };
 
+const DIMMING_OPTIONS = ['None', 'DALI', '0-10V Dimming', '1-10V Dimming', 'TRIAC', 'Non Dimmable', 'DMX Controlled'];
+const ACCESSORIES_OPTIONS = ['None', 'Spike', 'Honeycomb Louvre', 'Tree Strap', 'Spread Lens', 'Cowl'];
+const FINISH_OPTIONS = ['None', 'White', 'Black', 'Silver', 'Gold'];
+const REFLECTOR_FINISH_OPTIONS = ['None', 'Chrome', 'White', 'Black', 'Silver', 'Gold', 'Dark Chrome'];
+
 export default function ProductsPage() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -184,6 +193,10 @@ export default function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [customizeProduct, setCustomizeProduct] = useState<any>(null);
   const [customSpecs, setCustomSpecs] = useState<any>({});
+  const [dimmingCustom, setDimmingCustom] = useState(false);
+  const [accessoriesCustom, setAccessoriesCustom] = useState(false);
+  const [finishCustom, setFinishCustom] = useState(false);
+  const [reflectorFinishCustom, setReflectorFinishCustom] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2125,6 +2138,10 @@ export default function ProductsPage() {
                                     reflectorFinish: p.reflectorFinish || '',
                                     quantity: 1,
                                   });
+                                  setDimmingCustom(p.dimming ? !DIMMING_OPTIONS.includes(p.dimming) : false);
+                                  setAccessoriesCustom(p.accessories ? !ACCESSORIES_OPTIONS.includes(p.accessories) : false);
+                                  setFinishCustom(p.finish ? !FINISH_OPTIONS.includes(p.finish) : false);
+                                  setReflectorFinishCustom(p.reflectorFinish ? !REFLECTOR_FINISH_OPTIONS.includes(p.reflectorFinish) : false);
                                 }}
                                 disabled={addingProductId === cartItemId}
                                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -2381,10 +2398,6 @@ export default function ProductsPage() {
                 { label: 'Lumen', key: 'lumen' },
                 { label: 'IP Rating', key: 'ipRating' },
                 { label: 'CCT', key: 'cct' },
-                { label: 'Dimming', key: 'dimming' },
-                { label: 'Accessories', key: 'accessories' },
-                { label: 'Finish', key: 'finish' },
-                { label: 'Reflector Finish', key: 'reflectorFinish' },
               ].map(({ label, key }) => (
                 <div key={key} className="flex flex-col gap-1">
                   <label className="text-gray-400 text-xs font-medium">
@@ -2402,6 +2415,122 @@ export default function ProductsPage() {
                   />
                 </div>
               ))}
+              
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-400 text-xs font-medium">Dimming</label>
+                <select
+                  value={dimmingCustom ? 'Custom' : (customSpecs.dimming || 'None')}
+                  onChange={(e) => {
+                    if (e.target.value === 'Custom') {
+                      setDimmingCustom(true);
+                      setCustomSpecs((prev: any) => ({...prev, dimming: ''}));
+                    } else {
+                      setDimmingCustom(false);
+                      setCustomSpecs((prev: any) => ({...prev, dimming: e.target.value === 'None' ? '' : e.target.value}));
+                    }
+                  }}
+                  className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  {DIMMING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  <option value="Custom">Custom...</option>
+                </select>
+                {dimmingCustom && (
+                  <input
+                    type="text"
+                    placeholder="Enter custom dimming"
+                    value={customSpecs.dimming || ''}
+                    onChange={(e) => setCustomSpecs((prev: any) => ({...prev, dimming: e.target.value}))}
+                    className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-600"
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-400 text-xs font-medium">Accessories</label>
+                <select
+                  value={accessoriesCustom ? 'Custom' : (customSpecs.accessories || 'None')}
+                  onChange={(e) => {
+                    if (e.target.value === 'Custom') {
+                      setAccessoriesCustom(true);
+                      setCustomSpecs((prev: any) => ({...prev, accessories: ''}));
+                    } else {
+                      setAccessoriesCustom(false);
+                      setCustomSpecs((prev: any) => ({...prev, accessories: e.target.value === 'None' ? '' : e.target.value}));
+                    }
+                  }}
+                  className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  {ACCESSORIES_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  <option value="Custom">Custom...</option>
+                </select>
+                {accessoriesCustom && (
+                  <input
+                    type="text"
+                    placeholder="Enter custom accessories"
+                    value={customSpecs.accessories || ''}
+                    onChange={(e) => setCustomSpecs((prev: any) => ({...prev, accessories: e.target.value}))}
+                    className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-600"
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-400 text-xs font-medium">Finish</label>
+                <select
+                  value={finishCustom ? 'Custom' : (customSpecs.finish || 'None')}
+                  onChange={(e) => {
+                    if (e.target.value === 'Custom') {
+                      setFinishCustom(true);
+                      setCustomSpecs((prev: any) => ({...prev, finish: ''}));
+                    } else {
+                      setFinishCustom(false);
+                      setCustomSpecs((prev: any) => ({...prev, finish: e.target.value === 'None' ? '' : e.target.value}));
+                    }
+                  }}
+                  className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  {FINISH_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  <option value="Custom">Custom...</option>
+                </select>
+                {finishCustom && (
+                  <input
+                    type="text"
+                    placeholder="Enter custom finish"
+                    value={customSpecs.finish || ''}
+                    onChange={(e) => setCustomSpecs((prev: any) => ({...prev, finish: e.target.value}))}
+                    className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-600"
+                  />
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-400 text-xs font-medium">Reflector Finish</label>
+                <select
+                  value={reflectorFinishCustom ? 'Custom' : (customSpecs.reflectorFinish || 'None')}
+                  onChange={(e) => {
+                    if (e.target.value === 'Custom') {
+                      setReflectorFinishCustom(true);
+                      setCustomSpecs((prev: any) => ({...prev, reflectorFinish: ''}));
+                    } else {
+                      setReflectorFinishCustom(false);
+                      setCustomSpecs((prev: any) => ({...prev, reflectorFinish: e.target.value === 'None' ? '' : e.target.value}));
+                    }
+                  }}
+                  className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  {REFLECTOR_FINISH_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  <option value="Custom">Custom...</option>
+                </select>
+                {reflectorFinishCustom && (
+                  <input
+                    type="text"
+                    placeholder="Enter custom reflector finish"
+                    value={customSpecs.reflectorFinish || ''}
+                    onChange={(e) => setCustomSpecs((prev: any) => ({...prev, reflectorFinish: e.target.value}))}
+                    className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-600"
+                  />
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3 mb-3">
