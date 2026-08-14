@@ -2574,21 +2574,27 @@ export default function EnhancedCart() {
         // ORIGINAL FORMAT FOR LED LIGHTS (and mixed carts)
         const getSpecText = (item: any): string => {
           const specs: string[] = [];
-          if (item.category) specs.push(`Category: ${item.category}`);
-          if (item.type) specs.push(`Type: ${item.type}`);
-          if (item.watt) specs.push(`Wattage: ${item.watt}W`);
-          if (item.dimension) specs.push(`Dimension: ${item.dimension}`);
-          if (item.beamAngle) specs.push(`Beam Angle: ${item.beamAngle}`);
-          if (item.lumen) specs.push(`Lumen: ${item.lumen}`);
-          const ip = Array.isArray(item.ipRating) 
-            ? item.ipRating.join(', ') : item.ipRating;
-          if (ip) specs.push(`IP Rating: ${ip}`);
-          if (item.inputVoltage) specs.push(`Input Voltage: ${item.inputVoltage}`);
-          if (item.cct) specs.push(`CCT: ${item.cct}`);
-          if (item.dimming) specs.push(`Dimming: ${item.dimming}`);
-          if (item.accessories) specs.push(`Accessories: ${item.accessories}`);
-          if (item.finish) specs.push(`Finish: ${item.finish}`);
-          if (item.reflectorFinish) specs.push(`Reflector Finish: ${item.reflectorFinish}`);
+          const pushSpec = (label: string, value: any) => {
+            const val = Array.isArray(value) ? value.join(', ') : value;
+            if (val && val !== '-' && val !== '') {
+              specs.push(`${label}: ${val}`);
+            }
+          };
+
+          pushSpec('Category', item.category);
+          pushSpec('Type', item.type);
+          pushSpec('Wattage', item.watt ? item.watt + 'W' : null);
+          pushSpec('Dimension', item.dimension);
+          pushSpec('Beam Angle', item.beamAngle);
+          pushSpec('Lumen', item.lumen);
+          pushSpec('IP Rating', item.ipRating);
+          pushSpec('Input Voltage', item.inputVoltage);
+          pushSpec('CCT', item.cct);
+          pushSpec('Dimming', item.dimming);
+          pushSpec('Accessories', item.accessories);
+          pushSpec('Finish', item.finish);
+          pushSpec('Reflector Finish', item.reflectorFinish);
+
           return specs.join('\n');
         };
 

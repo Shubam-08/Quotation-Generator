@@ -189,6 +189,8 @@ export default function ProductsPage() {
   const [productType, setProductType] = useState<'led-lights' | 'led-displays' | 'lighting-controls'>('led-lights');
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [customizeProduct, setCustomizeProduct] = useState<any>(null);
+  const [customSpecs, setCustomSpecs] = useState<any>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2205,24 +2207,29 @@ export default function ProductsPage() {
                               // Show Add to Cart button when item is not in cart
                               <button 
                                 onClick={() => {
-                                  if (addingProductId !== cartItemId) {
-                                    setAddingProductId(cartItemId);
-                                    // Get selected beam angle if multiple exist
-                                    const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
-                                    const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
-                                    
-                                    const productToAdd = {
-                                      ...p,
-                                      ipRating: currentIpRating,
-                                      inputVoltage: currentVoltage !== 'default' ? currentVoltage : p.inputVoltage,
-                                      watt: currentWatt !== 'default' ? currentWatt : p.watt,
-                                      beamAngle: selectedBeamAngle,
-                                      lumen: currentLumen,
-                                      price: currentPrice
-                                    };
-                                    addToCart(productToAdd);
-                                    setTimeout(() => setAddingProductId(null), 500);
-                                  }
+                                  // Get selected beam angle if multiple exist
+                                  const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
+                                  const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
+
+                                  setCustomizeProduct({ ...p, price: currentPrice });
+                                  setCustomSpecs({
+                                    category: p.category || '',
+                                    type: p.type || '',
+                                    watt: currentWatt || p.watt || '',
+                                    dimension: p.dimension || '',
+                                    beamAngle: selectedBeamAngle || p.beamAngle || '',
+                                    lumen: currentLumen || p.lumen || '',
+                                    ipRating: currentIpRating || '',
+                                    inputVoltage: currentVoltage !== 'default' 
+                                      ? currentVoltage 
+                                      : p.inputVoltage || '',
+                                    cct: p.cct || '',
+                                    dimming: p.dimming || '',
+                                    accessories: p.accessories || '',
+                                    finish: p.finish || '',
+                                    reflectorFinish: p.reflectorFinish || '',
+                                    quantity: 1,
+                                  });
                                 }}
                                 disabled={addingProductId === cartItemId}
                                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -2446,6 +2453,125 @@ export default function ProductsPage() {
               className="mt-4 w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm cursor-pointer transition-all"
             >
               Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {customizeProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-xl p-6 max-w-lg w-full shadow-2xl border border-gray-700 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <p className="text-gray-400 text-xs mb-1">Adding to cart</p>
+                <h2 className="text-white font-bold text-lg">
+                  {customizeProduct.sku}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomizeProduct(null)}
+                className="text-gray-400 hover:text-white text-2xl cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {[
+                { label: 'Category', key: 'category' },
+                { label: 'Type', key: 'type' },
+                { label: 'Wattage', key: 'watt' },
+                { label: 'Dimension', key: 'dimension' },
+                { label: 'Beam Angle', key: 'beamAngle' },
+                { label: 'Lumen', key: 'lumen' },
+                { label: 'IP Rating', key: 'ipRating' },
+                { label: 'Input Voltage', key: 'inputVoltage' },
+                { label: 'CCT', key: 'cct' },
+                { label: 'Dimming', key: 'dimming' },
+                { label: 'Accessories', key: 'accessories' },
+                { label: 'Finish', key: 'finish' },
+                { label: 'Reflector Finish', key: 'reflectorFinish' },
+              ].map(({ label, key }) => (
+                <div key={key} className="flex flex-col gap-1">
+                  <label className="text-gray-400 text-xs font-medium">
+                    {label}
+                  </label>
+                  <input
+                    type="text"
+                    value={customSpecs[key] || ''}
+                    onChange={(e) => setCustomSpecs((prev: any) => ({
+                      ...prev,
+                      [key]: e.target.value
+                    }))}
+                    placeholder={`Enter ${label}`}
+                    className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-600"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3 mb-3">
+              <span className="text-gray-400 text-sm font-medium">
+                Quantity
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCustomSpecs((prev: any) => ({
+                    ...prev,
+                    quantity: Math.max(1, (prev.quantity || 1) - 1)
+                  }))}
+                  className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-bold cursor-pointer transition-all flex items-center justify-center"
+                >
+                  −
+                </button>
+                <span className="text-white font-bold text-lg w-8 text-center">
+                  {customSpecs.quantity || 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCustomSpecs((prev: any) => ({
+                    ...prev,
+                    quantity: (prev.quantity || 1) + 1
+                  }))}
+                  className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-bold cursor-pointer transition-all flex items-center justify-center"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const cartItemId = `${customizeProduct._id}_custom_${Date.now()}`;
+                const productToAdd = {
+                  ...customizeProduct,
+                  category: customSpecs.category || customizeProduct.category,
+                  type: customSpecs.type || customizeProduct.type,
+                  watt: customSpecs.watt ? Number(customSpecs.watt) : customizeProduct.watt,
+                  dimension: customSpecs.dimension || customizeProduct.dimension,
+                  beamAngle: customSpecs.beamAngle || customizeProduct.beamAngle,
+                  lumen: customSpecs.lumen || customizeProduct.lumen,
+                  ipRating: customSpecs.ipRating || customizeProduct.ipRating,
+                  inputVoltage: customSpecs.inputVoltage || customizeProduct.inputVoltage,
+                  cct: customSpecs.cct || customizeProduct.cct,
+                  dimming: customSpecs.dimming || customizeProduct.dimming,
+                  accessories: customSpecs.accessories || customizeProduct.accessories,
+                  finish: customSpecs.finish || customizeProduct.finish,
+                  reflectorFinish: customSpecs.reflectorFinish || customizeProduct.reflectorFinish,
+                  price: customizeProduct.price,
+                  quantity: customSpecs.quantity || 1,
+                  cartItemId,
+                };
+                addToCart(productToAdd);
+                setCustomizeProduct(null);
+              }}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer transition-all text-sm"
+            >
+              Add to Cart
             </button>
           </div>
         </div>
