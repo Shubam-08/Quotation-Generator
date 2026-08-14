@@ -148,6 +148,9 @@ export default function EnhancedCart() {
   const [displayFormData, setDisplayFormData] = useState<any | null>(null);
   const [editingCartItem, setEditingCartItem] = useState<any>(null);
   const [editSpecs, setEditSpecs] = useState<any>({});
+  const [showDownloadConfirm, setShowDownloadConfirm] = useState<'pdf' | 'excel' | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   // Password lock for Price Calculation editing
   const [priceEditUnlocked, setPriceEditUnlocked] = useState(false);
   const [showPriceEditModal, setShowPriceEditModal] = useState(false);
@@ -1239,7 +1242,7 @@ export default function EnhancedCart() {
     }
   };
 
-  const exportPDF = async () => {
+  const exportPDF = async (returnBlob = false): Promise<string | void> => {
     const currentQuotationType = quotationType;
     if (isPdfLoading || downloadingType !== null) return;
     setIsPdfLoading(true);
@@ -2933,6 +2936,20 @@ export default function EnhancedCart() {
         }
       }
 
+      if (returnBlob) {
+        const pdfBlob = doc.output('blob');
+        const url = URL.createObjectURL(pdfBlob);
+        clearInterval(progressInterval);
+        setDownloadProgress(100);
+        setDownloadSuccess('pdf');
+        setTimeout(() => {
+          setDownloadSuccess(null);
+          setDownloadProgress(0);
+          setDownloadingType(null);
+        }, 3000);
+        return url;
+      }
+      
       doc.save(`${userInfo.project}_quotation.pdf`);
       clearInterval(progressInterval);
       setDownloadProgress(100);
@@ -2944,6 +2961,15 @@ export default function EnhancedCart() {
       }, 3000);
     } finally {
       setIsPdfLoading(false);
+    }
+  };
+
+  const generatePdfBlob = async (): Promise<string | null> => {
+    try {
+      const url = await exportPDF(true);
+      return url || null;
+    } catch {
+      return null;
     }
   };
 
@@ -4185,7 +4211,7 @@ export default function EnhancedCart() {
                   <div className="grid grid-cols-2 gap-2">
                     {/* PDF Button */}
                     <button
-                      onClick={exportPDF}
+                      onClick={() => setShowDownloadConfirm('pdf')}
                       disabled={downloadingType !== null}
                       className={`relative flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-semibold text-sm transition-all cursor-pointer overflow-hidden ${downloadingType !== null ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
@@ -4209,7 +4235,7 @@ export default function EnhancedCart() {
 
                     {/* Excel Button */}
                     <button
-                      onClick={exportExcel}
+                      onClick={() => setShowDownloadConfirm('excel')}
                       disabled={downloadingType !== null}
                       className={`relative flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-md font-semibold text-sm transition-all cursor-pointer overflow-hidden ${downloadingType !== null ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
@@ -6154,6 +6180,116 @@ export default function EnhancedCart() {
               Update Cart Item
             </button>
           </div>
+        </div>
+      )}
+
+      {showDownloadConfirm && !showPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-xl p-6 max-w-sm w-full shadow-2xl border border-gray-700">
+            
+            <div className="mb-4">
+              <h2 className="text-white font-bold text-lg mb-1">
+                Ready to download?
+              </h2>
+              <p className="text-gray-400 text-sm">
+                This will be saved as a 
+                <span className={`font-semibold mx-1 ${quotationType === 'draft' ? 'text-orange-400' : 'text-green-400'}`}>
+                  {quotationType === 'draft' ? 'Draft' : 'Final'}
+                </span>
+                quotation.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {showDownloadConfirm === 'pdf' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const url = await generatePdfBlob();
+                    if (url) {
+                      setPreviewUrl(url);
+                      setShowPreview(true);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-blue-900 hover:bg-blue-800 text-blue-300 rounded-lg text-sm font-medium cursor-pointer transition-all border border-blue-700"
+                >
+                  👁 Preview PDF first
+                </button>
+              )}
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDownloadConfirm(null);
+                  if (showDownloadConfirm === 'pdf') exportPDF();
+                  else exportExcel();
+                }}
+                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold cursor-pointer transition-all"
+              >
+                Download {showDownloadConfirm === 'pdf' ? 'PDF' : 'Excel'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowDownloadConfirm(null)}
+                className="w-full py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm font-medium cursor-pointer transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPreview && previewUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex flex-col">
+          
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-700">
+            <h2 className="text-white font-semibold text-sm">
+              PDF Preview — {quotationType === 'draft' ? 'Draft' : 'Final'}
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPreview(false);
+                  setShowDownloadConfirm('pdf');
+                }}
+                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-xs cursor-pointer"
+              >
+                ← Back
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPreview(false);
+                  setPreviewUrl(null);
+                  setShowDownloadConfirm(null);
+                  exportPDF();
+                }}
+                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                Download PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPreview(false);
+                  setPreviewUrl(null);
+                  setShowDownloadConfirm(null);
+                }}
+                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-xs cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+          </div>
+
+          <iframe
+            src={previewUrl}
+            className="flex-1 w-full"
+            title="PDF Preview"
+          />
         </div>
       )}
     </div>
