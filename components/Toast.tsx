@@ -20,7 +20,7 @@ interface Product {
   category?: string;
   description?: string;
   application?: string;
-  inputVoltage?: string;
+
   watt?: string;
   lumen?: string;
   beamAngle?: string;
@@ -42,7 +42,7 @@ interface Driver {
   wattageRange?: { min: number; max: number };
   outputVoltage?: string;
   outputCurrent?: string;
-  inputVoltage?: string;
+
   ipRating?: string;
   type?: string;
   category?: string;
@@ -228,7 +228,7 @@ export default function EnhancedCart() {
     const details = [];
     if (item.application) details.push(item.application);
     if (item.lumen) details.push(`${item.lumen}lm`);
-    if (item.inputVoltage) details.push(item.inputVoltage);
+
     if (item.beamAngle) details.push(`${item.beamAngle} beam angle`);
     if (item.ipRating && item.ipRating.trim() !== '') details.push(item.ipRating);
     
@@ -449,7 +449,7 @@ export default function EnhancedCart() {
         if (item.wattageRange) parts.push(`Power: ${item.wattageRange.min}W`);
         if (item.outputVoltage) parts.push(`Output: ${item.outputVoltage}`);
         if ((item as any).outputCurrent) parts.push(`Current: ${(item as any).outputCurrent}`);
-        if (item.inputVoltage) parts.push(`Input: ${item.inputVoltage}`);
+
         if ((item as any).ipRating) parts.push(`IP: ${(item as any).ipRating}`);
         if ((item as any).type) parts.push(`Type: ${(item as any).type}`);
         const specText = parts.join(' | ');
@@ -939,9 +939,6 @@ export default function EnhancedCart() {
         if (item.outputCurrent) {
           driverSpecs.push(`Current: ${item.outputCurrent}`);
         }
-        if (item.inputVoltage) {
-          driverSpecs.push(`Input: ${item.inputVoltage}`);
-        }
         if (item.ipRating) {
           driverSpecs.push(`IP: ${item.ipRating}`);
         }
@@ -967,7 +964,6 @@ export default function EnhancedCart() {
           item.sku ?? 'N/A',
           item.category ?? '-',
           item.application ?? '-',
-          item.inputVoltage ?? '-',
           item.watt ?? '-',
           item.lumen ?? '-',
           item.beamAngle ?? '-',
@@ -1350,11 +1346,7 @@ export default function EnhancedCart() {
 
                       {/* Product Specs */}
                       <div className="flex flex-wrap gap-1 mb-1.5">
-                        {item.inputVoltage && item.inputVoltage !== '-' && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-50 text-green-700">
-                            {item.inputVoltage}
-                          </span>
-                        )}
+
                         {item.watt && item.watt !== '-' && (
                           <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700">
                             {item.watt}W
@@ -2110,14 +2102,7 @@ export default function EnhancedCart() {
                           </div>
                         )}
                         
-                        {driver.inputVoltage && (
-                          <div className="flex items-center justify-between text-xs">
-                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Input:</span>
-                            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                              {driver.inputVoltage}
-                            </span>
-                          </div>
-                        )}
+
                         
                         {driver.ipRating && (
                           <div className="flex items-center justify-between text-xs">
@@ -2245,14 +2230,7 @@ export default function EnhancedCart() {
                                       </div>
                                     )}
                                     
-                                    {driver.inputVoltage && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Input:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.inputVoltage}
-                                        </span>
-                                      </div>
-                                    )}
+
                                     
                                     {driver.ipRating && (
                                       <div className="flex items-center justify-between text-xs">

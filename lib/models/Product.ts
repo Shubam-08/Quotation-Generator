@@ -6,9 +6,9 @@ const ProductSchema = new mongoose.Schema(
     sku: { type: String, required: true },
     category: { type: String, required: true },
     categoryFilter: { type: String }, // Main category for filtering
-    description: { type: String }, // Product description
+
     application: { type: String },
-    inputVoltage: { type: String },
+
     watt: { type: Number },
     lumen: { type: String },
     beamAngle: { type: String },
@@ -29,15 +29,7 @@ const ProductSchema = new mongoose.Schema(
     },
     // Voltage variants with individual wattage, lumen, and prices (stored in USD)
     // Example: [{ voltage: "12V DC", watt: 5, lumen: "500", price: 45.00 }, { voltage: "24V DC", watt: 5, lumen: "600", price: 48.00 }]
-    voltageVariants: {
-      type: [{
-        voltage: { type: String, required: true },
-        watt: { type: Number, required: false, default: 0 },
-        lumen: { type: String, required: false },
-        price: { type: Number, required: false, default: 0 }
-      }],
-      default: []
-    },
+
     // Keep legacy fields for backward compatibility during migration
     ipRating: { type: [String], default: [] },
     price: { type: Number, default: 0 },
@@ -58,7 +50,7 @@ ProductSchema.index({ category: 1 });
 ProductSchema.index({ categoryFilter: 1 });
 ProductSchema.index({ sku: 1 });
 ProductSchema.index({ application: 1 });
-ProductSchema.index({ inputVoltage: 1 });
+
 ProductSchema.index({ watt: 1 });
 ProductSchema.index({ beamAngle: 1 });
 // Compound index for common filter combinations

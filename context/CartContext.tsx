@@ -7,12 +7,12 @@ type Product = {
   _id: string;
   sku: string;
   category?: string;
-  description?: string;
+
   price: number;
   stock?: number;
   watt?: number;
-  inputVoltage?: string;
-  type?: string;
+
+
   lumen?: string;
   beamAngle?: string;
   application?: string;
@@ -53,7 +53,7 @@ type Driver = {
   wattageRange?: { min: number; max: number };
   outputVoltage?: string;
   outputCurrent?: string;
-  inputVoltage?: string;
+
   ipRating?: string;
   type?: string;
   category?: string;
@@ -115,7 +115,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         : product.ipRating;
       
       // Get voltage and watt for unique identification
-      const productVoltage = product.inputVoltage || 'default';
+
       const productWatt = product.watt || 'default';
       
       // Get beam angle for unique identification
@@ -134,8 +134,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         ? `_${(product as any).selectedCabinetMaterial.replace(/\s+/g, '')}` 
         : '';
       
-      // Create unique cart item ID based on product ID + IP rating + voltage + watt + beam angle + lumen + dimensions + material
-      cartItemId = `${product._id}_${productIpRating || 'default'}_${productVoltage}_${productWatt}_${productBeamAngle}_${productLumen}${dimensionKey}${materialKey}`;
+      // Create unique cart item ID based on product ID + IP rating + watt + beam angle + lumen + dimensions + material
+      cartItemId = `${product._id}_${(product as any).ipRatings && (product as any).ipRatings.length > 0 ? (product as any).ipRatings[0].rating : (productIpRating || 'default')}_${productWatt}_${productBeamAngle}_${productLumen}${dimensionKey}${materialKey}`;
     }
     
     // Check if this specific combination already exists
@@ -148,11 +148,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     
     if (exists) {
       const ipRatingText = productIpRating ? ` (${productIpRating})` : '';
-      const voltageText = product.inputVoltage && product.inputVoltage !== '-' ? ` - ${product.inputVoltage}` : '';
+
       const wattText = product.watt ? ` - ${product.watt}W` : '';
       const beamAngleText = product.beamAngle && product.beamAngle !== '-' ? ` - ${product.beamAngle}` : '';
       const lumenText = product.lumen && product.lumen !== '-' ? ` - ${product.lumen}` : '';
-      showToast(`${product.sku}${ipRatingText}${voltageText}${wattText}${beamAngleText}${lumenText} is already in your list`, 'info');
+      showToast(`${product.sku}${ipRatingText}${wattText}${beamAngleText}${lumenText} is already in your list`, 'info');
       return; // Prevent duplicate
     }
 
@@ -166,7 +166,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       description: product.description || '',
       price: product.price ?? 0,
       watt: product.watt ?? 0,
-      inputVoltage: product.inputVoltage || '-',
+
       type: product.type || '-',
       lumen: product.lumen || '-',
       beamAngle: product.beamAngle || '-',
@@ -231,7 +231,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       wattageRange: driver.wattageRange,
       outputVoltage: driver.outputVoltage,
       outputCurrent: driver.outputCurrent,
-      inputVoltage: driver.inputVoltage,
+
       ipRating: driver.ipRating,
       type: driver.type,
       series: driver.series

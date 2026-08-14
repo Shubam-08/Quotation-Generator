@@ -36,15 +36,7 @@ export async function POST(req: Request) {
         price: Math.round(Number(ip.price || 0) * 100) / 100
       }));
     }
-    // Round voltageVariants prices to 2 decimal places
-    if (data.voltageVariants && Array.isArray(data.voltageVariants)) {
-      data.voltageVariants = data.voltageVariants.map((v: any) => ({
-        voltage: v.voltage,
-        watt: Number(v.watt || 0),
-        lumen: v.lumen || undefined,
-        price: Math.round(Number(v.price || 0) * 100) / 100
-      }));
-    }
+
 
     const newProduct = new Product({
       ...data,
@@ -85,15 +77,7 @@ export async function PUT(req: Request) {
         price: Math.round(Number(ip.price || 0) * 100) / 100
       }));
     }
-    // Round voltageVariants prices to 2 decimal places
-    if (data.voltageVariants && Array.isArray(data.voltageVariants)) {
-      data.voltageVariants = data.voltageVariants.map((v: any) => ({
-        voltage: v.voltage,
-        watt: Number(v.watt || 0),
-        lumen: v.lumen || undefined,
-        price: Math.round(Number(v.price || 0) * 100) / 100
-      }));
-    }
+
 
     const updatedProduct = await Product.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!updatedProduct) return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -143,7 +127,6 @@ export async function GET(req: Request) {
         { sku: rx },
         { category: rx },
         { application: rx },
-        { inputVoltage: rx },
         { lumen: rx },
         { beamAngle: rx },
         { ipRating: { $elemMatch: { $regex: search, $options: "i" } } }, // Legacy field
@@ -156,7 +139,6 @@ export async function GET(req: Request) {
       "sku",
       "application",
       "beamAngle",
-      "inputVoltage",
     ];
     for (const field of fieldFilters) {
       const val = searchParams.get(field);

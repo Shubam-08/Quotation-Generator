@@ -24,7 +24,7 @@ interface Product {
   category?: string;
   description?: string;
   application?: string;
-  inputVoltage?: string;
+
   watt?: string;
   lumen?: string;
   beamAngle?: string;
@@ -56,7 +56,7 @@ interface Driver {
   wattageRange?: { min: number; max: number };
   outputVoltage?: string;
   outputCurrent?: string;
-  inputVoltage?: string;
+
   ipRating?: string;
   type?: string;
   category?: string;
@@ -612,7 +612,7 @@ export default function EnhancedCart() {
     const details = [];
     if (item.application) details.push(item.application);
     if (item.lumen) details.push(`${item.lumen}lm`);
-    if (item.inputVoltage) details.push(item.inputVoltage);
+
     if (item.beamAngle) details.push(`${item.beamAngle} beam angle`);
     if (item.ipRating && item.ipRating.trim() !== '') details.push(item.ipRating);
 
@@ -853,7 +853,7 @@ export default function EnhancedCart() {
           if (item.wattageRange) parts.push(`Power: ${item.wattageRange.min}W`);
           if (item.outputVoltage) parts.push(`Output: ${item.outputVoltage}`);
           if ((item as any).outputCurrent) parts.push(`Current: ${(item as any).outputCurrent}`);
-          if (item.inputVoltage) parts.push(`Input: ${item.inputVoltage}`);
+
           if ((item as any).ipRating) parts.push(`IP: ${(item as any).ipRating}`);
           if ((item as any).type) parts.push(`Type: ${(item as any).type}`);
           const specText = parts.join(' | ');
@@ -968,7 +968,7 @@ export default function EnhancedCart() {
             item.category, (item as any).type, item.watt,
             (item as any).dimension, (item as any).beamAngle,
             (item as any).lumen, item.ipRating,
-            item.inputVoltage, (item as any).cct,
+            (item as any).cct,
             (item as any).dimming, (item as any).accessories,
             (item as any).finish, (item as any).reflectorFinish
           ].filter(v => v && v !== '-' && v !== '').length;
@@ -990,13 +990,11 @@ export default function EnhancedCart() {
           };
 
           addSpec('Category: ', item.category);
-          addSpec('Type: ', (item as any).type);
           addSpec('Wattage: ', item.watt ? item.watt + 'W' : null);
           addSpec('Dimension: ', (item as any).dimension);
           addSpec('Beam Angle: ', (item as any).beamAngle);
           addSpec('Lumen: ', (item as any).lumen);
           addSpec('IP Rating: ', Array.isArray(item.ipRating) ? item.ipRating.join(', ') : item.ipRating);
-          addSpec('Input Voltage: ', item.inputVoltage);
           addSpec('CCT: ', (item as any).cct);
           addSpec('Dimming: ', (item as any).dimming);
           addSpec('Accessories: ', (item as any).accessories);
@@ -1670,7 +1668,7 @@ export default function EnhancedCart() {
             { label: '9. Defects Rate', value: asAny.screenParams?.defectsRate ?? 'N/A' },
             { label: '10. Frame Frequency', value: asAny.screenParams?.frameFrequency ?? 'N/A' },
             { label: '11. Refresh Rate', value: asAny.screenParams?.refreshRate ?? 'N/A' },
-            { label: '12. Input Voltage', value: asAny.screenParams?.inputVoltage ?? 'N/A' },
+
             { label: '13. Max Power Consumption', value: asAny.screenParams?.maxPowerConsumption ?? 'N/A' },
             { label: '14. Avg Power Consumption', value: asAny.screenParams?.avgPowerConsumption ?? 'N/A' },
             { label: '15. Life Span', value: asAny.screenParams?.lifeSpan ?? 'N/A' },
@@ -2582,13 +2580,11 @@ export default function EnhancedCart() {
           };
 
           pushSpec('Category', item.category);
-          pushSpec('Type', item.type);
           pushSpec('Wattage', item.watt ? item.watt + 'W' : null);
           pushSpec('Dimension', item.dimension);
           pushSpec('Beam Angle', item.beamAngle);
           pushSpec('Lumen', item.lumen);
           pushSpec('IP Rating', item.ipRating);
-          pushSpec('Input Voltage', item.inputVoltage);
           pushSpec('CCT', item.cct);
           pushSpec('Dimming', item.dimming);
           pushSpec('Accessories', item.accessories);
@@ -2613,9 +2609,7 @@ export default function EnhancedCart() {
             if (item.outputCurrent) {
               driverSpecs.push(`Current: ${item.outputCurrent}`);
             }
-            if (item.inputVoltage) {
-              driverSpecs.push(`Input: ${item.inputVoltage}`);
-            }
+
             if (item.ipRating) {
               driverSpecs.push(`IP: ${item.ipRating}`);
             }
@@ -3577,11 +3571,6 @@ export default function EnhancedCart() {
                                 </button>
                               </div>
                               <div className="flex flex-wrap gap-1.5 mb-2">
-                                {item.inputVoltage && item.inputVoltage !== '-' && (
-                                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-slate-200 border border-slate-700">
-                                    {item.inputVoltage}
-                                  </span>
-                                )}
                                 {item.outputVoltage && (
                                   <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-emerald-200 border border-slate-700">
                                     OV: {item.outputVoltage}
@@ -3688,11 +3677,6 @@ export default function EnhancedCart() {
                                     {(item as any).selectedVariant?.size && (
                                       <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-slate-600 to-slate-700 text-white border border-slate-700 shadow-sm">
                                         {(item as any).selectedVariant.size}
-                                      </span>
-                                    )}
-                                    {item.inputVoltage && item.inputVoltage !== '-' && (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
-                                        {item.inputVoltage}
                                       </span>
                                     )}
                                     {item.watt && item.watt !== '-' && (
@@ -5518,14 +5502,7 @@ export default function EnhancedCart() {
                                       </div>
                                     )}
 
-                                    {driver.inputVoltage && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Input:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.inputVoltage}
-                                        </span>
-                                      </div>
-                                    )}
+
 
                                     {driver.ipRating && (
                                       <div className="flex items-center justify-between text-xs">
@@ -5649,14 +5626,7 @@ export default function EnhancedCart() {
                                       </div>
                                     )}
 
-                                    {driver.inputVoltage && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Input:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.inputVoltage}
-                                        </span>
-                                      </div>
-                                    )}
+
 
                                     {driver.ipRating && (
                                       <div className="flex items-center justify-between text-xs">

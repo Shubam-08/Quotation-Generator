@@ -165,7 +165,7 @@ function buildQuery(parsedQuery: any) {
   }
   
   // Note: Price filter is applied AFTER processing products, not in DB query
-  // This is because actual prices are in ipRatings/voltageVariants arrays
+  // This is because actual prices are in ipRatings arrays
   
   // IP Rating filter
   if (parsedQuery.ipRating) {
@@ -180,13 +180,7 @@ function buildQuery(parsedQuery: any) {
     query.application = { $regex: parsedQuery.application, $options: 'i' };
   }
   
-  // Voltage filter
-  if (parsedQuery.voltage) {
-    orConditions.push(
-      { inputVoltage: { $regex: parsedQuery.voltage, $options: 'i' } },
-      { 'voltageVariants.voltage': { $regex: parsedQuery.voltage, $options: 'i' } }
-    );
-  }
+
   
   // Category search - prioritize category fields over SKU
   if (parsedQuery.categories.length > 0) {
@@ -321,10 +315,10 @@ export async function POST(req: NextRequest) {
         const products = await Product.find(dbQuery).limit(10).lean();
         const processedProducts = products.map((product: any) => ({
           ...product,
-          price: product.ipRatings?.[0]?.price || product.voltageVariants?.[0]?.price || product.price || 0,
+          price: product.ipRatings?.[0]?.price || product.price || 0,
           ipRating: product.ipRatings?.[0]?.rating || product.ipRating?.[0] || '',
-          watt: product.voltageVariants?.[0]?.watt || product.watt || 0,
-          lumen: product.voltageVariants?.[0]?.lumen || product.lumen || '',
+          watt: product.watt || 0,
+          lumen: product.lumen || '',
         }));
         
         return NextResponse.json({
@@ -380,7 +374,7 @@ export async function POST(req: NextRequest) {
     
     // Handle analytical queries
     if (queryType === 'average_price') {
-      const products = await Product.find({}).select('price ipRatings voltageVariants').lean();
+      const products = await Product.find({}).select('price ipRatings').lean();
       let totalPrice = 0;
       let count = 0;
       
@@ -389,13 +383,6 @@ export async function POST(req: NextRequest) {
           product.ipRatings.forEach((ip: any) => {
             if (ip.price > 0) {
               totalPrice += ip.price;
-              count++;
-            }
-          });
-        } else if (product.voltageVariants && product.voltageVariants.length > 0) {
-          product.voltageVariants.forEach((variant: any) => {
-            if (variant.price > 0) {
-              totalPrice += variant.price;
               count++;
             }
           });
@@ -421,17 +408,13 @@ export async function POST(req: NextRequest) {
     }
     
     if (queryType === 'price_range') {
-      const products = await Product.find({}).select('price ipRatings voltageVariants sku').lean();
+      const products = await Product.find({}).select('price ipRatings sku').lean();
       let prices: number[] = [];
       
       products.forEach((product: any) => {
         if (product.ipRatings && product.ipRatings.length > 0) {
           product.ipRatings.forEach((ip: any) => {
             if (ip.price > 0) prices.push(ip.price);
-          });
-        } else if (product.voltageVariants && product.voltageVariants.length > 0) {
-          product.voltageVariants.forEach((variant: any) => {
-            if (variant.price > 0) prices.push(variant.price);
           });
         } else if (product.price > 0) {
           prices.push(product.price);
@@ -551,7 +534,7 @@ export async function POST(req: NextRequest) {
     
     let products = await Product.find(dbQuery)
       .limit(fetchLimit)
-      .select('sku category description price watt lumen beamAngle inputVoltage ipRating ipRatings application voltageVariants categoryFilter')
+      .select('sku category description price watt lumen beamAngle ipRating ipRatings application categoryFilter')
       .lean();
     
     // Process products to get the right price and IP rating
@@ -567,13 +550,7 @@ export async function POST(req: NextRequest) {
         finalIpRating = Array.isArray(product.ipRating) ? product.ipRating[0] : product.ipRating;
       }
       
-      // Get price from voltage variants if available
-      if (product.voltageVariants && product.voltageVariants.length > 0) {
-        const variant = product.voltageVariants[0];
-        if (variant.price > 0) {
-          finalPrice = variant.price;
-        }
-      }
+
       
       // Calculate relevance score for sorting
       let relevanceScore = 0;
@@ -600,7 +577,6 @@ export async function POST(req: NextRequest) {
         watt: product.watt,
         lumen: product.lumen,
         beamAngle: product.beamAngle,
-        inputVoltage: product.inputVoltage,
         ipRating: finalIpRating,
         application: product.application,
         relevanceScore
@@ -610,7 +586,7 @@ export async function POST(req: NextRequest) {
     // Sort by relevance score (highest first)
     processedProducts.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
     
-    // Apply price filter AFTER processing (since real prices are in ipRatings/voltageVariants)
+    // Apply price filter AFTER processing (since real prices are in ipRatings)
     if (parsedQuery.minPrice !== null && parsedQuery.maxPrice !== null) {
       const minPrice = parsedQuery.minPrice;
       const maxPrice = parsedQuery.maxPrice;

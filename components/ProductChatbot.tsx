@@ -21,7 +21,7 @@ type ProductSuggestion = {
   watt?: number;
   lumen?: string;
   beamAngle?: string;
-  inputVoltage?: string;
+
   ipRating?: string;
   application?: string;
   relevanceScore?: number;

@@ -16,13 +16,6 @@ type IpRatingPrice = {
   price: number;
 };
 
-type VoltageVariant = {
-  voltage: string;
-  watt: number;
-  lumen?: string;
-  price: number;
-};
-
 type CabinetMaterialVariant = {
   material: string;
   price: number;
@@ -41,7 +34,7 @@ type Product = {
   category: string;
   categoryFilter?: string;
   application?: string;
-  inputVoltage?: string;
+
   watt?: number;
   lumen?: string;
   beamAngle?: string;
@@ -54,7 +47,7 @@ type Product = {
   sqft?: number;
   ipRating?: string[];
   ipRatings?: IpRatingPrice[];
-  voltageVariants?: VoltageVariant[];
+
   cabinetMaterialVariants?: CabinetMaterialVariant[];
   // Lighting control specific
   productImage?: string;
@@ -100,7 +93,7 @@ type Filters = {
   sku: string;
   category: string;
   application: string;
-  inputVoltage: string;
+
   watt: string;
   lumen: string;
   beamAngle: string;
@@ -196,7 +189,7 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [selectedIpRatings, setSelectedIpRatings] = useState<Record<string, string>>({});
-  const [selectedVoltageVariants, setSelectedVoltageVariants] = useState<Record<string, number>>({});
+
   const [selectedBeamAngles, setSelectedBeamAngles] = useState<Record<string, string>>({});
   const [selectedLumens, setSelectedLumens] = useState<Record<string, string>>({});
   const [selectedCabinetMaterials, setSelectedCabinetMaterials] = useState<Record<string, number>>({});
@@ -235,7 +228,6 @@ export default function ProductsPage() {
     sku: '',
     category: '',
     application: '',
-    inputVoltage: '',
     watt: '',
     lumen: '',
     beamAngle: '',
@@ -281,7 +273,6 @@ export default function ProductsPage() {
     skus: [] as string[],
     categories: [] as string[],
     applications: [] as string[],
-    inputVoltages: [] as string[],
     beamAngles: [] as string[],
     // LED Display options
     pixelPitches: [] as string[],
@@ -400,7 +391,6 @@ export default function ProductsPage() {
             skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
             categories: [...new Set(categoryFilters)].sort() as string[],
             applications: [...new Set(products.map(p => p.application).filter((v): v is string => Boolean(v)))].sort() as string[],
-            inputVoltages: [...new Set(products.map(p => p.inputVoltage).filter((v): v is string => Boolean(v)))].sort(numericSortWithNALast) as string[],
             beamAngles: [...new Set(products.map(p => p.beamAngle).filter((v): v is string => Boolean(v)))].sort(numericSort) as string[],
             pixelPitches: [],
             displayApplications: [],
@@ -414,7 +404,6 @@ export default function ProductsPage() {
             skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
             categories: [...new Set(categoryFilters)].sort() as string[],
             applications: [],
-            inputVoltages: [],
             beamAngles: [],
             pixelPitches: [...new Set(products.map(p => p.pixelPitch).filter((v): v is string => Boolean(v)))].sort(numericSort) as string[],
             displayApplications: [...new Set(products.map(p => p.application).filter((v): v is string => Boolean(v)))].sort() as string[],
@@ -428,7 +417,6 @@ export default function ProductsPage() {
             skus: [...new Set(products.map(p => p.sku).filter((v): v is string => Boolean(v)))].sort() as string[],
             categories: [...new Set(categoryFilters)].sort() as string[],
             applications: [],
-            inputVoltages: [],
             beamAngles: [],
             pixelPitches: [],
             displayApplications: [],
@@ -473,7 +461,6 @@ export default function ProductsPage() {
       sku: '',
       category: '',
       application: '',
-      inputVoltage: '',
       watt: '',
       lumen: '',
       beamAngle: '',
@@ -861,24 +848,6 @@ export default function ProductsPage() {
                       </select>
                     </div>
 
-                    {/* Input Voltage */}
-                    <div>
-                      <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Input Voltage</label>
-                      <select 
-                        value={filters.inputVoltage} 
-                        onChange={e => handleFilterChange('inputVoltage', e.target.value)} 
-                        className={`w-full px-4 py-2.5 rounded-lg outline-none transition-all cursor-pointer ${
-                          isDarkMode 
-                            ? 'bg-black border border-white/20 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400' 
-                            : 'bg-white border border-gray-300 text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400'
-                        }`}
-                      >
-                        <option value="">All Voltages</option>
-                        {filterOptions.inputVoltages.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
-                    </div>
 
                     {/* Beam Angle */}
                     <div>
@@ -1017,7 +986,7 @@ export default function ProductsPage() {
                         { label: 'Model', key: 'sku' },
                         { label: 'Category', key: 'category' },
                         { label: 'Application', key: 'application' },
-                        { label: 'Voltage', key: 'inputVoltage' },
+
                         { label: 'Watt', key: 'watt' },
                         { label: 'Lumen', key: 'lumen' },
                         { label: 'Beam Angle', key: 'beamAngle' },
@@ -1080,26 +1049,8 @@ export default function ProductsPage() {
                     {paginatedProducts.map((p) => {
                       let currentIpRating: string | undefined;
                       let currentPrice: number;
-                      let currentVoltageVariant: VoltageVariant | undefined;
-                      
-                      // Get voltage variant if exists
-                      if (p.voltageVariants && p.voltageVariants.length > 0) {
-                        const selectedIdx = selectedVoltageVariants[p._id] ?? 0;
-                        currentVoltageVariant = p.voltageVariants[selectedIdx];
-                      }
-                      
-                      // Calculate price based on voltage variant or IP rating
-                      if (currentVoltageVariant && currentVoltageVariant.price > 0) {
-                        // Use voltage variant price if available
-                        currentPrice = currentVoltageVariant.price;
-                        // Still track IP rating for display
-                        if (p.ipRatings && p.ipRatings.length > 0) {
-                          currentIpRating = selectedIpRatings[p._id] || p.ipRatings[0].rating;
-                        } else if (p.ipRating) {
-                          // Handle both string and array
-                          currentIpRating = typeof p.ipRating === 'string' ? p.ipRating : (Array.isArray(p.ipRating) && p.ipRating.length > 0 ? (selectedIpRatings[p._id] || p.ipRating[0]) : undefined);
-                        }
-                      } else if (p.ipRatings && p.ipRatings.length > 0) {
+                      // Calculate price based on IP rating
+                      if (p.ipRatings && p.ipRatings.length > 0) {
                         const selectedRating = selectedIpRatings[p._id] || p.ipRatings[0].rating;
                         const ipData = p.ipRatings.find(ip => ip.rating === selectedRating);
                         currentIpRating = selectedRating;
@@ -1119,11 +1070,9 @@ export default function ProductsPage() {
                       
                       // Get current lumen selection
                       const lumenValues = p.lumen ? p.lumen.split(/[\/,]/).map(lumen => lumen.trim()).filter(Boolean) : [];
-                      const currentLumen = currentVoltageVariant?.lumen || (lumenValues.length > 1 ? (selectedLumens[p._id] || lumenValues[0]) : p.lumen);
+                      const currentLumen = lumenValues.length > 1 ? (selectedLumens[p._id] || lumenValues[0]) : p.lumen;
                       
-                      // Get current voltage for cart ID
-                      const currentVoltage = currentVoltageVariant?.voltage || p.inputVoltage || 'default';
-                      const currentWatt = currentVoltageVariant?.watt || p.watt || 'default';
+                      const currentWatt = p.watt || 'default';
                       
                       // For LED displays, include dimensions and cabinet material in cart ID
                       let dimensionKey = '';
@@ -1148,7 +1097,7 @@ export default function ProductsPage() {
                         materialKey = currentCabinetMaterial ? `_${currentCabinetMaterial.replace(/\s+/g, '')}` : '';
                       }
                       
-                      const cartItemId = `${p._id}_${currentIpRating || 'default'}_${currentVoltage}_${currentWatt}_${currentBeamAngle || 'default'}_${currentLumen || 'default'}${dimensionKey}${materialKey}`;
+                      const cartItemId = `${p._id}_${currentIpRating || 'default'}_${currentWatt}_${currentBeamAngle || 'default'}_${currentLumen || 'default'}${dimensionKey}${materialKey}`;
                       const isInCart = cart.some(item => item.cartItemId === cartItemId);
 
                       // Custom layout for LED Displays
@@ -1507,7 +1456,7 @@ export default function ProductsPage() {
                                       const productToAdd = {
                                         ...p,
                                         ipRating: currentIpRating,
-                                        inputVoltage: currentVoltage !== 'default' ? currentVoltage : p.inputVoltage,
+
                                         watt: currentWatt !== 'default' ? currentWatt : p.watt,
                                         beamAngle: selectedBeamAngleForCart,
                                         lumen: currentLumen,
@@ -1864,61 +1813,11 @@ export default function ProductsPage() {
                               return dynamicApplication;
                             })()}
                           </td>
-                          <td className={`px-4 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {p.voltageVariants && p.voltageVariants.length > 0 ? (
-                              p.voltageVariants.length === 1 ? (
-                                <span className="inline-block bg-green-400/10 border border-green-400/30 text-green-400 px-3 py-1 rounded-full text-xs font-semibold">
-                                  {p.voltageVariants[0].voltage}
-                                </span>
-                              ) : (
-                                <select
-                                  value={selectedVoltageVariants[p._id] ?? 0}
-                                  onChange={(e) => setSelectedVoltageVariants(prev => ({ ...prev, [p._id]: parseInt(e.target.value) }))}
-                                  className="bg-green-400/10 border border-green-400/30 text-green-400 px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer outline-none"
-                                >
-                                  {p.voltageVariants.map((variant, idx) => (
-                                    <option key={idx} value={idx}>{variant.voltage}</option>
-                                  ))}
-                                </select>
-                              )
-                            ) : (
-                              <span>{p.inputVoltage || '-'}</span>
-                            )}
-                          </td>
                           <td className={`px-4 py-4 text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {p.voltageVariants && p.voltageVariants.length > 0 ? (
-                              (() => {
-                                const selectedIdx = selectedVoltageVariants[p._id] ?? 0;
-                                const variant = p.voltageVariants[selectedIdx];
-                                return variant?.watt ? `${variant.watt}W` : '-';
-                              })()
-                            ) : (
-                              p.watt ? `${p.watt}W` : '-'
-                            )}
+                            {p.watt ? `${p.watt}W` : '-'}
                           </td>
                           <td className="px-4 py-4">
                             {(() => {
-                              // Check if product has voltage variants - prioritize variant lumen
-                              if (p.voltageVariants && p.voltageVariants.length > 0) {
-                                const selectedIdx = selectedVoltageVariants[p._id] ?? 0;
-                                const variant = p.voltageVariants[selectedIdx];
-                                if (variant?.lumen) {
-                                  const displayValue = variant.lumen.toLowerCase().includes('lm') ? variant.lumen : `${variant.lumen} lm`;
-                                  return (
-                                    <span className={`px-2 py-1 rounded-lg text-xs font-semibold inline-block ${
-                                      isDarkMode
-                                        ? 'bg-gray-800 border border-white/20 text-gray-300'
-                                        : 'bg-white border border-gray-300 text-gray-700'
-                                    }`}>
-                                      {displayValue}
-                                    </span>
-                                  );
-                                } else {
-                                  // Variant exists but no lumen specified
-                                  return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
-                                }
-                              }
-                              
                               if (!p.lumen || p.lumen === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
                               
                               // Parse lumen values - split by / or comma
@@ -2214,15 +2113,11 @@ export default function ProductsPage() {
                                   setCustomizeProduct({ ...p, price: currentPrice });
                                   setCustomSpecs({
                                     category: p.category || '',
-                                    type: p.type || '',
                                     watt: currentWatt || p.watt || '',
                                     dimension: p.dimension || '',
                                     beamAngle: selectedBeamAngle || p.beamAngle || '',
                                     lumen: currentLumen || p.lumen || '',
                                     ipRating: currentIpRating || '',
-                                    inputVoltage: currentVoltage !== 'default' 
-                                      ? currentVoltage 
-                                      : p.inputVoltage || '',
                                     cct: p.cct || '',
                                     dimming: p.dimming || '',
                                     accessories: p.accessories || '',
@@ -2411,7 +2306,6 @@ export default function ProductsPage() {
                 { label: 'Wattage', value: selectedProduct.watt ? selectedProduct.watt + 'W' : null },
                 { label: 'Lumen', value: selectedProduct.lumen },
                 { label: 'Beam Angle', value: selectedProduct.beamAngle },
-                { label: 'Input Voltage', value: selectedProduct.inputVoltage },
                 { label: 'Dimension', value: selectedProduct.dimension },
                 { label: 'CCT', value: selectedProduct.cct },
                 {
@@ -2481,13 +2375,11 @@ export default function ProductsPage() {
             <div className="grid grid-cols-2 gap-3 mb-5">
               {[
                 { label: 'Category', key: 'category' },
-                { label: 'Type', key: 'type' },
                 { label: 'Wattage', key: 'watt' },
                 { label: 'Dimension', key: 'dimension' },
                 { label: 'Beam Angle', key: 'beamAngle' },
                 { label: 'Lumen', key: 'lumen' },
                 { label: 'IP Rating', key: 'ipRating' },
-                { label: 'Input Voltage', key: 'inputVoltage' },
                 { label: 'CCT', key: 'cct' },
                 { label: 'Dimming', key: 'dimming' },
                 { label: 'Accessories', key: 'accessories' },
@@ -2550,13 +2442,11 @@ export default function ProductsPage() {
                 const productToAdd = {
                   ...customizeProduct,
                   category: customSpecs.category || customizeProduct.category,
-                  type: customSpecs.type || customizeProduct.type,
                   watt: customSpecs.watt ? Number(customSpecs.watt) : customizeProduct.watt,
                   dimension: customSpecs.dimension || customizeProduct.dimension,
                   beamAngle: customSpecs.beamAngle || customizeProduct.beamAngle,
                   lumen: customSpecs.lumen || customizeProduct.lumen,
                   ipRating: customSpecs.ipRating || customizeProduct.ipRating,
-                  inputVoltage: customSpecs.inputVoltage || customizeProduct.inputVoltage,
                   cct: customSpecs.cct || customizeProduct.cct,
                   dimming: customSpecs.dimming || customizeProduct.dimming,
                   accessories: customSpecs.accessories || customizeProduct.accessories,

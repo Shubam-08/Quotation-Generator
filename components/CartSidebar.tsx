@@ -16,7 +16,6 @@ interface Product {
   category?: string;
   description?: string;
   application?: string;
-  inputVoltage?: string;
   watt?: string;
   lumen?: string;
   beamAngle?: string;
@@ -65,7 +64,6 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
     const details = [];
     if (item.application) details.push(item.application);
     if (item.lumen) details.push(`${item.lumen}lm`);
-    if (item.inputVoltage) details.push(item.inputVoltage);
     if (item.beamAngle) details.push(`${item.beamAngle} beam angle`);
     if (item.ipRating && item.ipRating.trim() !== '') details.push(item.ipRating);
     if (item.dimension) details.push(`Dimension: ${item.dimension}`);
@@ -139,7 +137,7 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
     // Add column headers
     const headerRow = worksheet.getRow(startRow);
     const columns = [
-      'SI No','Image','Model Number','Description','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','Dimension','Cut Out','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
+      'SI No','Image','Model Number','Description','Category','Application','Watt','Lumen','Beam Angle','Dimension','Cut Out','IP Rating',`Price (${excelCurrency})`,'Quantity',`Total (${excelCurrency})`
     ];
     columns.forEach((col, index) => {
       headerRow.getCell(index + 1).value = col;
@@ -160,16 +158,15 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
     worksheet.getColumn(4).width = 30; // Description
     worksheet.getColumn(5).width = 12; // Category
     worksheet.getColumn(6).width = 12; // Application
-    worksheet.getColumn(7).width = 15; // Input Voltage
-    worksheet.getColumn(8).width = 8;  // Watt
-    worksheet.getColumn(9).width = 10; // Lumen
-    worksheet.getColumn(10).width = 12; // Beam Angle
-    worksheet.getColumn(11).width = 12; // Dimension
-    worksheet.getColumn(12).width = 12; // Cut Out
-    worksheet.getColumn(13).width = 10; // IP Rating
-    worksheet.getColumn(14).width = 12; // Price
-    worksheet.getColumn(15).width = 10; // Quantity
-    worksheet.getColumn(16).width = 12; // Total
+    worksheet.getColumn(7).width = 8;  // Watt
+    worksheet.getColumn(8).width = 10; // Lumen
+    worksheet.getColumn(9).width = 12; // Beam Angle
+    worksheet.getColumn(10).width = 12; // Dimension
+    worksheet.getColumn(11).width = 12; // Cut Out
+    worksheet.getColumn(12).width = 10; // IP Rating
+    worksheet.getColumn(13).width = 12; // Price
+    worksheet.getColumn(14).width = 10; // Quantity
+    worksheet.getColumn(15).width = 12; // Total
 
     // Helper function to get image URL
     const getPrimaryImageUrl = (item: CartItem): string | null => {
@@ -222,16 +219,15 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
       row.getCell(4).alignment = { wrapText: true, vertical: 'top' }; // Enable text wrapping
       row.getCell(5).value = item.category ?? '-';
       row.getCell(6).value = item.application ?? '-';
-      row.getCell(7).value = item.inputVoltage ?? '-';
-      row.getCell(8).value = item.watt ?? '-';
-      row.getCell(9).value = item.lumen ?? '-';
-      row.getCell(10).value = item.beamAngle ?? '-';
-      row.getCell(11).value = item.dimension ?? '-';
-      row.getCell(12).value = item.cutOut ?? '-';
-      row.getCell(13).value = item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A';
-      row.getCell(14).value = convertPrice(item.price ?? 0).toFixed(2);
-      row.getCell(15).value = item.quantity ?? 1;
-      row.getCell(16).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2);
+      row.getCell(7).value = item.watt ?? '-';
+      row.getCell(8).value = item.lumen ?? '-';
+      row.getCell(9).value = item.beamAngle ?? '-';
+      row.getCell(10).value = item.dimension ?? '-';
+      row.getCell(11).value = item.cutOut ?? '-';
+      row.getCell(12).value = item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A';
+      row.getCell(13).value = convertPrice(item.price ?? 0).toFixed(2);
+      row.getCell(14).value = item.quantity ?? 1;
+      row.getCell(15).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2);
 
       // Add image
       const imageUrl = getPrimaryImageUrl(item);
@@ -259,10 +255,10 @@ export default function CartSidebar({ closeSidebar }: { closeSidebar?: () => voi
     const totalAmount = cart.reduce((sum, item) => sum + (convertPrice(item.price ?? 0) * (item.quantity ?? 1)), 0);
     const totalRowIndex = startRow + 1 + cart.length;
     const totalRow = worksheet.getRow(totalRowIndex);
-    totalRow.getCell(14).value = `Total Amount (${excelCurrency}):`;
+    totalRow.getCell(13).value = `Total Amount (${excelCurrency}):`;
+    totalRow.getCell(13).font = { bold: true };
+    totalRow.getCell(14).value = totalAmount.toFixed(2);
     totalRow.getCell(14).font = { bold: true };
-    totalRow.getCell(15).value = totalAmount.toFixed(2);
-    totalRow.getCell(15).font = { bold: true };
 
     // Generate and download
     const buffer = await workbook.xlsx.writeBuffer();
@@ -310,7 +306,7 @@ const exportPDF = async () => {
   // Use currency code instead of symbol for PDF to avoid encoding issues with ₹
   const pdfCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
   const columns = [
-    'Image','Model Number','Category','Application','Input Voltage','Watt','Lumen','Beam Angle','IP Rating',`Price (${pdfCurrency})`,'Quantity',`Total (${pdfCurrency})`
+    'Image','Model Number','Category','Application','Watt','Lumen','Beam Angle','IP Rating',`Price (${pdfCurrency})`,'Quantity',`Total (${pdfCurrency})`
   ];
 
   const getPrimaryImageUrl = (item: CartItem): string | null => {
@@ -374,7 +370,7 @@ const exportPDF = async () => {
 
   const rows = cart.map(item => [
     '',
-    item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', item.inputVoltage ?? '-', 
+    item.sku ?? 'N/A', item.category ?? '-', item.application ?? '-', 
     item.watt ?? '-', item.lumen ?? '-', item.beamAngle ?? '-', item.ipRating && item.ipRating.trim() !== '' ? item.ipRating : 'N/A', 
     convertPrice(item.price ?? 0).toFixed(2), item.quantity ?? 1, 
     (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toFixed(2)
@@ -406,7 +402,7 @@ const exportPDF = async () => {
     margin: { left: 14, right: 14, top: 20 },
     columnStyles: { 
       0: { cellWidth: 50 },  // Image column
-      8: { cellWidth: 'auto', minCellWidth: 45 }  // IP Rating column - ensure enough width for text like "IP67 front / IP65 rear"
+      7: { cellWidth: 'auto', minCellWidth: 45 }  // IP Rating column - ensure enough width for text like "IP67 front / IP65 rear"
     },
     theme: 'grid', // Use grid theme to show all borders
     didParseCell: (data: CellHookData) => {

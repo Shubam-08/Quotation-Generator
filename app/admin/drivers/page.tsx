@@ -19,7 +19,7 @@ interface Driver {
   };
   outputVoltage?: string;
   outputCurrent?: string;
-  inputVoltage?: string;
+
   ipRating?: string;
   type?: string;
   price: number;
@@ -49,7 +49,7 @@ export default function DriversManagement() {
     powerWattage: "",
     outputVoltage: "",
     outputCurrent: "",
-    inputVoltageRange: "",
+
     ipRating: "",
     type: "",
     price: "",
@@ -107,7 +107,7 @@ export default function DriversManagement() {
         },
         outputVoltage: formData.outputVoltage,
         outputCurrent: formData.outputCurrent,
-        inputVoltage: formData.inputVoltageRange,
+
         ipRating: formData.ipRating,
         type: formData.type,
         price: parseFloat(formData.price),
@@ -196,7 +196,7 @@ export default function DriversManagement() {
         powerWattage: `${driver.wattageRange.min}-${driver.wattageRange.max}W`,
         outputVoltage: driver.outputVoltage || "",
         outputCurrent: driver.outputCurrent || "",
-        inputVoltageRange: driver.inputVoltage || "",
+
         ipRating: driver.ipRating || "",
         type: driver.type || "",
         price: driver.price.toString(),
@@ -210,7 +210,7 @@ export default function DriversManagement() {
         powerWattage: "",
         outputVoltage: "",
         outputCurrent: "",
-        inputVoltageRange: "",
+
         ipRating: "",
         type: "",
         price: "",
@@ -235,7 +235,7 @@ export default function DriversManagement() {
         "Power (Wattage)": "10-50W",
         "Output Voltage": "12V DC",
         "Output Current": "4.16A",
-        "Input Voltage Range": "100-240V AC",
+
         "IP Rating": "IP67",
         "Type": "Constant Voltage",
         "Price (USD)": 25.00,
@@ -247,7 +247,7 @@ export default function DriversManagement() {
         "Power (Wattage)": "50-100W",
         "Output Voltage": "24V DC",
         "Output Current": "4.16A",
-        "Input Voltage Range": "100-240V AC",
+
         "IP Rating": "IP67",
         "Type": "Constant Voltage",
         "Price (USD)": 45.00,
@@ -332,7 +332,7 @@ export default function DriversManagement() {
             },
             outputVoltage: row["Output Voltage"] || "",
             outputCurrent: row["Output Current"] || "",
-            inputVoltage: row["Input Voltage Range"] || row["Input Voltage"] || "",
+
             ipRating: row["IP Rating"] || "",
             type: row["Type"] || "",
             price: parseFloat(row["Price (USD)"] || row.price || 0),
@@ -480,9 +480,7 @@ export default function DriversManagement() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Output Current
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Input Voltage
-                  </th>
+
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     IP Rating
                   </th>
@@ -525,9 +523,7 @@ export default function DriversManagement() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {driver.outputCurrent || "-"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {driver.inputVoltage || "-"}
-                      </td>
+
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {driver.ipRating || "-"}
                       </td>
@@ -703,20 +699,7 @@ export default function DriversManagement() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Input Voltage Range
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.inputVoltageRange}
-                    onChange={(e) =>
-                      setFormData({ ...formData, inputVoltageRange: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                    placeholder="e.g., 100-240V AC"
-                  />
-                </div>
+
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

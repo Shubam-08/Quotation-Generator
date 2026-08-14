@@ -655,6 +655,7 @@ export const renderFormFields = (
             <option value="7740" className={isDarkMode ? 'bg-gray-800 text-white' : ''}>7740 Hz</option>
           </select>
         </div>
+
         <div>
           <label className={labelClass}>12. Input Voltage</label>
           <input
@@ -676,6 +677,7 @@ export const renderFormFields = (
               })
           )}
         </div>
+
         <div>
           <label className={labelClass}>13. Max Power Consumption</label>
           <input
