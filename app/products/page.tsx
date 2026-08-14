@@ -44,6 +44,7 @@ type Product = {
   accessories?: string;
   finish?: string;
   reflectorFinish?: string;
+  wattageVariants?: { watt: number; lumen: string; dimension: string; }[];
   price: number;
   // LED display specific
   pixelPitch?: string;
