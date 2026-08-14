@@ -146,6 +146,8 @@ export default function EnhancedCart() {
   const [quotationType, setQuotationType] = useState<'draft' | 'final'>('final');
   const [editingDisplay, setEditingDisplay] = useState<CartItem | null>(null);
   const [displayFormData, setDisplayFormData] = useState<any | null>(null);
+  const [editingCartItem, setEditingCartItem] = useState<any>(null);
+  const [editSpecs, setEditSpecs] = useState<any>({});
   // Password lock for Price Calculation editing
   const [priceEditUnlocked, setPriceEditUnlocked] = useState(false);
   const [showPriceEditModal, setShowPriceEditModal] = useState(false);
@@ -963,7 +965,7 @@ export default function EnhancedCart() {
           // LED PRODUCT
           const row1Index = currentRowIndex;
           const row1 = worksheet.getRow(row1Index);
-          
+
           const specCount = [
             item.category, (item as any).type, item.watt,
             (item as any).dimension, (item as any).beamAngle,
@@ -2761,7 +2763,7 @@ export default function EnhancedCart() {
                     doc.setTextColor(0, 0, 0);
                     doc.text(label, textX, textY);
                     const labelWidth = doc.getTextWidth(label);
-                    
+
                     // Draw normal value
                     doc.setFont('helvetica', 'normal');
                     doc.text(value, textX + labelWidth, textY);
@@ -3660,14 +3662,41 @@ export default function EnhancedCart() {
                                         {item.category}
                                       </p>
                                     </div>
-                                    <button
-                                      onClick={() => removeFromCart(item.cartItemId)}
-                                      className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-50 text-red-600 hover:text-red-700"
-                                      title="Remove"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingCartItem(item);
+                                            setEditSpecs({
+                                              category: item.category || '',
+                                              watt: item.watt || '',
+                                              lumen: item.lumen || '',
+                                              dimension: item.dimension || '',
+                                              beamAngle: item.beamAngle || '',
+                                              ipRating: Array.isArray(item.ipRating) 
+                                                ? item.ipRating.join(', ') 
+                                                : item.ipRating || '',
+                                              cct: (item as any).cct || '',
+                                              dimming: (item as any).dimming || '',
+                                              accessories: (item as any).accessories || '',
+                                              finish: (item as any).finish || '',
+                                              reflectorFinish: (item as any).reflectorFinish || '',
+                                              quantity: item.quantity || 1,
+                                            });
+                                          }}
+                                          className="text-blue-500 hover:text-blue-700 cursor-pointer transition-all text-[11px] font-medium mr-2"
+                                        >
+                                          ✏️ Edit
+                                        </button>
+                                        <button
+                                          onClick={() => removeFromCart(item.cartItemId)}
+                                          className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-50 text-red-600 hover:text-red-700"
+                                          title="Remove"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
                                   <div className="flex flex-wrap gap-1.5 mb-2">
                                     {(item as any).selectedVariant?.channels && (
                                       <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-indigo-500 to-blue-500 text-white border border-indigo-600 shadow-sm">
@@ -3699,29 +3728,29 @@ export default function EnhancedCart() {
                                         {item.ipRating}
                                       </span>
                                     )}
-                                    {item.cct && item.cct !== '-' && item.cct !== 'None' && (
+                                    {(item as any).cct && (item as any).cct !== '-' && (item as any).cct !== 'None' && (
                                       <span className="inline-block bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-200">
-                                        {item.cct}
+                                        {(item as any).cct}
                                       </span>
                                     )}
-                                    {item.dimming && item.dimming !== '-' && item.dimming !== 'None' && (
+                                    {(item as any).dimming && (item as any).dimming !== '-' && (item as any).dimming !== 'None' && (
                                       <span className="inline-block bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-emerald-200">
-                                        {item.dimming}
+                                        {(item as any).dimming}
                                       </span>
                                     )}
-                                    {item.accessories && item.accessories !== '-' && item.accessories !== 'None' && (
+                                    {(item as any).accessories && (item as any).accessories !== '-' && (item as any).accessories !== 'None' && (
                                       <span className="inline-block bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-200">
-                                        {item.accessories}
+                                        {(item as any).accessories}
                                       </span>
                                     )}
-                                    {item.finish && item.finish !== '-' && item.finish !== 'None' && (
+                                    {(item as any).finish && (item as any).finish !== '-' && (item as any).finish !== 'None' && (
                                       <span className="inline-block bg-slate-50 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-slate-200">
-                                        Finish: {item.finish}
+                                        Finish: {(item as any).finish}
                                       </span>
                                     )}
-                                    {item.reflectorFinish && item.reflectorFinish !== '-' && item.reflectorFinish !== 'None' && (
+                                    {(item as any).reflectorFinish && (item as any).reflectorFinish !== '-' && (item as any).reflectorFinish !== 'None' && (
                                       <span className="inline-block bg-zinc-50 text-zinc-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-zinc-200">
-                                        Reflector: {item.reflectorFinish}
+                                        Reflector: {(item as any).reflectorFinish}
                                       </span>
                                     )}
                                   </div>
@@ -6013,6 +6042,117 @@ export default function EnhancedCart() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {editingCartItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-xl p-6 max-w-lg w-full shadow-2xl border border-gray-700 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <p className="text-gray-400 text-xs mb-1">
+                  Editing cart item
+                </p>
+                <h2 className="text-white font-bold text-lg">
+                  {editingCartItem.sku}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCartItem(null)}
+                className="text-gray-400 hover:text-white text-2xl cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {[
+                { label: 'Category', key: 'category' },
+                { label: 'Wattage', key: 'watt' },
+                { label: 'Lumen', key: 'lumen' },
+                { label: 'Dimension', key: 'dimension' },
+                { label: 'Beam Angle', key: 'beamAngle' },
+                { label: 'IP Rating', key: 'ipRating' },
+                { label: 'CCT', key: 'cct' },
+                { label: 'Dimming', key: 'dimming' },
+                { label: 'Accessories', key: 'accessories' },
+                { label: 'Finish', key: 'finish' },
+                { label: 'Reflector Finish', key: 'reflectorFinish' },
+              ].map(({ label, key }) => (
+                <div key={key} className="flex flex-col gap-1">
+                  <label className="text-gray-400 text-xs font-medium">
+                    {label}
+                  </label>
+                  <input
+                    type="text"
+                    value={editSpecs[key] || ''}
+                    onChange={(e) => setEditSpecs((prev: any) => ({
+                      ...prev,
+                      [key]: e.target.value
+                    }))}
+                    className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3 mb-3">
+              <span className="text-gray-400 text-sm font-medium">
+                Quantity
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditSpecs((prev: any) => ({
+                    ...prev,
+                    quantity: Math.max(1, (prev.quantity || 1) - 1)
+                  }))}
+                  className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-bold cursor-pointer transition-all"
+                >
+                  −
+                </button>
+                <span className="text-white font-bold text-lg w-8 text-center">
+                  {editSpecs.quantity || 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEditSpecs((prev: any) => ({
+                    ...prev,
+                    quantity: (prev.quantity || 1) + 1
+                  }))}
+                  className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-bold cursor-pointer transition-all"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                updateCartItem(editingCartItem.cartItemId, {
+                  ...editingCartItem,
+                  category: editSpecs.category,
+                  watt: editSpecs.watt ? Number(editSpecs.watt) : editingCartItem.watt,
+                  lumen: editSpecs.lumen,
+                  dimension: editSpecs.dimension,
+                  beamAngle: editSpecs.beamAngle,
+                  ipRating: editSpecs.ipRating,
+                  cct: editSpecs.cct,
+                  dimming: editSpecs.dimming,
+                  accessories: editSpecs.accessories,
+                  finish: editSpecs.finish,
+                  reflectorFinish: editSpecs.reflectorFinish,
+                  quantity: editSpecs.quantity || 1,
+                });
+                setEditingCartItem(null);
+              }}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer transition-all text-sm"
+            >
+              Update Cart Item
+            </button>
           </div>
         </div>
       )}
