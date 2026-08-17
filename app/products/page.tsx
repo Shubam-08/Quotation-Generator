@@ -238,6 +238,7 @@ export default function ProductsPage() {
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [recentlyAdded, setRecentlyAdded] = useState<boolean>(false);
   const [itemsPerPage] = useState<number>(30);
 
   const [filters, setFilters] = useState<Filters>({
@@ -473,6 +474,7 @@ export default function ProductsPage() {
   };
 
   const resetFilters = () => {
+    setRecentlyAdded(false);
     setFilters({
       search: '',
       sku: '',
@@ -510,16 +512,27 @@ export default function ProductsPage() {
     // If session exists, allow default download behavior
   };
 
+  // Sort products locally if "Recently Added" is selected
+  let displayProducts = [...products];
+  if (recentlyAdded) {
+    displayProducts.sort((a, b) => {
+      // Use _id string comparison which inherently sorts by creation time since ObjectIDs start with a timestamp
+      const idA = a._id?.toString() || '';
+      const idB = b._id?.toString() || '';
+      return idB.localeCompare(idA);
+    });
+  }
+
   // Pagination calculations
-  const totalPages = Math.ceil(products.length / itemsPerPage);
+  const totalPages = Math.ceil(displayProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedProducts = products.slice(startIndex, endIndex);
+  const paginatedProducts = displayProducts.slice(startIndex, endIndex);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters]);
+  }, [filters, recentlyAdded]);
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-gray-50'}`}>
@@ -784,6 +797,8 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
+
+
                 {/* SKU - Only for lighting controls */}
                 {productType === 'lighting-controls' && (
                   <div>
@@ -948,6 +963,31 @@ export default function ProductsPage() {
                     </div>
                   </>
                 )}
+
+                {/* Recently Added - Common for all types */}
+                <div className="flex flex-col justify-end pb-[2px]">
+                  <label className="flex items-center gap-3 cursor-pointer group w-fit">
+                    <div className="relative flex items-center">
+                      <input 
+                        type="checkbox" 
+                        checked={recentlyAdded}
+                        onChange={(e) => setRecentlyAdded(e.target.checked)}
+                        className="peer sr-only"
+                      />
+                      <div className={`w-10 h-5 rounded-full peer-focus:outline-none transition-colors ${
+                        isDarkMode ? 'bg-gray-700 peer-checked:bg-yellow-500' : 'bg-gray-300 peer-checked:bg-yellow-400'
+                      }`}></div>
+                      <div className="absolute left-[2px] top-[2px] bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-full shadow-sm"></div>
+                    </div>
+                    <span className={`text-xs font-semibold uppercase tracking-wide transition-colors ${
+                      recentlyAdded 
+                        ? (isDarkMode ? 'text-yellow-400' : 'text-yellow-600') 
+                        : (isDarkMode ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-600 group-hover:text-gray-900')
+                    }`}>
+                      Recently Added
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
           )}

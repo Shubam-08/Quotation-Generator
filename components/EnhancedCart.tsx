@@ -68,6 +68,7 @@ type CartItem = Product & {
   quantity: number;
   name?: string;
   cartItemId: string;
+  wattage?: string | number;
   isDriver?: boolean;
   parentProductId?: string;
   // Driver-specific fields
