@@ -1011,7 +1011,7 @@ export default function ProductsPage() {
                         { label: 'CCT', key: 'cct' },
                         { label: 'IP Rating', key: 'ipRating' },
                         { label: 'Price', key: 'price' },
-                        { label: 'Files', key: 'files' },
+                        /* { label: 'Files', key: 'files' }, */
                         { label: 'Action', key: 'action' }
                       ].map(col => (
                         <th 
@@ -1049,7 +1049,7 @@ export default function ProductsPage() {
                         { label: 'Product Name', key: 'productName' },
                         { label: 'Category', key: 'category' },
                         { label: 'Price', key: 'price' },
-                        { label: 'Files', key: 'files' },
+                        /* { label: 'Files', key: 'files' }, */
                         { label: 'Action', key: 'action' }
                       ].map(col => (
                         <th 
@@ -1609,6 +1609,7 @@ export default function ProductsPage() {
                                 </div>
                               )}
                             </td>
+                            {false && (
                             <td className="px-4 py-4">
                               {(p.datasheets?.length || p.certifications?.length || p.bisApproval?.length || p.isoCertificate?.length) ? (
                                 <div className="relative group">
@@ -1716,6 +1717,7 @@ export default function ProductsPage() {
                                 <span className={`text-xs italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>No files</span>
                               )}
                             </td>
+                            )}
                             <td className="px-4 py-4">
                               {isInCart ? (
                                 // Show increment/decrement controls when item is in cart
@@ -2043,6 +2045,7 @@ export default function ProductsPage() {
                           <td className="px-4 py-4 text-sm font-bold text-yellow-400">
                             {formatPrice(currentPrice)}
                           </td>
+                          {false && (
                           <td className="px-4 py-4">
                             {(p.datasheets?.length || p.iesFiles?.length || p.certifications?.length || p.bisApproval?.length || p.isoCertificate?.length) ? (
                               <div className="relative group">
@@ -2170,6 +2173,7 @@ export default function ProductsPage() {
                               <span className={`text-xs italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>No files</span>
                             )}
                           </td>
+                          )}
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-2">
                               {isInCart ? (
