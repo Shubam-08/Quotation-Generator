@@ -1461,7 +1461,7 @@ export default function ProductsPage() {
                                     }
                                   }}
                                   disabled={addingProductId === cartItemId}
-                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                                     addingProductId === cartItemId
                                     ? 'bg-blue-500 text-white cursor-wait'
                                     : 'bg-green-500 hover:bg-green-600 text-white hover:scale-105'
@@ -1537,7 +1537,7 @@ export default function ProductsPage() {
                                     }
                                   }}
                                   disabled={addingProductId === cartItemId}
-                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                                     addingProductId === cartItemId
                                     ? 'bg-blue-500 text-white cursor-wait'
                                     : 'bg-yellow-400 hover:bg-yellow-500 text-black hover:scale-105'
@@ -1815,7 +1815,7 @@ export default function ProductsPage() {
                                     }
                                   }}
                                   disabled={addingProductId === cartItemId}
-                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                                     addingProductId === cartItemId
                                     ? 'bg-blue-500 text-white cursor-wait'
                                     : 'bg-yellow-400 hover:bg-yellow-500 text-black hover:scale-105'
@@ -2288,7 +2288,7 @@ export default function ProductsPage() {
                                   setReflectorFinishCustom(p.reflectorFinish ? !REFLECTOR_FINISH_OPTIONS.includes(p.reflectorFinish) : false);
                                 }}
                                 disabled={addingProductId === cartItemId}
-                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                                   addingProductId === cartItemId
                                   ? 'bg-blue-500 text-white cursor-wait'
                                   : 'bg-yellow-400 hover:bg-yellow-500 text-black hover:scale-105'

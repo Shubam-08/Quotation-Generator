@@ -1017,7 +1017,7 @@ export default function EnhancedCart() {
               try {
                 const imageId = workbook.addImage({ buffer: imageBuffer, extension: 'jpeg' });
                 worksheet.addImage(imageId, {
-                  tl: { col: 4.15, row: row1Index - 1 + 0.25 },
+                  tl: { col: 4.85, row: row1Index - 1 + 0.10 },
                   ext: { width: 65, height: 65 },
                   editAs: 'oneCell'
                 });
