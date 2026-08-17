@@ -3540,11 +3540,11 @@ export default function EnhancedCart() {
                             </div>
                           ) : (
                             item.isDriver ? (
-                              <div className="flex flex-col gap-3 rounded-none bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-600 px-4 py-3 shadow-sm">
-                                <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex flex-col gap-2 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-600 px-3 py-2.5 shadow-sm mt-2 max-w-lg mx-auto md:mx-0 md:ml-4">
+                                <div className="flex items-start justify-between gap-2 mb-0.5">
                                   <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-100 border border-slate-600">
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-700 text-slate-100 border border-slate-600">
                                         🔌 Driver
                                       </span>
                                       {item.series && (
@@ -3559,7 +3559,7 @@ export default function EnhancedCart() {
                                       )}
                                     </div>
                                     <h3 className="font-bold text-xs mb-0.5 truncate text-white">
-                                      {item.name || item.sku}
+                                      {item.name || item.sku}{item.wattage && item.wattage !== 'N/A' ? ` - ${item.wattage}${String(item.wattage).toUpperCase().endsWith('W') ? '' : 'W'}` : ''}
                                     </h3>
                                     {item.category && (
                                       <p className="text-[10px] text-slate-300">
@@ -5805,24 +5805,43 @@ export default function EnhancedCart() {
                 { label: 'Beam Angle', key: 'beamAngle' },
                 { label: 'IP Rating', key: 'ipRating' },
                 { label: 'CCT', key: 'cct' },
-                { label: 'Dimming', key: 'dimming' },
-                { label: 'Accessories', key: 'accessories' },
-                { label: 'Finish', key: 'finish' },
-                { label: 'Reflector Finish', key: 'reflectorFinish' },
-              ].map(({ label, key }) => (
+                { label: 'Dimming', key: 'dimming', options: ['None', 'DALI', '0-10V Dimming', '1-10V Dimming', 'TRIAC', 'Non Dimmable', 'DMX Controlled'] },
+                { label: 'Accessories', key: 'accessories', options: ['None', 'Spike', 'Honeycomb Louvre', 'Tree Strap', 'Spread Lens', 'Cowl'] },
+                { label: 'Finish', key: 'finish', options: ['None', 'White', 'Black', 'Silver', 'Gold'] },
+                { label: 'Reflector Finish', key: 'reflectorFinish', options: ['None', 'Chrome', 'White', 'Black', 'Silver', 'Gold', 'Dark Chrome'] },
+              ].map(({ label, key, options }) => (
                 <div key={key} className="flex flex-col gap-1">
                   <label className="text-gray-400 text-xs font-medium">
                     {label}
                   </label>
-                  <input
-                    type="text"
-                    value={editSpecs[key] || ''}
-                    onChange={(e) => setEditSpecs((prev: any) => ({
-                      ...prev,
-                      [key]: e.target.value
-                    }))}
-                    className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  {options ? (
+                    <select
+                      value={editSpecs[key] || ''}
+                      onChange={(e) => setEditSpecs((prev: any) => ({
+                        ...prev,
+                        [key]: e.target.value
+                      }))}
+                      className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="">Select {label}</option>
+                      {editSpecs[key] && !options.includes(editSpecs[key]) && (
+                        <option value={editSpecs[key]}>{editSpecs[key]}</option>
+                      )}
+                      {options.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={editSpecs[key] || ''}
+                      onChange={(e) => setEditSpecs((prev: any) => ({
+                        ...prev,
+                        [key]: e.target.value
+                      }))}
+                      className="bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  )}
                 </div>
               ))}
             </div>
