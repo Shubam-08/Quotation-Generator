@@ -27,7 +27,7 @@ const quotationSchema = new mongoose.Schema({
   userCompanyName: { type: String, default: '' },
 
   createdAt: { type: Date, default: Date.now },
-  status: { type: String, enum: ['draft', 'final'], default: 'final' },
+
 });
 
 delete mongoose.models['Quotation'];

@@ -143,7 +143,7 @@ export default function EnhancedCart() {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadingType, setDownloadingType] = useState<'excel' | 'pdf' | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<'excel' | 'pdf' | null>(null);
-  const [quotationType, setQuotationType] = useState<'draft' | 'final'>('final');
+
   const [editingDisplay, setEditingDisplay] = useState<CartItem | null>(null);
   const [displayFormData, setDisplayFormData] = useState<any | null>(null);
   const [editingCartItem, setEditingCartItem] = useState<any>(null);
@@ -630,7 +630,6 @@ export default function EnhancedCart() {
   };
 
   const exportExcel = async () => {
-    const currentQuotationType = quotationType;
     if (isExcelLoading || downloadingType !== null) return;
     setIsExcelLoading(true);
 
@@ -660,8 +659,6 @@ export default function EnhancedCart() {
       setUserInfo(prev => ({ ...prev, invoiceNo: exportQuoteNo }));
 
       // Persist quotation + user snapshot in backend
-      console.log('Sending quotation with status:', currentQuotationType);
-      console.log('quotationType state value:', quotationType);
       try {
         const res = await fetch('/api/quotations', {
           method: 'POST',
@@ -675,7 +672,6 @@ export default function EnhancedCart() {
               quantity: item.quantity ?? 1,
             })),
             totalPrice: total,
-            status: currentQuotationType,
             userDepartment: session?.user?.department || '',
             userCountry: session?.user?.country || '',
             userMobile: session?.user?.mobile || userInfo.mobile || '',
@@ -1243,7 +1239,6 @@ export default function EnhancedCart() {
   };
 
   const exportPDF = async (returnBlob = false): Promise<string | void> => {
-    const currentQuotationType = quotationType;
     if (isPdfLoading || downloadingType !== null) return;
     setIsPdfLoading(true);
 
@@ -1273,8 +1268,6 @@ export default function EnhancedCart() {
       setUserInfo(prev => ({ ...prev, invoiceNo: exportQuoteNo }));
 
       // Persist quotation + user snapshot in backend
-      console.log('Sending quotation with status:', currentQuotationType);
-      console.log('quotationType state value:', quotationType);
       try {
         const res = await fetch('/api/quotations', {
           method: 'POST',
@@ -1288,7 +1281,6 @@ export default function EnhancedCart() {
               quantity: item.quantity ?? 1,
             })),
             totalPrice: total,
-            status: currentQuotationType,
             userDepartment: session?.user?.department || '',
             userCountry: session?.user?.country || '',
             userMobile: session?.user?.mobile || userInfo.mobile || '',
@@ -2920,22 +2912,6 @@ export default function EnhancedCart() {
         doc.rect(termsBoxX, termsBoxY, termsBoxWidth, termsBoxHeight);
       }
 
-      if (currentQuotationType === 'draft') {
-        const pageCount = doc.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-          doc.setPage(i);
-          doc.setFontSize(60);
-          doc.setTextColor(200, 200, 200);
-          doc.setFont('helvetica', 'bold');
-          const centerX = doc.internal.pageSize.width / 2;
-          const centerY = doc.internal.pageSize.height / 2;
-          doc.text('DRAFT', centerX, centerY, {
-            align: 'center',
-            angle: 45
-          });
-        }
-      }
-
       if (returnBlob) {
         const pdfBlob = doc.output('blob');
         const url = URL.createObjectURL(pdfBlob);
@@ -4177,36 +4153,7 @@ export default function EnhancedCart() {
                       ✅ {downloadSuccess === 'excel' ? 'Excel' : 'PDF'} downloaded successfully!
                     </div>
                   )}
-                  <div className="flex gap-2 mb-3">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setQuotationType('draft');
-                      }}
-                      className={`flex-1 py-2 rounded-md text-sm font-semibold border transition-all cursor-pointer
-                        ${quotationType === 'draft'
-                          ? 'bg-orange-500 text-white border-orange-500'
-                          : 'bg-white text-gray-600 border-gray-300'}`}
-                    >
-                      Draft
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setQuotationType('final');
-                      }}
-                      className={`flex-1 py-2 rounded-md text-sm font-semibold border transition-all cursor-pointer
-                        ${quotationType === 'final'
-                          ? 'bg-green-600 text-white border-green-600'
-                          : 'bg-white text-gray-600 border-gray-300'}`}
-                    >
-                      Final
-                    </button>
-                  </div>
+
 
                   <div className="grid grid-cols-2 gap-2">
                     {/* PDF Button */}
@@ -6192,11 +6139,7 @@ export default function EnhancedCart() {
                 Ready to download?
               </h2>
               <p className="text-gray-400 text-sm">
-                This will be saved as a 
-                <span className={`font-semibold mx-1 ${quotationType === 'draft' ? 'text-orange-400' : 'text-green-400'}`}>
-                  {quotationType === 'draft' ? 'Draft' : 'Final'}
-                </span>
-                quotation.
+                This will be saved as a quotation.
               </p>
             </div>
 
@@ -6246,7 +6189,7 @@ export default function EnhancedCart() {
           
           <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-700">
             <h2 className="text-white font-semibold text-sm">
-              PDF Preview — {quotationType === 'draft' ? 'Draft' : 'Final'}
+              PDF Preview
             </h2>
             <div className="flex items-center gap-2">
               <button

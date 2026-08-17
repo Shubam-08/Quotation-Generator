@@ -1083,7 +1083,7 @@ export default function ProductsPage() {
                       }
                       
                       // Get current beam angle selection
-                      const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
+                      const beamAngles = p.beamAngle ? Array.from(new Set(p.beamAngle.split(/[\/,]/).map((angle: string) => angle.trim()).filter(Boolean))) : [];
                       const currentBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
                       
                       // Get current lumen selection
@@ -1930,7 +1930,7 @@ export default function ProductsPage() {
                               if (!p.beamAngle || p.beamAngle === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
                               
                               // Parse beam angles - split by / or comma
-                              const beamAngles = p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean);
+                              const beamAngles = Array.from(new Set(p.beamAngle.split(/[\/,]/).map((angle: string) => angle.trim()).filter(Boolean)));
                               
                               if (beamAngles.length === 1) {
                                 return (
@@ -1967,7 +1967,7 @@ export default function ProductsPage() {
                               if (!p.cct || p.cct === '-') return <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>-</span>;
                               
                               // Parse CCT - split by / or comma
-                              const ccts = p.cct.split(/[\/,]/).map((c: string) => c.trim()).filter(Boolean);
+                              const ccts = Array.from(new Set(p.cct.split(/[\/,]/).map((c: string) => c.trim()).filter(Boolean)));
                               
                               if (ccts.length === 1) {
                                 return (
@@ -2212,10 +2212,10 @@ export default function ProductsPage() {
                               <button 
                                 onClick={() => {
                                   // Get selected beam angle if multiple exist
-                                  const beamAngles = p.beamAngle ? p.beamAngle.split(/[\/,]/).map(angle => angle.trim()).filter(Boolean) : [];
+                                  const beamAngles = p.beamAngle ? Array.from(new Set(p.beamAngle.split(/[\/,]/).map((angle: string) => angle.trim()).filter(Boolean))) : [];
                                   const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
 
-                                  const ccts = p.cct ? p.cct.split(/[\/,]/).map((c: string) => c.trim()).filter(Boolean) : [];
+                                  const ccts = p.cct ? Array.from(new Set(p.cct.split(/[\/,]/).map((c: string) => c.trim()).filter(Boolean))) : [];
                                   const selectedCct = ccts.length > 1 ? (selectedCcts[p._id] || ccts[0]) : p.cct;
 
                                   const selectedIdx = selectedWattVariants[p._id] ?? 0;
