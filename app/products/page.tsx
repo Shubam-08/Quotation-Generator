@@ -193,6 +193,7 @@ export default function ProductsPage() {
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [customizeProduct, setCustomizeProduct] = useState<any>(null);
+  const [showNoPriceConfirm, setShowNoPriceConfirm] = useState(false);
   const [customSpecs, setCustomSpecs] = useState<any>({});
   const [dimmingCustom, setDimmingCustom] = useState(false);
   const [accessoriesCustom, setAccessoriesCustom] = useState(false);
@@ -2230,6 +2231,7 @@ export default function ProductsPage() {
                                     lumen: selectedVariant?.lumen || currentLumen || p.lumen || '',
                                     ipRating: currentIpRating || '',
                                     cct: selectedCct || p.cct || '',
+                                    price: p.price || '',
                                     dimming: p.dimming || '',
                                     accessories: p.accessories || '',
                                     finish: p.finish || '',
@@ -2487,6 +2489,22 @@ export default function ProductsPage() {
               </button>
             </div>
 
+            <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded-lg">
+              <label className="block text-yellow-400 text-xs font-semibold mb-1">
+                💰 Price (USD) — Optional
+              </label>
+              <input
+                type="text"
+                value={customSpecs.price || ''}
+                onChange={(e) => setCustomSpecs((prev: any) => ({
+                  ...prev,
+                  price: e.target.value
+                }))}
+                placeholder="Enter price in USD (leave empty if unknown)"
+                className="w-full bg-gray-800 border border-yellow-600/50 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-yellow-500 outline-none placeholder-gray-500"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3 mb-5">
               {[
                 { label: 'Category', key: 'category' },
@@ -2665,6 +2683,10 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => {
+                if (!customSpecs.price || customSpecs.price === '0') {
+                  setShowNoPriceConfirm(true);
+                  return;
+                }
                 const cartItemId = `${customizeProduct._id}_custom_${Date.now()}`;
                 const productToAdd = {
                   ...customizeProduct,
@@ -2679,17 +2701,74 @@ export default function ProductsPage() {
                   accessories: customSpecs.accessories || customizeProduct.accessories,
                   finish: customSpecs.finish || customizeProduct.finish,
                   reflectorFinish: customSpecs.reflectorFinish || customizeProduct.reflectorFinish,
-                  price: customizeProduct.price,
+                  price: customSpecs.price ? Number(customSpecs.price) : customizeProduct.price,
                   quantity: customSpecs.quantity || 1,
                   cartItemId,
                 };
-                addToCart(productToAdd);
+                addToCart(productToAdd, productToAdd.quantity);
                 setCustomizeProduct(null);
               }}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer transition-all text-sm"
             >
               Add to Cart
             </button>
+          </div>
+        </div>
+      )}
+
+      {showNoPriceConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-xl p-6 max-w-sm w-full border border-yellow-600/50 shadow-2xl">
+            
+            <div className="mb-4 text-center">
+              <div className="text-3xl mb-2">⚠️</div>
+              <h3 className="text-white font-bold text-base mb-1">
+                No price added!
+              </h3>
+              <p className="text-gray-400 text-sm">
+                This item will show ₹0.00 in the quotation. 
+                Do you want to continue without a price?
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setShowNoPriceConfirm(false)}
+                className="w-full py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-semibold cursor-pointer"
+              >
+                Add Price
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoPriceConfirm(false);
+                  const cartItemId = `${customizeProduct._id}_custom_${Date.now()}`;
+                  const productToAdd = {
+                    ...customizeProduct,
+                    category: customSpecs.category || customizeProduct.category,
+                    watt: customSpecs.watt ? Number(customSpecs.watt) : customizeProduct.watt,
+                    lumen: customSpecs.lumen || customizeProduct.lumen,
+                    dimension: customSpecs.dimension || customizeProduct.dimension,
+                    beamAngle: customSpecs.beamAngle || customizeProduct.beamAngle,
+                    ipRating: customSpecs.ipRating || customizeProduct.ipRating,
+                    cct: customSpecs.cct || customizeProduct.cct,
+                    dimming: customSpecs.dimming || customizeProduct.dimming,
+                    accessories: customSpecs.accessories || customizeProduct.accessories,
+                    finish: customSpecs.finish || customizeProduct.finish,
+                    reflectorFinish: customSpecs.reflectorFinish || customizeProduct.reflectorFinish,
+                    price: 0,
+                    quantity: customSpecs.quantity || 1,
+                    cartItemId,
+                  };
+                  addToCart(productToAdd, productToAdd.quantity);
+                  setCustomizeProduct(null);
+                }}
+                className="w-full py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm cursor-pointer"
+              >
+                Continue without price
+              </button>
+            </div>
           </div>
         </div>
       )}

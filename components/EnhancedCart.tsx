@@ -148,6 +148,7 @@ export default function EnhancedCart() {
   const [displayFormData, setDisplayFormData] = useState<any | null>(null);
   const [editingCartItem, setEditingCartItem] = useState<any>(null);
   const [editSpecs, setEditSpecs] = useState<any>({});
+  const [showNoPriceConfirm, setShowNoPriceConfirm] = useState(false);
   const [showDownloadConfirm, setShowDownloadConfirm] = useState<'pdf' | 'excel' | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -3679,6 +3680,7 @@ export default function EnhancedCart() {
                                                 ? item.ipRating.join(', ') 
                                                 : item.ipRating || '',
                                               cct: (item as any).cct || '',
+                                              price: item.price || '',
                                               dimming: (item as any).dimming || '',
                                               accessories: (item as any).accessories || '',
                                               finish: (item as any).finish || '',
@@ -6040,6 +6042,22 @@ export default function EnhancedCart() {
               </button>
             </div>
 
+            <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded-lg">
+              <label className="block text-yellow-400 text-xs font-semibold mb-1">
+                💰 Price (USD) — Optional
+              </label>
+              <input
+                type="text"
+                value={editSpecs.price || ''}
+                onChange={(e) => setEditSpecs((prev: any) => ({
+                  ...prev,
+                  price: e.target.value
+                }))}
+                placeholder="Enter price in USD (leave empty if unknown)"
+                className="w-full bg-gray-800 border border-yellow-600/50 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-yellow-500 outline-none placeholder-gray-500"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3 mb-5">
               {[
                 { label: 'Category', key: 'category' },
@@ -6105,6 +6123,10 @@ export default function EnhancedCart() {
             <button
               type="button"
               onClick={() => {
+                if (!editSpecs.price || editSpecs.price === '0') {
+                  setShowNoPriceConfirm(true);
+                  return;
+                }
                 updateCartItem(editingCartItem.cartItemId, {
                   ...editingCartItem,
                   category: editSpecs.category,
@@ -6118,6 +6140,7 @@ export default function EnhancedCart() {
                   accessories: editSpecs.accessories,
                   finish: editSpecs.finish,
                   reflectorFinish: editSpecs.reflectorFinish,
+                  price: editSpecs.price ? Number(editSpecs.price) : editingCartItem.price,
                   quantity: editSpecs.quantity || 1,
                 });
                 setEditingCartItem(null);
@@ -6233,6 +6256,60 @@ export default function EnhancedCart() {
             className="flex-1 w-full"
             title="PDF Preview"
           />
+        </div>
+      )}
+
+      {showNoPriceConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-xl p-6 max-w-sm w-full border border-yellow-600/50 shadow-2xl">
+            
+            <div className="mb-4 text-center">
+              <div className="text-3xl mb-2">⚠️</div>
+              <h3 className="text-white font-bold text-base mb-1">
+                No price added!
+              </h3>
+              <p className="text-gray-400 text-sm">
+                This item will show ₹0.00 in the quotation. 
+                Do you want to continue without a price?
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setShowNoPriceConfirm(false)}
+                className="w-full py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-semibold cursor-pointer"
+              >
+                Add Price
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoPriceConfirm(false);
+                  updateCartItem(editingCartItem.cartItemId, {
+                    ...editingCartItem,
+                    category: editSpecs.category,
+                    watt: editSpecs.watt ? Number(editSpecs.watt) : editingCartItem.watt,
+                    lumen: editSpecs.lumen,
+                    dimension: editSpecs.dimension,
+                    beamAngle: editSpecs.beamAngle,
+                    ipRating: editSpecs.ipRating,
+                    cct: editSpecs.cct,
+                    dimming: editSpecs.dimming,
+                    accessories: editSpecs.accessories,
+                    finish: editSpecs.finish,
+                    reflectorFinish: editSpecs.reflectorFinish,
+                    price: 0,
+                    quantity: editSpecs.quantity || 1,
+                  });
+                  setEditingCartItem(null);
+                }}
+                className="w-full py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm cursor-pointer"
+              >
+                Continue without price
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
