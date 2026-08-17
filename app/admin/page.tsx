@@ -786,7 +786,7 @@ export default function AdminDashboard() {
                     IP Ratings
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price (USD)
+                    Base Price (INR)
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -1459,7 +1459,7 @@ export default function AdminDashboard() {
                       <input
                         type="number"
                         step="0.01"
-                        placeholder="Price (USD) - Optional"
+                        placeholder="Price (INR) - Optional"
                         value={newIpPrice}
                         onChange={(e) => setNewIpPrice(e.target.value)}
                         onKeyPress={(e) => {
@@ -1479,7 +1479,7 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Enter IP rating (e.g., IP20 or just 20) with price in USD. "IP" prefix is added automatically if you enter just numbers.
+                      Enter IP rating (e.g., IP20 or just 20) with price in INR. "IP" prefix is added automatically if you enter just numbers.
                     </p>
 
                     {ipRatings.length > 0 && (
@@ -1510,7 +1510,7 @@ export default function AdminDashboard() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Base Price (USD)
+                      Base Price (INR)
                     </label>
                     <input
                       type="number"
@@ -1523,7 +1523,7 @@ export default function AdminDashboard() {
                     <p className="text-xs text-gray-500 mt-1">
                       {ipRatings.length > 0 
                         ? "Price is set per IP rating above" 
-                        : "Base price in USD (optional if using IP ratings)"}
+                        : "Base price in INR (optional if using IP ratings)"}
                     </p>
                   </div>
 

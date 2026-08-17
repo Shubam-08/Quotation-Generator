@@ -751,7 +751,7 @@ export default function EnhancedCart() {
         fgColor: { argb: 'FFA5B7CD' }
       };
 
-      const excelCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
+      const excelCurrency = 'INR';
 
       // SECTION 3 - TABLE
       const startRow = 3;
@@ -1409,7 +1409,7 @@ export default function EnhancedCart() {
 
       // Boxes removed as per new LED Lights design
 
-      const pdfCurrency = currencyInfo.symbol === '₹' ? 'INR' : currencyInfo.symbol;
+      const pdfCurrency = 'INR';
 
       const getPrimaryImageUrl = (item: CartItem): string | null => {
         const url = item.productImages?.[0] || item.images?.[0] || null;
@@ -6044,7 +6044,7 @@ export default function EnhancedCart() {
 
             <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded-lg">
               <label className="block text-yellow-400 text-xs font-semibold mb-1">
-                💰 Price (USD) — Optional
+                💰 Price (INR) — Optional
               </label>
               <input
                 type="text"
@@ -6053,7 +6053,7 @@ export default function EnhancedCart() {
                   ...prev,
                   price: e.target.value
                 }))}
-                placeholder="Enter price in USD (leave empty if unknown)"
+                placeholder="Enter price in INR (leave empty if unknown)"
                 className="w-full bg-gray-800 border border-yellow-600/50 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-yellow-500 outline-none placeholder-gray-500"
               />
             </div>

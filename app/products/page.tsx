@@ -2231,7 +2231,7 @@ export default function ProductsPage() {
                                     lumen: selectedVariant?.lumen || currentLumen || p.lumen || '',
                                     ipRating: currentIpRating || '',
                                     cct: selectedCct || p.cct || '',
-                                    price: p.price || '',
+                                    price: currentPrice || p.price || '',
                                     dimming: p.dimming || '',
                                     accessories: p.accessories || '',
                                     finish: p.finish || '',
@@ -2491,7 +2491,7 @@ export default function ProductsPage() {
 
             <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded-lg">
               <label className="block text-yellow-400 text-xs font-semibold mb-1">
-                💰 Price (USD) — Optional
+                💰 Price (INR) — Optional
               </label>
               <input
                 type="text"
@@ -2500,7 +2500,7 @@ export default function ProductsPage() {
                   ...prev,
                   price: e.target.value
                 }))}
-                placeholder="Enter price in USD (leave empty if unknown)"
+                placeholder="Enter price in INR (leave empty if unknown)"
                 className="w-full bg-gray-800 border border-yellow-600/50 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-yellow-500 outline-none placeholder-gray-500"
               />
             </div>

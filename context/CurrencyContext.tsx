@@ -43,8 +43,8 @@ interface CurrencyContextType {
   currency: Currency;
   setCurrency: (currency: Currency) => void;
   currencyInfo: CurrencyInfo;
-  convertPrice: (priceInUSD: number) => number;
-  formatPrice: (priceInUSD: number) => string;
+  convertPrice: (basePriceINR: number) => number;
+  formatPrice: (basePriceINR: number) => string;
   getAllCurrencies: () => CurrencyInfo[];
   lastUpdated: number | null;
   refreshRates: () => Promise<void>;
@@ -53,7 +53,7 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 export const CurrencyProvider = ({ children }: { children: React.ReactNode }) => {
-  const [currency, setCurrencyState] = useState<Currency>('USD');
+  const [currency, setCurrencyState] = useState<Currency>('INR');
   const [exchangeRates, setExchangeRates] = useState<Record<Currency, number>>(FALLBACK_RATES);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
@@ -121,13 +121,14 @@ export const CurrencyProvider = ({ children }: { children: React.ReactNode }) =>
     rate: exchangeRates[currency],
   };
 
-  const convertPrice = (priceInUSD: number): number => {
-    return priceInUSD * exchangeRates[currency];
+  const convertPrice = (basePriceINR: number): number => {
+    if (currency === 'INR') return basePriceINR;
+    if (currency === 'USD') return basePriceINR / exchangeRates['INR'];
+    return (basePriceINR / exchangeRates['INR']) * exchangeRates[currency];
   };
 
-  const formatPrice = (priceInUSD: number): string => {
-    // For USD, use the exact price without conversion to avoid floating-point precision issues
-    const convertedPrice = currency === 'USD' ? priceInUSD : convertPrice(priceInUSD);
+  const formatPrice = (basePriceINR: number): string => {
+    const convertedPrice = convertPrice(basePriceINR);
     
     // Round to 2 decimal places to fix floating-point precision issues
     const roundedPrice = Math.round(convertedPrice * 100) / 100;
