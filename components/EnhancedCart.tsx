@@ -136,8 +136,10 @@ export default function EnhancedCart() {
   const [showContactPopup, setShowContactPopup] = useState(false);
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [selectedProductForDriver, setSelectedProductForDriver] = useState<CartItem | null>(null);
-  const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
-  const [loadingDrivers, setLoadingDrivers] = useState(false);
+  const [customDriverName, setCustomDriverName] = useState('');
+  const [customDriverWattage, setCustomDriverWattage] = useState('');
+  const [customDriverPrice, setCustomDriverPrice] = useState('');
+  const [customDriverQuantity, setCustomDriverQuantity] = useState(1);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -159,8 +161,7 @@ export default function EnhancedCart() {
   const [priceEditError, setPriceEditError] = useState('');
   const PRICE_EDIT_PASSWORD = 'Qlitescreen2025';
 
-  // Driver search state
-  const [driverSearchTerm, setDriverSearchTerm] = useState('');
+
 
   // Initialize theme from localStorage so it matches the products page selection
   useEffect(() => {
@@ -519,84 +520,34 @@ export default function EnhancedCart() {
     handleCloseDisplayEdit();
   };
 
-  // Fetch all available drivers for a product
-  const fetchDriversForProduct = async (product: CartItem) => {
-    setLoadingDrivers(true);
+  // Open simple driver modal
+  const fetchDriversForProduct = (product: CartItem) => {
     setSelectedProductForDriver(product);
+    setCustomDriverName('');
+    setCustomDriverWattage('');
+    setCustomDriverPrice('');
+    setCustomDriverQuantity(1);
     setShowDriverModal(true);
-
-    // Reset search when opening modal
-    setDriverSearchTerm('');
-
-    try {
-      // Fetch all in-stock drivers without filtering by wattage
-      const response = await fetch(`/api/drivers`);
-      if (!response.ok) throw new Error('Failed to fetch drivers');
-
-      const drivers = await response.json();
-      setAvailableDrivers(drivers);
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
-      setAvailableDrivers([]);
-    } finally {
-      setLoadingDrivers(false);
-    }
   };
 
-  const handleAddDriver = (driver: Driver) => {
-    if (selectedProductForDriver) {
-      addDriverToCart(driver, selectedProductForDriver.cartItemId, 1);
+  const handleAddCustomDriver = () => {
+    if (selectedProductForDriver && customDriverName) {
+      const driverObj: any = {
+        _id: `custom-driver-${Date.now()}`,
+        name: customDriverName,
+        sku: 'CUSTOM-DRIVER',
+        price: Number(customDriverPrice) || 0,
+        wattage: customDriverWattage || 'N/A',
+        isDriver: true
+      };
+
+      addDriverToCart(driverObj, selectedProductForDriver.cartItemId, customDriverQuantity);
       setShowDriverModal(false);
-      // Reset search when closing
-      setDriverSearchTerm('');
     }
   };
 
   const handleCloseDriverModal = () => {
     setShowDriverModal(false);
-    // Reset search when closing
-    setDriverSearchTerm('');
-  };
-
-  // Helper function to extract numeric IP rating from string (e.g., "IP67" -> 67)
-  const getNumericIPRating = (ipRating: string | undefined): number => {
-    if (!ipRating) return 0;
-    const match = ipRating.match(/\d+/);
-    return match ? parseInt(match[0], 10) : 0;
-  };
-
-  // Filter and categorize drivers by IP rating with search
-  const categorizeDrivers = () => {
-    let filtered = [...availableDrivers];
-
-    // Apply search filter
-    if (driverSearchTerm.trim()) {
-      const searchLower = driverSearchTerm.toLowerCase();
-      filtered = filtered.filter(driver =>
-        driver.name?.toLowerCase().includes(searchLower) ||
-        driver.sku?.toLowerCase().includes(searchLower) ||
-        driver.series?.toLowerCase().includes(searchLower) ||
-        driver.description?.toLowerCase().includes(searchLower) ||
-        driver.outputVoltage?.toLowerCase().includes(searchLower) ||
-        driver.type?.toLowerCase().includes(searchLower) ||
-        driver.wattageRange && `${driver.wattageRange.min}-${driver.wattageRange.max}w`.includes(searchLower)
-      );
-    }
-
-    // Categorize by IP rating
-    const indoor: Driver[] = [];
-    const outdoor: Driver[] = [];
-
-    filtered.forEach(driver => {
-      const ipValue = getNumericIPRating(driver.ipRating);
-      if (ipValue <= 64) {
-        indoor.push(driver);
-      } else {
-        outdoor.push(driver);
-      }
-    });
-
-    return { indoor, outdoor };
   };
 
   // Get drivers associated with a product
@@ -668,10 +619,15 @@ export default function EnhancedCart() {
             quotationNumber: exportQuoteNo,
             clientName: userInfo.project || userInfo.company || 'Client',
             clientEmail: userInfo.email || session?.user?.email || '',
-            products: cart.map(item => ({
-              productId: (item as any).productId || (item as any)._id || undefined,
-              quantity: item.quantity ?? 1,
-            })),
+            products: cart
+              .filter(item => {
+                const id = (item as any).productId || (item as any)._id || '';
+                return !String(id).startsWith('custom-');
+              })
+              .map(item => ({
+                productId: (item as any).productId || (item as any)._id || undefined,
+                quantity: item.quantity ?? 1,
+              })),
             totalPrice: total,
             userDepartment: session?.user?.department || '',
             userCountry: session?.user?.country || '',
@@ -727,7 +683,7 @@ export default function EnhancedCart() {
           });
           worksheet.addImage(headerImageId, {
             tl: { col: 1.5, row: 0 } as any,
-            br: { col: 8, row: 1 } as any,
+            br: { col: 9, row: 1 } as any,
             editAs: 'oneCell'
           } as any);
         }
@@ -736,7 +692,7 @@ export default function EnhancedCart() {
       }
       // SECTION 2 - ADDRESS
       worksheet.getRow(2).height = 90;
-      worksheet.mergeCells(2, 1, 2, 8);
+      worksheet.mergeCells(2, 1, 2, 9);
       const addressCell = worksheet.getCell(2, 1);
       addressCell.value = addressInfo.lines.join('\n');
       addressCell.font = { bold: true, size: 9 };
@@ -757,7 +713,7 @@ export default function EnhancedCart() {
       const startRow = 3;
       const headerRow = worksheet.getRow(startRow);
       const columns = [
-        'S.No.', 'Description', 'Model No.', 'Image', 'Unit', 'Quantity', 'Unit Price', 'Total Amount'
+        'S.No.', 'Code', 'Description', 'Model No.', 'Image', 'Unit', 'Quantity', 'Unit Price', 'Total Amount'
       ];
 
       columns.forEach((col, index) => {
@@ -780,13 +736,14 @@ export default function EnhancedCart() {
       headerRow.height = 20;
 
       worksheet.getColumn(1).width = 8;
-      worksheet.getColumn(2).width = 35;
-      worksheet.getColumn(3).width = 20;
-      worksheet.getColumn(4).width = 15;
-      worksheet.getColumn(5).width = 10;
+      worksheet.getColumn(2).width = 15;
+      worksheet.getColumn(3).width = 35;
+      worksheet.getColumn(4).width = 20;
+      worksheet.getColumn(5).width = 15;
       worksheet.getColumn(6).width = 10;
-      worksheet.getColumn(7).width = 15;
+      worksheet.getColumn(7).width = 10;
       worksheet.getColumn(8).width = 15;
+      worksheet.getColumn(9).width = 15;
 
       // Helper function to get image URL
       const getPrimaryImageUrl = (item: CartItem): string | null => {
@@ -849,7 +806,7 @@ export default function EnhancedCart() {
           // DRIVER row
           const rowIndex = currentRowIndex;
           const row = worksheet.getRow(rowIndex);
-          row.height = 60;
+          row.height = 20;
 
           const parts: string[] = [];
           if (item.wattageRange) parts.push(`Power: ${item.wattageRange.min}W`);
@@ -860,10 +817,14 @@ export default function EnhancedCart() {
           if ((item as any).type) parts.push(`Type: ${(item as any).type}`);
           const specText = parts.join(' | ');
 
+          const driverLabel = item.name
+            ? `${item.name}${item.wattage && item.wattage !== 'N/A' ? ' - ' + item.wattage + (String(item.wattage).toUpperCase().endsWith('W') ? '' : 'W') : ''}`
+            : item.sku ?? 'Driver';
+
           if (hasOnlyLightingControlsExcel) {
             row.getCell(1).value = serialNumber;
             row.getCell(2).value = '';
-            row.getCell(3).value = item.sku ?? 'N/A';
+            row.getCell(3).value = driverLabel;
             row.getCell(4).value = specText;
             row.getCell(5).value = item.quantity ?? 1;
             row.getCell(6).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -877,18 +838,19 @@ export default function EnhancedCart() {
             }
           } else {
             row.getCell(1).value = serialNumber;
-            row.getCell(2).value = specText;
-            row.getCell(3).value = item.sku ?? 'N/A';
-            row.getCell(4).value = '';
-            row.getCell(5).value = 'Nos';
-            row.getCell(6).value = item.quantity ?? 1;
-            row.getCell(7).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            row.getCell(8).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            row.getCell(2).value = '';
+            row.getCell(3).value = driverLabel;
+            row.getCell(4).value = specText;
+            row.getCell(5).value = '';
+            row.getCell(6).value = 'Nos';
+            row.getCell(7).value = item.quantity ?? 1;
+            row.getCell(8).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            row.getCell(9).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            for (let col = 1; col <= 8; col++) {
+            for (let col = 1; col <= 9; col++) {
               const cell = row.getCell(col);
               cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-              if (col === 2) {
+              if (col === 3 || col === 4) {
                 cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
               } else {
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -981,7 +943,10 @@ export default function EnhancedCart() {
           // 1. S.No.
           row1.getCell(1).value = serialNumber;
 
-          // 2. Description
+          // 2. Code (Blank)
+          row1.getCell(2).value = '';
+
+          // 3. Description
           const specLines: any[] = [];
           const addSpec = (label: string, value: any, isLast = false) => {
             const val = Array.isArray(value) ? value.join(', ') : value;
@@ -1003,41 +968,41 @@ export default function EnhancedCart() {
           addSpec('Finish: ', (item as any).finish);
           addSpec('Reflector Finish: ', (item as any).reflectorFinish, true);
 
-          row1.getCell(2).value = { richText: specLines };
-          row1.getCell(2).alignment = {
+          row1.getCell(3).value = { richText: specLines };
+          row1.getCell(3).alignment = {
             wrapText: true, vertical: 'top', horizontal: 'left'
           };
 
-          // 3. Model No.
-          row1.getCell(3).value = item.sku ?? 'N/A';
+          // 4. Model No.
+          row1.getCell(4).value = item.sku ?? 'N/A';
 
-          // 4. Image
-          row1.getCell(4).value = '';
+          // 5. Image
+          row1.getCell(5).value = '';
 
-          // 5. Unit
-          row1.getCell(5).value = 'Nos';
+          // 6. Unit
+          row1.getCell(6).value = 'Nos';
 
-          // 6. Quantity
-          row1.getCell(6).value = item.quantity ?? 1;
+          // 7. Quantity
+          row1.getCell(7).value = item.quantity ?? 1;
 
-          // 7. Unit Price
-          row1.getCell(7).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          // 8. Unit Price
+          row1.getCell(8).value = convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-          // 8. Total Amount
-          row1.getCell(8).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          // 9. Total Amount
+          row1.getCell(9).value = (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
           // Borders and Formatting
-          for (let col = 1; col <= 8; col++) {
+          for (let col = 1; col <= 9; col++) {
             const cell = worksheet.getRow(row1Index).getCell(col);
             cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
-            if (col === 2) {
+            if (col === 3) {
               cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
             } else {
               cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             }
 
-            if (col !== 2) {
+            if (col !== 3) {
               cell.font = { bold: false, size: 9, color: { argb: 'FF000000' } };
             }
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
@@ -1051,7 +1016,7 @@ export default function EnhancedCart() {
               try {
                 const imageId = workbook.addImage({ buffer: imageBuffer, extension: 'jpeg' });
                 worksheet.addImage(imageId, {
-                  tl: { col: 3.9, row: row1Index - 1 + 0.25 },
+                  tl: { col: 4.15, row: row1Index - 1 + 0.25 },
                   ext: { width: 65, height: 65 },
                   editAs: 'oneCell'
                 });
@@ -1070,25 +1035,25 @@ export default function EnhancedCart() {
       const totalRowIndex = currentRowIndex;
       const totalRow = worksheet.getRow(totalRowIndex);
 
-      // Merge cols 6-7 for label, put value in 8
-      worksheet.mergeCells(totalRowIndex, 6, totalRowIndex, 7);
-      totalRow.getCell(6).value = `Total Amount (${excelCurrency}):`;
-      totalRow.getCell(6).font = { bold: true, size: 14 };
-      totalRow.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
-      totalRow.getCell(6).border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      // Merge cols 7-8 for label, put value in 9
+      worksheet.mergeCells(totalRowIndex, 7, totalRowIndex, 8);
+      totalRow.getCell(7).value = `Total Amount (${excelCurrency}):`;
+      totalRow.getCell(7).font = { bold: true, size: 14 };
+      totalRow.getCell(7).alignment = { horizontal: 'right', vertical: 'middle' };
+      totalRow.getCell(7).border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
-      totalRow.getCell(8).value = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      totalRow.getCell(8).font = { bold: true, size: 14 };
-      totalRow.getCell(8).alignment = { horizontal: 'left', vertical: 'middle' };
-      totalRow.getCell(8).border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      totalRow.getCell(9).value = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      totalRow.getCell(9).font = { bold: true, size: 14 };
+      totalRow.getCell(9).alignment = { horizontal: 'left', vertical: 'middle' };
+      totalRow.getCell(9).border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
       // SECTION 5 - TERMS AND CONDITIONS
       const termsStartRow = totalRowIndex + 1; // 2 blank rows
       worksheet.getRow(termsStartRow).getCell(1).value = 'Terms and Conditions:';
       worksheet.getRow(termsStartRow).getCell(1).font = { bold: true, size: 11, underline: true };
-      worksheet.mergeCells(termsStartRow, 1, termsStartRow, 8);
+      worksheet.mergeCells(termsStartRow, 1, termsStartRow, 9);
 
-      for (let col = 1; col <= 8; col++) {
+      for (let col = 1; col <= 9; col++) {
         const cell = worksheet.getRow(termsStartRow).getCell(col);
         cell.border = {
           top: { style: 'thin' },
@@ -1113,10 +1078,10 @@ export default function EnhancedCart() {
         row.getCell(1).value = term;
         row.getCell(1).font = { bold: true, size: 9 };
         row.getCell(1).alignment = { wrapText: true, vertical: 'middle' };
-        worksheet.mergeCells(rowNum, 1, rowNum, 8);
+        worksheet.mergeCells(rowNum, 1, rowNum, 9);
         row.height = 25;
 
-        for (let col = 1; col <= 8; col++) {
+        for (let col = 1; col <= 9; col++) {
           const cell = worksheet.getRow(rowNum).getCell(col);
           cell.border = {
             top: { style: 'thin' },
@@ -1277,10 +1242,15 @@ export default function EnhancedCart() {
             quotationNumber: exportQuoteNo,
             clientName: userInfo.project || userInfo.company || 'Client',
             clientEmail: userInfo.email || session?.user?.email || '',
-            products: cart.map(item => ({
-              productId: (item as any).productId || (item as any)._id || undefined,
-              quantity: item.quantity ?? 1,
-            })),
+            products: cart
+              .filter(item => {
+                const id = (item as any).productId || (item as any)._id || '';
+                return !String(id).startsWith('custom-');
+              })
+              .map(item => ({
+                productId: (item as any).productId || (item as any)._id || undefined,
+                quantity: item.quantity ?? 1,
+              })),
             totalPrice: total,
             userDepartment: session?.user?.department || '',
             userCountry: session?.user?.country || '',
@@ -2616,12 +2586,16 @@ export default function EnhancedCart() {
             }
             const allSpecs = driverSpecs.join(' | ');
 
+            const driverLabel = item.name
+              ? `${item.name}${item.wattage && item.wattage !== 'N/A' ? ' - ' + item.wattage + (String(item.wattage).toUpperCase().endsWith('W') ? '' : 'W') : ''}`
+              : item.sku ?? 'Driver';
+
             // Different format for lighting control drivers vs LED light drivers
             if (hasOnlyLightingControls) {
               return [
                 index + 1, // SI No
                 '', // No image for driver
-                `   > ${item.sku ?? 'N/A'}`, // Indented driver SKU
+                `${driverLabel}`, // No indentation or icon
                 { content: allSpecs, colSpan: 1, styles: { halign: 'left' as const } }, // Description
                 convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                 item.quantity ?? 1,
@@ -2630,11 +2604,10 @@ export default function EnhancedCart() {
             } else {
               return [
                 index + 1, // SI No
-                '', // No image for driver
-                `   > ${item.sku ?? 'N/A'}`, // Indented driver SKU
-                { content: allSpecs, colSpan: 7, styles: { halign: 'left' as const } }, // Merged cell with all specs
-                convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                `${driverLabel}`, // No indentation or icon
+                { content: allSpecs, colSpan: 3, styles: { halign: 'left' as const } }, // Merged cell with all specs
                 item.quantity ?? 1,
+                convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                 (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
               ];
             }
@@ -2682,7 +2655,8 @@ export default function EnhancedCart() {
             halign: 'center',
             lineColor: [0, 0, 0], // Black border lines
             lineWidth: 1, // Bold border line thickness
-            textColor: [0, 0, 0] // Black text for better visibility
+            textColor: [0, 0, 0], // Black text for better visibility
+            overflow: 'linebreak'
           },
           headStyles: {
             fillColor: [183, 183, 183],
@@ -2700,9 +2674,14 @@ export default function EnhancedCart() {
             3: { cellWidth: 'auto', minCellWidth: 50 }
           } : {
             0: { cellWidth: 45, halign: 'center' },      // S.No.
-            1: { cellWidth: 160, halign: 'left' },       // Description
+            1: {
+              cellWidth: 150,
+              halign: 'left',
+              overflow: 'linebreak',
+              cellPadding: { top: 4, right: 4, bottom: 4, left: 4 }
+            },       // Description
             2: { cellWidth: 80, halign: 'center' },      // Model No.
-            3: { cellWidth: 60, halign: 'center' },      // Image
+            3: { cellWidth: 70, halign: 'center' },      // Image
             4: { cellWidth: 45, halign: 'center' },      // Unit
             5: { cellWidth: 45, halign: 'center' },      // Quantity
             6: { cellWidth: 65, halign: 'center' },      // Unit Price
@@ -2716,6 +2695,8 @@ export default function EnhancedCart() {
 
               if (data.column.index === 1 && !item?.isDriver) {
                 data.cell.styles.fontStyle = 'normal';
+                data.cell.styles.overflow = 'linebreak';
+                data.cell.styles.cellWidth = 150;
               }
 
               // For driver rows, use lighter background and smaller height
@@ -2723,8 +2704,15 @@ export default function EnhancedCart() {
                 data.cell.styles.fillColor = [250, 250, 250]; // Very light gray
                 data.cell.styles.textColor = [0, 0, 0]; // Black text for better visibility
                 data.cell.styles.fontSize = 7.5;
-                data.cell.styles.fontStyle = 'bold';
-                data.cell.styles.minCellHeight = 30; // Smaller height for drivers
+                data.cell.styles.minCellHeight = 20; // Smaller height for drivers
+
+                // Only make the Driver Label bold, keep everything else normal
+                const driverLabelColIndex = hasOnlyLightingControls ? 2 : 1;
+                if (data.column.index === driverLabelColIndex) {
+                  data.cell.styles.fontStyle = 'bold';
+                } else {
+                  data.cell.styles.fontStyle = 'normal';
+                }
               } else {
                 const lineCount = getSpecText(organizedCart[idx]).split('\n').length;
                 const dynamicHeight = Math.max(52, lineCount * 12);
@@ -2926,7 +2914,7 @@ export default function EnhancedCart() {
         }, 3000);
         return url;
       }
-      
+
       doc.save(`${userInfo.project}_quotation.pdf`);
       clearInterval(progressInterval);
       setDownloadProgress(100);
@@ -3105,311 +3093,517 @@ export default function EnhancedCart() {
 
               {/* Products Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {cart.map((item) => {
-                  const isDisplay = isDisplayItem(item);
-                  return (
-                    <div
-                      key={item.cartItemId}
-                      className={`${isDisplay ? 'col-span-2' : ''}`}
-                    >
-                      <div
-                        className={`rounded-none p-4 transition-all duration-200 bg-white border border-gray-200 hover:border-gray-300 shadow-md hover:shadow-lg ${isDarkMode ? '' : ''
-                          }`}
-                      >
-                        {isDisplay ? (
-                          <div className="flex flex-col md:flex-row gap-4">
-                            {/* Left: Image */}
-                            <div className="flex-shrink-0 md:self-stretch">
-                              <div className="w-full max-w-sm md:max-w-md min-h-[12rem] md:min-h-[14rem] h-full rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex flex-col overflow-hidden mx-auto md:mx-0">
-                                {(() => {
-                                  const image1 = item.productImages?.[0] || item.images?.[0];
-                                  const image2 = item.productImages?.[1] || item.images?.[1];
+                {(() => {
+                  const organizedCartRender: any[] = [];
+                  cart.forEach(item => {
+                    if (!item.isDriver) {
+                      organizedCartRender.push(item);
+                      const productDrivers = cart.filter(d => d.isDriver && d.parentProductId === item.cartItemId);
+                      organizedCartRender.push(...productDrivers);
+                    }
+                  });
+                  const standaloneDriversRender = cart.filter(item => item.isDriver && !item.parentProductId);
+                  organizedCartRender.push(...standaloneDriversRender);
 
-                                  if (!image1 && !image2) {
+                  return organizedCartRender.map((item) => {
+                    const isDisplay = isDisplayItem(item);
+                    return (
+                      <div
+                        key={item.cartItemId}
+                        className={`${isDisplay ? 'col-span-2' : ''}`}
+                      >
+                        <div
+                          className={`rounded-none p-4 transition-all duration-200 bg-white border border-gray-200 hover:border-gray-300 shadow-md hover:shadow-lg ${isDarkMode ? '' : ''
+                            }`}
+                        >
+                          {isDisplay ? (
+                            <div className="flex flex-col md:flex-row gap-4">
+                              {/* Left: Image */}
+                              <div className="flex-shrink-0 md:self-stretch">
+                                <div className="w-full max-w-sm md:max-w-md min-h-[12rem] md:min-h-[14rem] h-full rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex flex-col overflow-hidden mx-auto md:mx-0">
+                                  {(() => {
+                                    const image1 = item.productImages?.[0] || item.images?.[0];
+                                    const image2 = item.productImages?.[1] || item.images?.[1];
+
+                                    if (!image1 && !image2) {
+                                      return (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                          <Package className="w-10 h-10 text-slate-400" />
+                                        </div>
+                                      );
+                                    }
+
+                                    // Both images: stack with subtle divider, each taking half height
+                                    if (image1 && image2) {
+                                      return (
+                                        <>
+                                          <div className="h-1/2 border-b border-slate-200 bg-white/60">
+                                            <img
+                                              src={image1}
+                                              alt={item.sku}
+                                              className="w-full h-full object-contain p-3"
+                                            />
+                                          </div>
+                                          <div className="h-1/2 bg-white/60">
+                                            <img
+                                              src={image2}
+                                              alt={item.sku}
+                                              className="w-full h-full object-contain p-3"
+                                            />
+                                          </div>
+                                        </>
+                                      );
+                                    }
+
+                                    // Single image only
+                                    const single = image1 || image2;
                                     return (
-                                      <div className="w-full h-full flex items-center justify-center">
-                                        <Package className="w-10 h-10 text-slate-400" />
+                                      <div className="w-full h-full relative bg-white/60">
+                                        <img
+                                          src={single}
+                                          alt={item.sku}
+                                          className="w-full h-full object-contain p-3"
+                                        />
                                       </div>
                                     );
-                                  }
+                                  })()}
+                                </div>
+                              </div>
 
-                                  // Both images: stack with subtle divider, each taking half height
-                                  if (image1 && image2) {
-                                    return (
-                                      <>
-                                        <div className="h-1/2 border-b border-slate-200 bg-white/60">
-                                          <img
-                                            src={image1}
-                                            alt={item.sku}
-                                            className="w-full h-full object-contain p-3"
-                                          />
-                                        </div>
-                                        <div className="h-1/2 bg-white/60">
-                                          <img
-                                            src={image2}
-                                            alt={item.sku}
-                                            className="w-full h-full object-contain p-3"
-                                          />
-                                        </div>
-                                      </>
-                                    );
-                                  }
-
-                                  // Single image only
-                                  const single = image1 || image2;
-                                  return (
-                                    <div className="w-full h-full relative bg-white/60">
-                                      <img
-                                        src={single}
-                                        alt={item.sku}
-                                        className="w-full h-full object-contain p-3"
-                                      />
+                              {/* Center: Product Info & Specs */}
+                              <div className="flex-1 flex flex-col gap-3 mt-3 md:mt-0">
+                                {/* Header Section */}
+                                <div className="flex items-start justify-between gap-3 border-b border-gray-200 pb-2">
+                                  <div>
+                                    <h3 className="font-semibold text-base text-gray-900 tracking-tight">
+                                      {item.sku}
+                                    </h3>
+                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                      {item.category && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-white">
+                                          {item.category}
+                                        </span>
+                                      )}
+                                      {item.pixelPitch && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-600 text-white">
+                                          {item.pixelPitch}
+                                        </span>
+                                      )}
                                     </div>
-                                  );
-                                })()}
+                                  </div>
+                                </div>
+
+                                {/* Specifications Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
+                                  {item.application && (
+                                    <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                                      <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                      <div className="flex-1">
+                                        <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                          Application
+                                        </p>
+                                        <p className="text-xs font-semibold text-gray-900">{item.application}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {item.ipRating && item.ipRating !== 'N/A' && (
+                                    <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
+                                      <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                      <div className="flex-1">
+                                        <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                          IP Rating
+                                        </p>
+                                        <p className="text-xs font-semibold text-gray-900">
+                                          {typeof item.ipRating === 'string'
+                                            ? item.ipRating
+                                            : Array.isArray(item.ipRating)
+                                              ? (item.ipRating as string[]).join(', ')
+                                              : String(item.ipRating)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {(item.suggestedSize || item.requiredLength || item.requiredWidth) && (
+                                    <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
+                                      <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                                      <div className="flex-1">
+                                        <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                          Suggested Size
+                                        </p>
+                                        <p className="text-xs font-semibold text-gray-900">
+                                          {item.suggestedSize && item.suggestedSize.trim() !== ''
+                                            ? item.suggestedSize
+                                            : (item.requiredLength || item.requiredWidth)
+                                              ? `W${(() => {
+                                                const ft = parseFloat(item.requiredLength || '0');
+                                                return (ft * 0.3048).toFixed(2);
+                                              })()}m × H${(() => {
+                                                const ft = parseFloat(item.requiredWidth || '0');
+                                                return (ft * 0.3048).toFixed(2);
+                                              })()}m`
+                                              : 'N/A'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {item.totalResolution && item.totalResolution.trim() !== '' && (
+                                    <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
+                                      <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                                      <div className="flex-1">
+                                        <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                          Screen Resolution
+                                        </p>
+                                        <p className="text-xs font-semibold text-gray-900">{item.totalResolution}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0 && (
+                                    <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 col-span-2">
+                                      <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                                      <div className="flex-1">
+                                        <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                          Cabinet Arrangement
+                                        </p>
+                                        {(() => {
+                                          const w = (item as any).cabinetArrangementWidth as number | undefined;
+                                          const h = (item as any).cabinetArrangementHeight as number | undefined;
+                                          const total = item.cabinetRequired;
+                                          if (w && h) {
+                                            return (
+                                              <div className="flex flex-col text-xs text-gray-900 font-semibold">
+                                                <span>{`W${w} × H${h}`}</span>
+                                                <span className="text-[10px] text-gray-500 font-normal">({total} cabinets)</span>
+                                              </div>
+                                            );
+                                          }
+                                          return (
+                                            <p className="text-xs font-semibold text-gray-900">{total} cabinets</p>
+                                          );
+                                        })()}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Controllers Row */}
+                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {/* Controller 1 */}
+                                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+                                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                      Controller 1
+                                    </p>
+                                    <div className="space-y-1.5">
+                                      <div>
+                                        <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Name</span>
+                                        <input
+                                          type="text"
+                                          value={item.controller1Name ?? ''}
+                                          onChange={(e) =>
+                                            updateCartItem(item.cartItemId, { controller1Name: e.target.value })
+                                          }
+                                          className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                          placeholder="Enter controller name"
+                                        />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Price (USD)</span>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            step="0.01"
+                                            value={item.controller1Price ?? ''}
+                                            onChange={(e) => {
+                                              const val = parseFloat(e.target.value);
+                                              updateCartItem(item.cartItemId, {
+                                                controller1Price: isNaN(val) || val < 0 ? undefined : val,
+                                              });
+                                            }}
+                                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            placeholder="0.00"
+                                          />
+                                        </div>
+                                        <div>
+                                          <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Quantity</span>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            value={item.controller1Qty ?? ''}
+                                            onChange={(e) => {
+                                              const val = parseInt(e.target.value, 10);
+                                              updateCartItem(item.cartItemId, {
+                                                controller1Qty: isNaN(val) || val < 0 ? undefined : val,
+                                              });
+                                            }}
+                                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            placeholder="0"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Controller 2 */}
+                                  <div className="rounded-xl border border-gray-200 bg-white/80 px-3 py-3">
+                                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                      Controller 2
+                                    </p>
+                                    <div className="space-y-1.5">
+                                      <div>
+                                        <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Name</span>
+                                        <input
+                                          type="text"
+                                          value={item.controller2Name ?? ''}
+                                          onChange={(e) =>
+                                            updateCartItem(item.cartItemId, { controller2Name: e.target.value })
+                                          }
+                                          className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                          placeholder="Enter controller name"
+                                        />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Price (USD)</span>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            step="0.01"
+                                            value={item.controller2Price ?? ''}
+                                            onChange={(e) => {
+                                              const val = parseFloat(e.target.value);
+                                              updateCartItem(item.cartItemId, {
+                                                controller2Price: isNaN(val) || val < 0 ? undefined : val,
+                                              });
+                                            }}
+                                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            placeholder="0.00"
+                                          />
+                                        </div>
+                                        <div>
+                                          <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Quantity</span>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            value={item.controller2Qty ?? ''}
+                                            onChange={(e) => {
+                                              const val = parseInt(e.target.value, 10);
+                                              updateCartItem(item.cartItemId, {
+                                                controller2Qty: isNaN(val) || val < 0 ? undefined : val,
+                                              });
+                                            }}
+                                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            placeholder="0"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Quantity & Total Row */}
+                                <div className="mt-3 flex items-center justify-between gap-4 border-t border-gray-200 pt-3">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xs font-semibold text-gray-600">Quantity:</span>
+                                    <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 px-3 py-2 shadow-sm">
+                                      <button
+                                        onClick={() => decreaseQuantity(item.cartItemId)}
+                                        className="flex h-6 w-6 items-center justify-center rounded-md text-gray-700 transition-all hover:bg-white hover:text-blue-600 hover:shadow-md"
+                                      >
+                                        <Minus className="h-3.5 w-3.5" />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity}
+                                        onChange={(e) => {
+                                          const value = parseInt(e.target.value) || 1;
+                                          updateQuantity(item.cartItemId, value);
+                                        }}
+                                        onFocus={() => setEditingQuantity(item.cartItemId)}
+                                        onBlur={() => setEditingQuantity(null)}
+                                        className="w-12 bg-transparent text-center text-sm font-bold text-gray-900 outline-none"
+                                      />
+                                      <button
+                                        onClick={() => increaseQuantity(item.cartItemId)}
+                                        className="flex h-6 w-6 items-center justify-center rounded-md text-gray-700 transition-all hover:bg-white hover:text-blue-600 hover:shadow-md"
+                                      >
+                                        <Plus className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="mb-0.5 text-[10px] font-medium text-gray-500">Total Display Price ({currencyInfo.code})</p>
+                                    <p className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-base font-bold text-transparent">
+                                      {(() => {
+                                        const totalConverted = computeItemTotal(item);
+                                        const formatted = totalConverted.toLocaleString('en-US', {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        });
+                                        return `${currencyInfo.symbol} ${formatted}`;
+                                      })()}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right: Actions */}
+                              <div className="flex flex-col items-end justify-between gap-3">
+                                <button
+                                  onClick={() => removeFromCart(item.cartItemId)}
+                                  className="rounded-full border border-red-200 bg-red-50 p-2.5 text-red-600 shadow-sm transition-all hover:border-red-300 hover:bg-red-100 hover:text-red-700 hover:shadow-md"
+                                  title="Remove from cart"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    setEditingDisplay(item);
+                                    // Base form data
+                                    let baseData: any = {
+                                      __context: 'cart',
+                                      ...item,
+                                      moduleSpecs: item.moduleSpecs || {},
+                                      cabinetSpecs: item.cabinetSpecs || {},
+                                      screenParams: item.screenParams || {},
+                                      customTotalManuallyEdited: false,
+                                      priceInput: (typeof item.price === 'number' ? String(item.price) : (item.price || '')) as any,
+                                      cabinetRequiredManuallyEdited: false,
+                                    };
+                                    // Try to hydrate cabinet specs from backend by SKU
+                                    try {
+                                      if (item.sku) {
+                                        const res = await fetch(`/api/led-displays?search=${encodeURIComponent(item.sku)}`);
+                                        if (res.ok) {
+                                          const list = await res.json();
+                                          const match = Array.isArray(list) ? list.find((d: any) => d.sku === item.sku) : null;
+                                          if (match) {
+                                            // Merge cabinet specs
+                                            if (match.cabinetSpecs) {
+                                              const mergedCabinetSpecs = { ...match.cabinetSpecs, ...baseData.cabinetSpecs };
+                                              baseData.cabinetSpecs = mergedCabinetSpecs;
+                                            }
+
+                                            // Limit Cabinet Material Variants to the user-selected one (if any)
+                                            if (Array.isArray(match.cabinetMaterialVariants) && match.cabinetMaterialVariants.length > 0) {
+                                              const selectedMaterial = (item as any).selectedCabinetMaterial as string | undefined;
+                                              let variants = match.cabinetMaterialVariants as any[];
+                                              if (selectedMaterial) {
+                                                const filtered = variants.filter(v => v.material === selectedMaterial);
+                                                if (filtered.length > 0) {
+                                                  variants = filtered;
+                                                }
+                                              }
+                                              baseData.cabinetMaterialVariants = variants;
+                                            }
+                                            // If required size present, compute initial cabinetRequired
+                                            const FEET_TO_METER = 0.3048;
+                                            const lenFt = parseFloat((baseData as any)?.requiredLength ?? '');
+                                            const widFt = parseFloat((baseData as any)?.requiredWidth ?? '');
+                                            if (!isNaN(lenFt) && !isNaN(widFt) && lenFt > 0 && widFt > 0) {
+                                              const lenM = lenFt * FEET_TO_METER;
+                                              const widM = widFt * FEET_TO_METER;
+                                              const areaSqm = lenM * widM;
+                                              // Use baseData.cabinetSpecs (which already contains mergedCabinetSpecs)
+                                              let cabArea = (baseData as any)?.cabinetSpecs?.cabinetArea as number | undefined;
+                                              if (!(typeof cabArea === 'number' && cabArea > 0)) {
+                                                const sizeStr = (baseData as any)?.cabinetSpecs?.cabinetSize || '';
+                                                const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
+                                                if (m) {
+                                                  const w = parseFloat(m[1]);
+                                                  const h = parseFloat(m[2]);
+                                                  if (!isNaN(w) && !isNaN(h)) {
+                                                    cabArea = (w / 1000) * (h / 1000);
+                                                  }
+                                                }
+                                              }
+                                              if (cabArea && cabArea > 0) {
+                                                baseData.cabinetRequired = Math.round(areaSqm / cabArea);
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    } catch { }
+                                    setDisplayFormData(baseData);
+                                    // Reset price edit lock state when opening editor
+                                    setPriceEditUnlocked(false);
+                                    setShowPriceEditModal(false);
+                                    setPriceEditPassword('');
+                                    setPriceEditError('');
+                                  }}
+                                  className="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all border-2 border-blue-400 hover:border-blue-500"
+                                >
+                                  ✏️ Edit Specs
+                                </button>
                               </div>
                             </div>
-
-                            {/* Center: Product Info & Specs */}
-                            <div className="flex-1 flex flex-col gap-3 mt-3 md:mt-0">
-                              {/* Header Section */}
-                              <div className="flex items-start justify-between gap-3 border-b border-gray-200 pb-2">
-                                <div>
-                                  <h3 className="font-semibold text-base text-gray-900 tracking-tight">
-                                    {item.sku}
-                                  </h3>
-                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          ) : (
+                            item.isDriver ? (
+                              <div className="flex flex-col gap-3 rounded-none bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-600 px-4 py-3 shadow-sm">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-100 border border-slate-600">
+                                        🔌 Driver
+                                      </span>
+                                      {item.series && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-slate-800 text-slate-100 border border-slate-600">
+                                          {item.series}
+                                        </span>
+                                      )}
+                                      {item.type && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-slate-900 text-slate-300 border border-slate-700">
+                                          {item.type}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <h3 className="font-bold text-xs mb-0.5 truncate text-white">
+                                      {item.name || item.sku}
+                                    </h3>
                                     {item.category && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-white">
+                                      <p className="text-[10px] text-slate-300">
                                         {item.category}
-                                      </span>
-                                    )}
-                                    {item.pixelPitch && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-600 text-white">
-                                        {item.pixelPitch}
-                                      </span>
+                                      </p>
                                     )}
                                   </div>
+                                  <button
+                                    onClick={() => removeFromCart(item.cartItemId)}
+                                    className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-500/10 text-red-300 hover:text-red-200"
+                                    title="Remove Driver"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
-                              </div>
-
-                              {/* Specifications Grid */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
-                                {item.application && (
-                                  <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                                    <div className="flex-1">
-                                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                                        Application
-                                      </p>
-                                      <p className="text-xs font-semibold text-gray-900">{item.application}</p>
-                                    </div>
-                                  </div>
-                                )}
-                                {item.ipRating && item.ipRating !== 'N/A' && (
-                                  <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                                    <div className="flex-1">
-                                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                                        IP Rating
-                                      </p>
-                                      <p className="text-xs font-semibold text-gray-900">
-                                        {typeof item.ipRating === 'string'
-                                          ? item.ipRating
-                                          : Array.isArray(item.ipRating)
-                                            ? (item.ipRating as string[]).join(', ')
-                                            : String(item.ipRating)}
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-                                {(item.suggestedSize || item.requiredLength || item.requiredWidth) && (
-                                  <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
-                                    <div className="flex-1">
-                                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                                        Suggested Size
-                                      </p>
-                                      <p className="text-xs font-semibold text-gray-900">
-                                        {item.suggestedSize && item.suggestedSize.trim() !== ''
-                                          ? item.suggestedSize
-                                          : (item.requiredLength || item.requiredWidth)
-                                            ? `W${(() => {
-                                              const ft = parseFloat(item.requiredLength || '0');
-                                              return (ft * 0.3048).toFixed(2);
-                                            })()}m × H${(() => {
-                                              const ft = parseFloat(item.requiredWidth || '0');
-                                              return (ft * 0.3048).toFixed(2);
-                                            })()}m`
-                                            : 'N/A'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-                                {item.totalResolution && item.totalResolution.trim() !== '' && (
-                                  <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white/70 px-3 py-2.5">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                                    <div className="flex-1">
-                                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                                        Screen Resolution
-                                      </p>
-                                      <p className="text-xs font-semibold text-gray-900">{item.totalResolution}</p>
-                                    </div>
-                                  </div>
-                                )}
-                                {typeof item.cabinetRequired === 'number' && item.cabinetRequired > 0 && (
-                                  <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 col-span-2">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                                    <div className="flex-1">
-                                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                                        Cabinet Arrangement
-                                      </p>
-                                      {(() => {
-                                        const w = (item as any).cabinetArrangementWidth as number | undefined;
-                                        const h = (item as any).cabinetArrangementHeight as number | undefined;
-                                        const total = item.cabinetRequired;
-                                        if (w && h) {
-                                          return (
-                                            <div className="flex flex-col text-xs text-gray-900 font-semibold">
-                                              <span>{`W${w} × H${h}`}</span>
-                                              <span className="text-[10px] text-gray-500 font-normal">({total} cabinets)</span>
-                                            </div>
-                                          );
-                                        }
-                                        return (
-                                          <p className="text-xs font-semibold text-gray-900">{total} cabinets</p>
-                                        );
-                                      })()}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Controllers Row */}
-                              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {/* Controller 1 */}
-                                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-                                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                                    Controller 1
-                                  </p>
-                                  <div className="space-y-1.5">
-                                    <div>
-                                      <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Name</span>
-                                      <input
-                                        type="text"
-                                        value={item.controller1Name ?? ''}
-                                        onChange={(e) =>
-                                          updateCartItem(item.cartItemId, { controller1Name: e.target.value })
-                                        }
-                                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        placeholder="Enter controller name"
-                                      />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Price (USD)</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step="0.01"
-                                          value={item.controller1Price ?? ''}
-                                          onChange={(e) => {
-                                            const val = parseFloat(e.target.value);
-                                            updateCartItem(item.cartItemId, {
-                                              controller1Price: isNaN(val) || val < 0 ? undefined : val,
-                                            });
-                                          }}
-                                          className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                          placeholder="0.00"
-                                        />
-                                      </div>
-                                      <div>
-                                        <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Quantity</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          value={item.controller1Qty ?? ''}
-                                          onChange={(e) => {
-                                            const val = parseInt(e.target.value, 10);
-                                            updateCartItem(item.cartItemId, {
-                                              controller1Qty: isNaN(val) || val < 0 ? undefined : val,
-                                            });
-                                          }}
-                                          className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                  {item.outputVoltage && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-emerald-200 border border-slate-700">
+                                      OV: {item.outputVoltage}
+                                    </span>
+                                  )}
+                                  {item.outputCurrent && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-sky-200 border border-slate-700">
+                                      OC: {item.outputCurrent}
+                                    </span>
+                                  )}
+                                  {item.wattageRange && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-violet-200 border border-slate-700">
+                                      {item.wattageRange.min}-{item.wattageRange.max}W
+                                    </span>
+                                  )}
+                                  {item.ipRating && item.ipRating !== 'N/A' && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-teal-200 border border-slate-700">
+                                      {item.ipRating}
+                                    </span>
+                                  )}
                                 </div>
-
-                                {/* Controller 2 */}
-                                <div className="rounded-xl border border-gray-200 bg-white/80 px-3 py-3">
-                                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                                    Controller 2
-                                  </p>
-                                  <div className="space-y-1.5">
-                                    <div>
-                                      <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Name</span>
-                                      <input
-                                        type="text"
-                                        value={item.controller2Name ?? ''}
-                                        onChange={(e) =>
-                                          updateCartItem(item.cartItemId, { controller2Name: e.target.value })
-                                        }
-                                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        placeholder="Enter controller name"
-                                      />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Price (USD)</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step="0.01"
-                                          value={item.controller2Price ?? ''}
-                                          onChange={(e) => {
-                                            const val = parseFloat(e.target.value);
-                                            updateCartItem(item.cartItemId, {
-                                              controller2Price: isNaN(val) || val < 0 ? undefined : val,
-                                            });
-                                          }}
-                                          className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                          placeholder="0.00"
-                                        />
-                                      </div>
-                                      <div>
-                                        <span className="mb-0.5 block text-[10px] font-medium text-gray-500">Quantity</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          value={item.controller2Qty ?? ''}
-                                          onChange={(e) => {
-                                            const val = parseInt(e.target.value, 10);
-                                            updateCartItem(item.cartItemId, {
-                                              controller2Qty: isNaN(val) || val < 0 ? undefined : val,
-                                            });
-                                          }}
-                                          className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                          placeholder="0"
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Quantity & Total Row */}
-                              <div className="mt-3 flex items-center justify-between gap-4 border-t border-gray-200 pt-3">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-xs font-semibold text-gray-600">Quantity:</span>
-                                  <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 px-3 py-2 shadow-sm">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/40 border border-slate-600">
                                     <button
                                       onClick={() => decreaseQuantity(item.cartItemId)}
-                                      className="flex h-6 w-6 items-center justify-center rounded-md text-gray-700 transition-all hover:bg-white hover:text-blue-600 hover:shadow-md"
+                                      className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-slate-800 hover:shadow text-slate-100"
                                     >
-                                      <Minus className="h-3.5 w-3.5" />
+                                      <Minus className="w-3 h-3" />
                                     </button>
                                     <input
                                       type="number"
@@ -3421,250 +3615,56 @@ export default function EnhancedCart() {
                                       }}
                                       onFocus={() => setEditingQuantity(item.cartItemId)}
                                       onBlur={() => setEditingQuantity(null)}
-                                      className="w-12 bg-transparent text-center text-sm font-bold text-gray-900 outline-none"
+                                      className="w-10 text-center font-bold text-xs outline-none bg-transparent text-yellow-300"
                                     />
                                     <button
                                       onClick={() => increaseQuantity(item.cartItemId)}
-                                      className="flex h-6 w-6 items-center justify-center rounded-md text-gray-700 transition-all hover:bg-white hover:text-blue-600 hover:shadow-md"
+                                      className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-slate-800 hover:shadow text-slate-100"
                                     >
-                                      <Plus className="h-3.5 w-3.5" />
+                                      <Plus className="w-3 h-3" />
                                     </button>
                                   </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="mb-0.5 text-[10px] font-medium text-gray-500">Total Display Price ({currencyInfo.code})</p>
-                                  <p className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-base font-bold text-transparent">
-                                    {(() => {
-                                      const totalConverted = computeItemTotal(item);
-                                      const formatted = totalConverted.toLocaleString('en-US', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      });
-                                      return `${currencyInfo.symbol} ${formatted}`;
-                                    })()}
-                                  </p>
+                                  <div className="text-right">
+                                    <p className="text-[10px] text-slate-300">
+                                      {formatPrice(item.price ?? 0)} × {item.quantity}
+                                    </p>
+                                    <p className="text-sm font-bold text-slate-100">
+                                      {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-
-                            {/* Right: Actions */}
-                            <div className="flex flex-col items-end justify-between gap-3">
-                              <button
-                                onClick={() => removeFromCart(item.cartItemId)}
-                                className="rounded-full border border-red-200 bg-red-50 p-2.5 text-red-600 shadow-sm transition-all hover:border-red-300 hover:bg-red-100 hover:text-red-700 hover:shadow-md"
-                                title="Remove from cart"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  setEditingDisplay(item);
-                                  // Base form data
-                                  let baseData: any = {
-                                    __context: 'cart',
-                                    ...item,
-                                    moduleSpecs: item.moduleSpecs || {},
-                                    cabinetSpecs: item.cabinetSpecs || {},
-                                    screenParams: item.screenParams || {},
-                                    customTotalManuallyEdited: false,
-                                    priceInput: (typeof item.price === 'number' ? String(item.price) : (item.price || '')) as any,
-                                    cabinetRequiredManuallyEdited: false,
-                                  };
-                                  // Try to hydrate cabinet specs from backend by SKU
-                                  try {
-                                    if (item.sku) {
-                                      const res = await fetch(`/api/led-displays?search=${encodeURIComponent(item.sku)}`);
-                                      if (res.ok) {
-                                        const list = await res.json();
-                                        const match = Array.isArray(list) ? list.find((d: any) => d.sku === item.sku) : null;
-                                        if (match) {
-                                          // Merge cabinet specs
-                                          if (match.cabinetSpecs) {
-                                            const mergedCabinetSpecs = { ...match.cabinetSpecs, ...baseData.cabinetSpecs };
-                                            baseData.cabinetSpecs = mergedCabinetSpecs;
-                                          }
-
-                                          // Limit Cabinet Material Variants to the user-selected one (if any)
-                                          if (Array.isArray(match.cabinetMaterialVariants) && match.cabinetMaterialVariants.length > 0) {
-                                            const selectedMaterial = (item as any).selectedCabinetMaterial as string | undefined;
-                                            let variants = match.cabinetMaterialVariants as any[];
-                                            if (selectedMaterial) {
-                                              const filtered = variants.filter(v => v.material === selectedMaterial);
-                                              if (filtered.length > 0) {
-                                                variants = filtered;
-                                              }
-                                            }
-                                            baseData.cabinetMaterialVariants = variants;
-                                          }
-                                          // If required size present, compute initial cabinetRequired
-                                          const FEET_TO_METER = 0.3048;
-                                          const lenFt = parseFloat((baseData as any)?.requiredLength ?? '');
-                                          const widFt = parseFloat((baseData as any)?.requiredWidth ?? '');
-                                          if (!isNaN(lenFt) && !isNaN(widFt) && lenFt > 0 && widFt > 0) {
-                                            const lenM = lenFt * FEET_TO_METER;
-                                            const widM = widFt * FEET_TO_METER;
-                                            const areaSqm = lenM * widM;
-                                            // Use baseData.cabinetSpecs (which already contains mergedCabinetSpecs)
-                                            let cabArea = (baseData as any)?.cabinetSpecs?.cabinetArea as number | undefined;
-                                            if (!(typeof cabArea === 'number' && cabArea > 0)) {
-                                              const sizeStr = (baseData as any)?.cabinetSpecs?.cabinetSize || '';
-                                              const m = String(sizeStr).match(/(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)/);
-                                              if (m) {
-                                                const w = parseFloat(m[1]);
-                                                const h = parseFloat(m[2]);
-                                                if (!isNaN(w) && !isNaN(h)) {
-                                                  cabArea = (w / 1000) * (h / 1000);
-                                                }
-                                              }
-                                            }
-                                            if (cabArea && cabArea > 0) {
-                                              baseData.cabinetRequired = Math.round(areaSqm / cabArea);
-                                            }
-                                          }
-                                        }
-                                      }
-                                    }
-                                  } catch { }
-                                  setDisplayFormData(baseData);
-                                  // Reset price edit lock state when opening editor
-                                  setPriceEditUnlocked(false);
-                                  setShowPriceEditModal(false);
-                                  setPriceEditPassword('');
-                                  setPriceEditError('');
-                                }}
-                                className="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all border-2 border-blue-400 hover:border-blue-500"
-                              >
-                                ✏️ Edit Specs
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          item.isDriver ? (
-                            <div className="flex flex-col gap-3 rounded-none bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-600 px-4 py-3 shadow-sm">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-100 border border-slate-600">
-                                      🔌 Driver
-                                    </span>
-                                    {item.series && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-slate-800 text-slate-100 border border-slate-600">
-                                        {item.series}
-                                      </span>
-                                    )}
-                                    {item.type && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-slate-900 text-slate-300 border border-slate-700">
-                                        {item.type}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <h3 className="font-bold text-xs mb-0.5 truncate text-white">
-                                    {item.name || item.sku}
-                                  </h3>
-                                  {item.category && (
-                                    <p className="text-[10px] text-slate-300">
-                                      {item.category}
-                                    </p>
+                            ) : (
+                              <div className="flex flex-row gap-4 items-stretch">
+                                <div className="flex-shrink-0 w-40 h-40 md:w-48 md:h-48 rounded-none overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 shadow-sm">
+                                  {(item.productImages?.length || item.images?.length) ? (
+                                    <img
+                                      src={item.productImages?.[0] || item.images?.[0]}
+                                      alt={item.sku}
+                                      className="w-full h-full object-contain p-2"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <Package className="w-8 h-8 text-slate-400" />
+                                    </div>
                                   )}
                                 </div>
-                                <button
-                                  onClick={() => removeFromCart(item.cartItemId)}
-                                  className="p-1.5 rounded-lg transition-all flex-shrink-0 hover:bg-red-500/10 text-red-300 hover:text-red-200"
-                                  title="Remove Driver"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                              <div className="flex flex-wrap gap-1.5 mb-2">
-                                {item.outputVoltage && (
-                                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-emerald-200 border border-slate-700">
-                                    OV: {item.outputVoltage}
-                                  </span>
-                                )}
-                                {item.outputCurrent && (
-                                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-sky-200 border border-slate-700">
-                                    OC: {item.outputCurrent}
-                                  </span>
-                                )}
-                                {item.wattageRange && (
-                                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-violet-200 border border-slate-700">
-                                    {item.wattageRange.min}-{item.wattageRange.max}W
-                                  </span>
-                                )}
-                                {item.ipRating && item.ipRating !== 'N/A' && (
-                                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-teal-200 border border-slate-700">
-                                    {item.ipRating}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/40 border border-slate-600">
-                                  <button
-                                    onClick={() => decreaseQuantity(item.cartItemId)}
-                                    className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-slate-800 hover:shadow text-slate-100"
-                                  >
-                                    <Minus className="w-3 h-3" />
-                                  </button>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => {
-                                      const value = parseInt(e.target.value) || 1;
-                                      updateQuantity(item.cartItemId, value);
-                                    }}
-                                    onFocus={() => setEditingQuantity(item.cartItemId)}
-                                    onBlur={() => setEditingQuantity(null)}
-                                    className="w-10 text-center font-bold text-xs outline-none bg-transparent text-yellow-300"
-                                  />
-                                  <button
-                                    onClick={() => increaseQuantity(item.cartItemId)}
-                                    className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-slate-800 hover:shadow text-slate-100"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </button>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-[10px] text-slate-300">
-                                    {formatPrice(item.price ?? 0)} × {item.quantity}
-                                  </p>
-                                  <p className="text-sm font-bold text-slate-100">
-                                    {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex flex-row gap-4 items-stretch">
-                              <div className="flex-shrink-0 w-40 h-40 md:w-48 md:h-48 rounded-none overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 shadow-sm">
-                                {(item.productImages?.length || item.images?.length) ? (
-                                  <img
-                                    src={item.productImages?.[0] || item.images?.[0]}
-                                    alt={item.sku}
-                                    className="w-full h-full object-contain p-2"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <Package className="w-8 h-8 text-slate-400" />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1 flex flex-col justify-between min-w-0">
-                                <div>
-                                  <div className="flex justify-between items-start gap-1 mb-1.5">
-                                    <div className="flex-1 min-w-0">
-                                      <h3 className="font-bold text-xs mb-0.5 truncate text-gray-900">
-                                        {item.sku}
-                                      </h3>
-                                      {item.productName && (
-                                        <p className="text-[10px] text-gray-700 mb-0.5 leading-snug">
-                                          {item.productName}
+                                <div className="flex-1 flex flex-col justify-between min-w-0">
+                                  <div>
+                                    <div className="flex justify-between items-start gap-1 mb-1.5">
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-xs mb-0.5 truncate text-gray-900">
+                                          {item.sku}
+                                        </h3>
+                                        {item.productName && (
+                                          <p className="text-[10px] text-gray-700 mb-0.5 leading-snug">
+                                            {item.productName}
+                                          </p>
+                                        )}
+                                        <p className="text-[10px] text-gray-600 truncate">
+                                          {item.category}
                                         </p>
-                                      )}
-                                      <p className="text-[10px] text-gray-600 truncate">
-                                        {item.category}
-                                      </p>
-                                    </div>
+                                      </div>
                                       <div className="flex items-center gap-1">
                                         <button
                                           type="button"
@@ -3676,8 +3676,8 @@ export default function EnhancedCart() {
                                               lumen: item.lumen || '',
                                               dimension: item.dimension || '',
                                               beamAngle: item.beamAngle || '',
-                                              ipRating: Array.isArray(item.ipRating) 
-                                                ? item.ipRating.join(', ') 
+                                              ipRating: Array.isArray(item.ipRating)
+                                                ? item.ipRating.join(', ')
                                                 : item.ipRating || '',
                                               cct: (item as any).cct || '',
                                               price: item.price || '',
@@ -3701,138 +3701,139 @@ export default function EnhancedCart() {
                                         </button>
                                       </div>
                                     </div>
-                                  <div className="flex flex-wrap gap-1.5 mb-2">
-                                    {(item as any).selectedVariant?.channels && (
-                                      <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-indigo-500 to-blue-500 text-white border border-indigo-600 shadow-sm">
-                                        {(item as any).selectedVariant.channels} Channel{(item as any).selectedVariant.channels > 1 ? 's' : ''}
-                                      </span>
-                                    )}
-                                    {(item as any).selectedVariant?.size && (
-                                      <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-slate-600 to-slate-700 text-white border border-slate-700 shadow-sm">
-                                        {(item as any).selectedVariant.size}
-                                      </span>
-                                    )}
-                                    {item.watt && item.watt !== '-' && (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                        {item.watt}W
-                                      </span>
-                                    )}
-                                    {item.lumen && item.lumen !== '-' && (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                        {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen}lm`}
-                                      </span>
-                                    )}
-                                    {item.beamAngle && item.beamAngle !== '-' && (
-                                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
-                                        {item.beamAngle}
-                                      </span>
-                                    )}
-                                    {item.ipRating && item.ipRating !== 'N/A' && (
-                                      <span className="inline-block bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-yellow-200">
-                                        {item.ipRating}
-                                      </span>
-                                    )}
-                                    {(item as any).cct && (item as any).cct !== '-' && (item as any).cct !== 'None' && (
-                                      <span className="inline-block bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-200">
-                                        {(item as any).cct}
-                                      </span>
-                                    )}
-                                    {(item as any).dimming && (item as any).dimming !== '-' && (item as any).dimming !== 'None' && (
-                                      <span className="inline-block bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-emerald-200">
-                                        {(item as any).dimming}
-                                      </span>
-                                    )}
-                                    {(item as any).accessories && (item as any).accessories !== '-' && (item as any).accessories !== 'None' && (
-                                      <span className="inline-block bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-200">
-                                        {(item as any).accessories}
-                                      </span>
-                                    )}
-                                    {(item as any).finish && (item as any).finish !== '-' && (item as any).finish !== 'None' && (
-                                      <span className="inline-block bg-slate-50 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-slate-200">
-                                        Finish: {(item as any).finish}
-                                      </span>
-                                    )}
-                                    {(item as any).reflectorFinish && (item as any).reflectorFinish !== '-' && (item as any).reflectorFinish !== 'None' && (
-                                      <span className="inline-block bg-zinc-50 text-zinc-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-zinc-200">
-                                        Reflector: {(item as any).reflectorFinish}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 shadow-sm">
-                                      <button
-                                        onClick={() => decreaseQuantity(item.cartItemId)}
-                                        className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        value={item.quantity}
-                                        onChange={(e) => {
-                                          const value = parseInt(e.target.value) || 1;
-                                          updateQuantity(item.cartItemId, value);
-                                        }}
-                                        onFocus={() => setEditingQuantity(item.cartItemId)}
-                                        onBlur={() => setEditingQuantity(null)}
-                                        className="w-10 text-center font-bold text-xs outline-none bg-transparent text-gray-900"
-                                      />
-                                      <button
-                                        onClick={() => increaseQuantity(item.cartItemId)}
-                                        className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-[10px] text-gray-500">
-                                        {formatPrice(item.price ?? 0)} × {item.quantity}
-                                      </p>
-                                      <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                                        {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
-                                      </p>
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                      {(item as any).selectedVariant?.channels && (
+                                        <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-indigo-500 to-blue-500 text-white border border-indigo-600 shadow-sm">
+                                          {(item as any).selectedVariant.channels} Channel{(item as any).selectedVariant.channels > 1 ? 's' : ''}
+                                        </span>
+                                      )}
+                                      {(item as any).selectedVariant?.size && (
+                                        <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-slate-600 to-slate-700 text-white border border-slate-700 shadow-sm">
+                                          {(item as any).selectedVariant.size}
+                                        </span>
+                                      )}
+                                      {item.watt && item.watt !== '-' && (
+                                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                          {item.watt}W
+                                        </span>
+                                      )}
+                                      {item.lumen && item.lumen !== '-' && (
+                                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                          {item.lumen.toLowerCase().includes('lm') ? item.lumen : `${item.lumen}lm`}
+                                        </span>
+                                      )}
+                                      {item.beamAngle && item.beamAngle !== '-' && (
+                                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                          {item.beamAngle}
+                                        </span>
+                                      )}
+                                      {item.ipRating && item.ipRating !== 'N/A' && (
+                                        <span className="inline-block bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-yellow-200">
+                                          {item.ipRating}
+                                        </span>
+                                      )}
+                                      {(item as any).cct && (item as any).cct !== '-' && (item as any).cct !== 'None' && (
+                                        <span className="inline-block bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-200">
+                                          {(item as any).cct}
+                                        </span>
+                                      )}
+                                      {(item as any).dimming && (item as any).dimming !== '-' && (item as any).dimming !== 'None' && (
+                                        <span className="inline-block bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-emerald-200">
+                                          {(item as any).dimming}
+                                        </span>
+                                      )}
+                                      {(item as any).accessories && (item as any).accessories !== '-' && (item as any).accessories !== 'None' && (
+                                        <span className="inline-block bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-200">
+                                          {(item as any).accessories}
+                                        </span>
+                                      )}
+                                      {(item as any).finish && (item as any).finish !== '-' && (item as any).finish !== 'None' && (
+                                        <span className="inline-block bg-slate-50 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-slate-200">
+                                          Finish: {(item as any).finish}
+                                        </span>
+                                      )}
+                                      {(item as any).reflectorFinish && (item as any).reflectorFinish !== '-' && (item as any).reflectorFinish !== 'None' && (
+                                        <span className="inline-block bg-zinc-50 text-zinc-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-zinc-200">
+                                          Reflector: {(item as any).reflectorFinish}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
-                                  {!item.isDriver && !isDisplay && !(item as any).isLightingControl && (
-                                    <button
-                                      onClick={() => fetchDriversForProduct(item)}
-                                      className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 border border-blue-200 transition-all text-xs font-bold shadow-sm hover:shadow"
-                                    >
-                                      <Zap className="w-3.5 h-3.5" />
-                                      Add Driver
-                                    </button>
-                                  )}
-                                  {!item.isDriver && !isDisplay && !(item as any).isLightingControl && getDriversForProduct(item.cartItemId).length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-gray-200">
-                                      <p className="text-[10px] font-bold text-gray-700 mb-1.5">🔌 Drivers:</p>
-                                      {getDriversForProduct(item.cartItemId).map((driver) => (
-                                        <div key={driver.cartItemId} className="flex items-center justify-between gap-1 mb-1.5 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-[10px] font-bold text-blue-900 truncate">{driver.name}</p>
-                                            <p className="text-[9px] text-blue-700">Qty: {driver.quantity}</p>
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 shadow-sm">
+                                        <button
+                                          onClick={() => decreaseQuantity(item.cartItemId)}
+                                          className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
+                                        >
+                                          <Minus className="w-3 h-3" />
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          value={item.quantity}
+                                          onChange={(e) => {
+                                            const value = parseInt(e.target.value) || 1;
+                                            updateQuantity(item.cartItemId, value);
+                                          }}
+                                          onFocus={() => setEditingQuantity(item.cartItemId)}
+                                          onBlur={() => setEditingQuantity(null)}
+                                          className="w-10 text-center font-bold text-xs outline-none bg-transparent text-gray-900"
+                                        />
+                                        <button
+                                          onClick={() => increaseQuantity(item.cartItemId)}
+                                          className="w-6 h-6 rounded-md flex items-center justify-center transition-all hover:bg-white hover:shadow text-gray-900"
+                                        >
+                                          <Plus className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-[10px] text-gray-500">
+                                          {formatPrice(item.price ?? 0)} × {item.quantity}
+                                        </p>
+                                        <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                          {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {!item.isDriver && !isDisplay && !(item as any).isLightingControl && (
+                                      <button
+                                        onClick={() => fetchDriversForProduct(item)}
+                                        className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 border border-blue-200 transition-all text-xs font-bold shadow-sm hover:shadow"
+                                      >
+                                        <Zap className="w-3.5 h-3.5" />
+                                        Add Driver
+                                      </button>
+                                    )}
+                                    {!item.isDriver && !isDisplay && !(item as any).isLightingControl && getDriversForProduct(item.cartItemId).length > 0 && (
+                                      <div className="mt-2 pt-2 border-t border-gray-200">
+                                        <p className="text-[10px] font-bold text-gray-700 mb-1.5">🔌 Drivers:</p>
+                                        {getDriversForProduct(item.cartItemId).map((driver) => (
+                                          <div key={driver.cartItemId} className="flex items-center justify-between gap-1 mb-1.5 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-[10px] font-bold text-blue-900 truncate">{driver.name}</p>
+                                              <p className="text-[9px] text-blue-700">Qty: {driver.quantity}</p>
+                                            </div>
+                                            <button
+                                              onClick={() => removeFromCart(driver.cartItemId)}
+                                              className="p-1 rounded-md hover:bg-red-100 text-red-600 transition-all"
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </button>
                                           </div>
-                                          <button
-                                            onClick={() => removeFromCart(driver.cartItemId)}
-                                            className="p-1 rounded-md hover:bg-red-100 text-red-600 transition-all"
-                                          >
-                                            <X className="w-3 h-3" />
-                                          </button>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )
-                        )}
+                            )
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
 
               {/* Clear Cart Button - Mobile */}
@@ -5328,25 +5329,22 @@ export default function EnhancedCart() {
       {/* Driver Selection Modal */}
       {showDriverModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`max-w-5xl w-full rounded-xl max-h-[85vh] overflow-hidden ${isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-lg'
+          <div className={`max-w-md w-full rounded-xl overflow-hidden ${isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-lg'
             }`}>
-            {/* Header - Sticky */}
-            <div className={`sticky top-0 z-10 p-4 border-b ${isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-white'
+            {/* Header */}
+            <div className={`p-4 border-b ${isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-white'
               }`}>
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                     <Zap className="w-5 h-5 text-blue-500" />
-                    Select Driver for {selectedProductForDriver?.sku}
+                    Add Driver for {selectedProductForDriver?.sku}
                     {selectedProductForDriver?.watt && (
                       <span className="text-blue-500">
                         ({selectedProductForDriver.watt}W)
                       </span>
                     )}
                   </h3>
-                  <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {availableDrivers.length} driver{availableDrivers.length !== 1 ? 's' : ''} available
-                  </p>
                 </div>
                 <button
                   onClick={handleCloseDriverModal}
@@ -5356,356 +5354,96 @@ export default function EnhancedCart() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
-              {/* Search Bar */}
-              {!loadingDrivers && availableDrivers.length > 0 && (
-                <div className="mt-4">
-                  <div className="relative">
-                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                      }`} />
-                    <input
-                      type="text"
-                      placeholder="Search by name, SKU, series, voltage, type..."
-                      value={driverSearchTerm}
-                      onChange={(e) => setDriverSearchTerm(e.target.value)}
-                      className={`w-full pl-10 pr-10 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
-                        ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
-                        }`}
-                    />
-                    {driverSearchTerm && (
-                      <button
-                        onClick={() => setDriverSearchTerm('')}
-                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
-                          }`}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Results Count */}
-                  {driverSearchTerm && (() => {
-                    const { indoor, outdoor } = categorizeDrivers();
-                    const totalFiltered = indoor.length + outdoor.length;
-                    if (totalFiltered < availableDrivers.length) {
-                      return (
-                        <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Showing {totalFiltered} of {availableDrivers.length} drivers
-                        </p>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-              )}
             </div>
 
             {/* Content */}
-            <div className="p-4 overflow-y-auto max-h-[calc(85vh-240px)]">
-              {loadingDrivers ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <div className={`w-12 h-12 border-4 rounded-full animate-spin mb-4 ${isDarkMode ? 'border-white/10 border-t-blue-500' : 'border-gray-200 border-t-blue-500'
-                    }`}></div>
-                  <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading drivers...</p>
-                </div>
-              ) : availableDrivers.length === 0 ? (
-                <div className="text-center py-12">
-                  <Package className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-                  <p className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    No drivers available
-                  </p>
-                  <p className={`mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    No drivers have been added to the system yet
-                  </p>
-                  <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                    Add drivers in the admin panel to make them available
-                  </p>
-                </div>
-              ) : (
+            <div className="p-6">
+              <div className="space-y-4">
                 <div>
-                  {(() => {
-                    const { indoor, outdoor } = categorizeDrivers();
-                    const totalFiltered = indoor.length + outdoor.length;
-
-                    // Show "No results" message if search is applied but no drivers match
-                    if (totalFiltered === 0 && driverSearchTerm) {
-                      return (
-                        <div className="text-center py-12">
-                          <Search className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-                          <p className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                            No drivers found
-                          </p>
-                          <p className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                            Try a different search term
-                          </p>
-                          <button
-                            onClick={() => setDriverSearchTerm('')}
-                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${isDarkMode
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                              : 'bg-blue-600 hover:bg-blue-700 text-white'
-                              }`}
-                          >
-                            Clear Search
-                          </button>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Indoor Drivers Section */}
-                        {indoor.length > 0 && (
-                          <div className={`rounded-lg border p-4 ${isDarkMode ? 'bg-gray-800/30 border-white/10' : 'bg-gray-50 border-gray-200'
-                            }`}>
-                            <div className={`flex items-center gap-2 mb-3 pb-2 border-b ${isDarkMode ? 'border-white/10' : 'border-gray-200'
-                              }`}>
-                              <div className={`p-1.5 rounded-lg ${isDarkMode ? 'bg-blue-500/10' : 'bg-blue-50'
-                                }`}>
-                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                </svg>
-                              </div>
-                              <div>
-                                <h4 className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                  Indoor Drivers
-                                </h4>
-                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                  IP Rating ≤ 64 ({indoor.length} driver{indoor.length !== 1 ? 's' : ''})
-                                </p>
-                              </div>
-                            </div>
-                            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                              {indoor.map((driver) => (
-                                <div
-                                  key={driver._id}
-                                  className={`p-3 rounded-lg border transition-all cursor-pointer ${isDarkMode
-                                    ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800'
-                                    : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
-                                    }`}
-                                  onClick={() => handleAddDriver(driver)}
-                                >
-                                  {/* Header with Name and Price */}
-                                  <div className="flex items-start justify-between mb-2 pb-2 border-b border-gray-200/30">
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className={`font-bold text-sm mb-0.5 truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        {driver.name}
-                                      </h4>
-                                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                        {driver.sku}
-                                      </p>
-                                    </div>
-                                    <div className="text-right ml-2">
-                                      <p className="text-base font-bold text-blue-600 whitespace-nowrap">
-                                        {formatPrice(driver.price)}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  {/* Compact Specifications */}
-                                  <div className="space-y-1 mb-2">
-                                    {driver.wattageRange && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Power:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.wattageRange.min}-{driver.wattageRange.max}W
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {driver.outputVoltage && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Output:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.outputVoltage}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {driver.outputCurrent && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Current:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.outputCurrent}
-                                        </span>
-                                      </div>
-                                    )}
-
-
-
-                                    {driver.ipRating && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>IP Rating:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.ipRating}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {driver.type && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Type:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.type}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {driver.series && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Series:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.series}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Add Button - Compact */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleAddDriver(driver);
-                                    }}
-                                    className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    Add
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Outdoor Drivers Section */}
-                        {outdoor.length > 0 && (
-                          <div className={`rounded-lg border p-4 ${isDarkMode ? 'bg-gray-800/30 border-white/10' : 'bg-gray-50 border-gray-200'
-                            }`}>
-                            <div className={`flex items-center gap-2 mb-3 pb-2 border-b ${isDarkMode ? 'border-white/10' : 'border-gray-200'
-                              }`}>
-                              <div className={`p-1.5 rounded-lg ${isDarkMode ? 'bg-green-500/10' : 'bg-green-50'
-                                }`}>
-                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              </div>
-                              <div>
-                                <h4 className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                  Outdoor Drivers
-                                </h4>
-                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                  IP Rating ≥ 65 ({outdoor.length} driver{outdoor.length !== 1 ? 's' : ''})
-                                </p>
-                              </div>
-                            </div>
-                            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                              {outdoor.map((driver) => (
-                                <div
-                                  key={driver._id}
-                                  className={`p-3 rounded-lg border transition-all cursor-pointer ${isDarkMode
-                                    ? 'bg-gray-800/50 border-white/10 hover:border-blue-500/50 hover:bg-gray-800'
-                                    : 'bg-white border-gray-200 hover:border-blue-500/50 shadow-sm hover:shadow-md'
-                                    }`}
-                                  onClick={() => handleAddDriver(driver)}
-                                >
-                                  {/* Header with Name and Price */}
-                                  <div className="flex items-start justify-between mb-2 pb-2 border-b border-gray-200/30">
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className={`font-bold text-sm mb-0.5 truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        {driver.name}
-                                      </h4>
-                                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                        {driver.sku}
-                                      </p>
-                                    </div>
-                                    <div className="text-right ml-2">
-                                      <p className="text-base font-bold text-blue-600 whitespace-nowrap">
-                                        {formatPrice(driver.price)}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  {/* Compact Specifications */}
-                                  <div className="space-y-1 mb-2">
-                                    {driver.wattageRange && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Power:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.wattageRange.min}-{driver.wattageRange.max}W
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {driver.outputVoltage && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Output:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.outputVoltage}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {driver.outputCurrent && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Current:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.outputCurrent}
-                                        </span>
-                                      </div>
-                                    )}
-
-
-
-                                    {driver.ipRating && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>IP Rating:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.ipRating}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {driver.type && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Type:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.type}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {driver.series && (
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Series:</span>
-                                        <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                          {driver.series}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Add Button - Compact */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleAddDriver(driver);
-                                    }}
-                                    className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    Add
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  <label className={`block text-sm font-semibold mb-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Driver Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customDriverName}
+                    onChange={(e) => setCustomDriverName(e.target.value)}
+                    placeholder="e.g. Meanwell LPF-60-24"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      }`}
+                  />
                 </div>
-              )}
+
+                <div>
+                  <label className={`block text-sm font-semibold mb-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Wattage
+                  </label>
+                  <input
+                    type="text"
+                    value={customDriverWattage}
+                    onChange={(e) => setCustomDriverWattage(e.target.value)}
+                    placeholder="e.g. 60W"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold mb-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Price (INR)
+                  </label>
+                  <input
+                    type="number"
+                    value={customDriverPrice}
+                    onChange={(e) => setCustomDriverPrice(e.target.value)}
+                    placeholder="0.00"
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
+                      ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
+                      : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                      }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold mb-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Quantity
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setCustomDriverQuantity(Math.max(1, customDriverQuantity - 1))}
+                      className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                        }`}
+                    >
+                      <Minus size={16} />
+                    </button>
+                    <span className={`text-base font-semibold w-8 text-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {customDriverQuantity}
+                    </span>
+                    <button
+                      onClick={() => setCustomDriverQuantity(customDriverQuantity + 1)}
+                      className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                        }`}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleAddCustomDriver}
+                  disabled={!customDriverName}
+                  className={`w-full py-3 mt-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${!customDriverName
+                    ? 'bg-gray-500/50 text-gray-300 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-[1.02]'
+                    }`}
+                >
+                  <Plus size={18} />
+                  Add to Cart
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -6023,7 +5761,7 @@ export default function EnhancedCart() {
       {editingCartItem && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 rounded-xl p-6 max-w-lg w-full shadow-2xl border border-gray-700 max-h-[90vh] overflow-y-auto">
-            
+
             <div className="flex justify-between items-center mb-4">
               <div>
                 <p className="text-gray-400 text-xs mb-1">
@@ -6156,7 +5894,7 @@ export default function EnhancedCart() {
       {showDownloadConfirm && !showPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 rounded-xl p-6 max-w-sm w-full shadow-2xl border border-gray-700">
-            
+
             <div className="mb-4">
               <h2 className="text-white font-bold text-lg mb-1">
                 Ready to download?
@@ -6182,7 +5920,7 @@ export default function EnhancedCart() {
                   👁 Preview PDF first
                 </button>
               )}
-              
+
               <button
                 type="button"
                 onClick={() => {
@@ -6209,7 +5947,7 @@ export default function EnhancedCart() {
 
       {showPreview && previewUrl && (
         <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex flex-col">
-          
+
           <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-700">
             <h2 className="text-white font-semibold text-sm">
               PDF Preview
@@ -6262,14 +6000,14 @@ export default function EnhancedCart() {
       {showNoPriceConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4">
           <div className="bg-gray-900 rounded-xl p-6 max-w-sm w-full border border-yellow-600/50 shadow-2xl">
-            
+
             <div className="mb-4 text-center">
               <div className="text-3xl mb-2">⚠️</div>
               <h3 className="text-white font-bold text-base mb-1">
                 No price added!
               </h3>
               <p className="text-gray-400 text-sm">
-                This item will show ₹0.00 in the quotation. 
+                This item will show ₹0.00 in the quotation.
                 Do you want to continue without a price?
               </p>
             </div>

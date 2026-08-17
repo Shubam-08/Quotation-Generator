@@ -226,6 +226,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       isDriver: true,
       parentProductId: parentProductId,
       wattageRange: driver.wattageRange,
+      wattage: (driver as any).wattage,
       outputVoltage: driver.outputVoltage,
       outputCurrent: driver.outputCurrent,
 
