@@ -49,7 +49,7 @@ function checkEnvFile() {
 
 function main() {
   console.log("=".repeat(50));
-  console.log("  QLite Global - Environment Setup Check");
+  console.log("  Qlite Global - Environment Setup Check");
   console.log("=".repeat(50) + "\n");
 
   const isConfigured = checkEnvFile();

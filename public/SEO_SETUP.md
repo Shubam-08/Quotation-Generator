@@ -1,4 +1,4 @@
-# SEO Setup Guide for QLite Global
+# SEO Setup Guide for Qlite Global
 
 ## ✅ Completed Configuration
 
@@ -9,7 +9,7 @@ Qlite Global | Automatic Quotation Generator
 
 ### 2. **Description** (158 characters)
 ```
-Generate professional product quotations in minutes. QLite Global helps businesses automate pricing, proposals, and client management efficiently.
+Generate professional product quotations in minutes. Qlite Global helps businesses automate pricing, proposals, and client management efficiently.
 ```
 
 ### 3. **Keywords** (10 terms)
@@ -30,10 +30,10 @@ Generate professional product quotations in minutes. QLite Global helps business
 - **Apple Touch Icon**: `/logoqliteweb.png` (180x180)
 
 ### 5. **OpenGraph Data**
-- **Title**: QLite Global | Instant Quotation Automation
-- **Description**: QLite Global enables instant product quotation generation with smart automation tools. Create, manage, and send quotes within minutes.
+- **Title**: Qlite Global | Instant Quotation Automation
+- **Description**: Qlite Global enables instant product quotation generation with smart automation tools. Create, manage, and send quotes within minutes.
 - **URL**: https://www.qliteglobal.com
-- **Site Name**: QLite Global
+- **Site Name**: Qlite Global
 - **Image**: `/og-image.png` (1200x630 - needs to be created)
 - **Locale**: en_US
 - **Type**: website

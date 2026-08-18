@@ -89,7 +89,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">QLite Global</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Qlite Global</h1>
           <p className="text-gray-600 mt-2">Create your account</p>
         </div>
 
@@ -156,7 +156,7 @@ export default function RegisterPage() {
               onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-              placeholder="QLite Global"
+              placeholder="Qlite Global"
             />
           </div>
 

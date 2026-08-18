@@ -2,7 +2,7 @@
 
 ## ✅ Implementation Complete
 
-A comprehensive, secure authentication system has been successfully implemented for the QLite Global Product Quotation application.
+A comprehensive, secure authentication system has been successfully implemented for the Qlite Global Product Quotation application.
 
 ---
 

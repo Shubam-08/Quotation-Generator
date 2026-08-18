@@ -180,7 +180,7 @@ Example structure:
 export async function generateMetadata({ params }): Promise<Metadata> {
   const product = await fetchProduct(params.id)
   return {
-    title: `${product.name} - ${product.sku} | QLite Global`,
+    title: `${product.name} - ${product.sku} | Qlite Global`,
     description: `${product.description} - Get instant quotation for ${product.name}`,
     openGraph: {
       images: [product.image],

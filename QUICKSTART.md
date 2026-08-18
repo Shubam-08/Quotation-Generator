@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get your QLite Global application up and running in 5 minutes!
+Get your Qlite Global application up and running in 5 minutes!
 
 ## Prerequisites
 

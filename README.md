@@ -1,4 +1,4 @@
-# QLite Global - Product Quotation System
+# Qlite Global - Product Quotation System
 
 A modern product quotation and management system built with Next.js, MongoDB, and NextAuth.js.
 
