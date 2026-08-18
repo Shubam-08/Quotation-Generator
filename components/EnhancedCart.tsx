@@ -2691,6 +2691,7 @@ export default function EnhancedCart() {
           theme: 'grid', // Use grid theme to show all borders
           didParseCell: (data: CellHookData) => {
             if (data.section === 'body') {
+              data.cell.styles.overflow = 'linebreak';
               const idx = data.row.index;
               const item = organizedCart[idx];
 
@@ -2751,14 +2752,19 @@ export default function EnhancedCart() {
 
                     // Draw normal value
                     doc.setFont('helvetica', 'normal');
-                    doc.text(value, textX + labelWidth, textY);
+                    const maxWidth = data.cell.width - labelWidth - 6;
+                    const splitValue = doc.splitTextToSize(value, maxWidth > 0 ? maxWidth : 10);
+                    doc.text(splitValue, textX + labelWidth, textY);
+                    textY += 12 * Math.max(1, splitValue.length); // Adjust Y for next line
                   } else {
                     doc.setFont('helvetica', 'normal');
                     doc.setFontSize(8);
                     doc.setTextColor(0, 0, 0);
-                    doc.text(line, textX, textY);
+                    const maxWidth = data.cell.width - 6;
+                    const splitLine = doc.splitTextToSize(line, maxWidth > 0 ? maxWidth : 10);
+                    doc.text(splitLine, textX, textY);
+                    textY += 12 * Math.max(1, splitLine.length); // Adjust Y for next line
                   }
-                  textY += 12; // Adjust Y for next line
                 });
               }
 
