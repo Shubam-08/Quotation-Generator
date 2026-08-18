@@ -51,13 +51,12 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/logoqliteweb.png", type: "image/png", sizes: "192x192" },
+      { url: "/logoqliteweb.png", type: "image/png" },
     ],
     apple: [
-      { url: "/logoqliteweb.png", sizes: "180x180", type: "image/png" },
+      { url: "/logoqliteweb.png", type: "image/png" },
     ],
-    shortcut: "/favicon.ico",
+    shortcut: "/logoqliteweb.png",
   },
   openGraph: {
     title: "Qlite Global | Instant Quotation Automation",
