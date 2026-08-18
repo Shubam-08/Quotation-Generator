@@ -153,6 +153,7 @@ export default function EnhancedCart() {
   const [editSpecs, setEditSpecs] = useState<any>({});
   const [showNoPriceConfirm, setShowNoPriceConfirm] = useState(false);
   const [showDownloadConfirm, setShowDownloadConfirm] = useState<'pdf' | 'excel' | null>(null);
+  const [showMissingDetailsPopup, setShowMissingDetailsPopup] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   // Password lock for Price Calculation editing
@@ -4179,7 +4180,13 @@ export default function EnhancedCart() {
                   <div className="grid grid-cols-2 gap-2">
                     {/* PDF Button */}
                     <button
-                      onClick={() => setShowDownloadConfirm('pdf')}
+                      onClick={() => {
+                        if (!canDownload) {
+                          setShowMissingDetailsPopup(true);
+                        } else {
+                          setShowDownloadConfirm('pdf');
+                        }
+                      }}
                       disabled={downloadingType !== null}
                       className={`relative flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-semibold text-sm transition-all cursor-pointer overflow-hidden ${downloadingType !== null ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
@@ -4203,7 +4210,13 @@ export default function EnhancedCart() {
 
                     {/* Excel Button */}
                     <button
-                      onClick={() => setShowDownloadConfirm('excel')}
+                      onClick={() => {
+                        if (!canDownload) {
+                          setShowMissingDetailsPopup(true);
+                        } else {
+                          setShowDownloadConfirm('excel');
+                        }
+                      }}
                       disabled={downloadingType !== null}
                       className={`relative flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-md font-semibold text-sm transition-all cursor-pointer overflow-hidden ${downloadingType !== null ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
@@ -6084,6 +6097,25 @@ export default function EnhancedCart() {
                 Continue without price
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Missing Details Popup Modal */}
+      {showMissingDetailsPopup && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className={`max-w-md w-full rounded-xl p-6 text-center ${isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-lg'}`}>
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h3 className={`text-xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Missing Details</h3>
+            <p className={`mb-6 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Please fill in all required details (Email, Mobile, Attn (Name), and Company) before downloading your quotation.
+            </p>
+            <button
+              onClick={() => setShowMissingDetailsPopup(false)}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer transition-all"
+            >
+              Okay, I'll fill them
+            </button>
           </div>
         </div>
       )}
