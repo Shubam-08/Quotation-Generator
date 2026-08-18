@@ -675,7 +675,7 @@ export default function EnhancedCart() {
 
       // Add headerImage on the right side
       try {
-        const headerImageResponse = await fetch('/headerImage.jpeg');
+        const headerImageResponse = await fetch('/HEADERIMAGE.jpeg');
         if (headerImageResponse.ok) {
           const headerImageBuffer = await headerImageResponse.arrayBuffer();
           const headerImageId = workbook.addImage({
@@ -1279,10 +1279,21 @@ export default function EnhancedCart() {
       const rightX = pageWidth - marginRight;
 
       // Add logo on left
-      doc.addImage('/logo.jpg', 'JPEG', 14, 10, 60, 50);
+      const logoImgData = await fetch('/logo.jpg')
+        .then(r => r.arrayBuffer())
+        .then(buf => {
+          const bytes = new Uint8Array(buf);
+          let binary = '';
+          bytes.forEach(b => binary += String.fromCharCode(b));
+          return btoa(binary);
+        });
+      doc.addImage(
+        'data:image/jpeg;base64,' + logoImgData,
+        'JPEG', 14, 10, 60, 50
+      );
 
       // Add headerImage spanning rest of width
-      const headerImgData = await fetch('/headerImage.jpeg')
+      const headerImgData = await fetch('/HEADERIMAGE.jpeg')
         .then(r => r.arrayBuffer())
         .then(buf => {
           const bytes = new Uint8Array(buf);
