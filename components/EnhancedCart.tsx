@@ -3117,8 +3117,6 @@ export default function EnhancedCart() {
                   cart.forEach(item => {
                     if (!item.isDriver) {
                       organizedCartRender.push(item);
-                      const productDrivers = cart.filter(d => d.isDriver && d.parentProductId === item.cartItemId);
-                      organizedCartRender.push(...productDrivers);
                     }
                   });
                   const standaloneDriversRender = cart.filter(item => item.isDriver && !item.parentProductId);
@@ -3553,7 +3551,7 @@ export default function EnhancedCart() {
                                   }}
                                   className="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all border-2 border-blue-400 hover:border-blue-500"
                                 >
-                                  ✏️ Edit Specs
+                                  Edit Specs
                                 </button>
                               </div>
                             </div>
@@ -3680,7 +3678,7 @@ export default function EnhancedCart() {
                                             {item.productName}
                                           </p>
                                         )}
-                                        <p className="text-[10px] text-gray-600 truncate">
+                                        <p className="text-[10px] text-gray-600">
                                           {item.category}
                                         </p>
                                       </div>
@@ -3707,9 +3705,9 @@ export default function EnhancedCart() {
                                               quantity: item.quantity || 1,
                                             });
                                           }}
-                                          className="text-blue-500 hover:text-blue-700 cursor-pointer transition-all text-[11px] font-medium mr-2"
+                                          className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-md cursor-pointer transition-all text-[10px] font-bold mr-2 shadow-sm"
                                         >
-                                          ✏️ Edit
+                                          Edit
                                         </button>
                                         <button
                                           onClick={() => removeFromCart(item.cartItemId)}
@@ -3807,10 +3805,10 @@ export default function EnhancedCart() {
                                         </button>
                                       </div>
                                       <div className="text-right">
-                                        <p className="text-[10px] text-gray-500">
+                                        <p className="text-[10px] text-gray-500 whitespace-nowrap">
                                           {formatPrice(item.price ?? 0)} × {item.quantity}
                                         </p>
-                                        <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                        <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent whitespace-nowrap">
                                           {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
                                         </p>
                                       </div>
@@ -3826,19 +3824,55 @@ export default function EnhancedCart() {
                                     )}
                                     {!item.isDriver && !isDisplay && !(item as any).isLightingControl && getDriversForProduct(item.cartItemId).length > 0 && (
                                       <div className="mt-2 pt-2 border-t border-gray-200">
-                                        <p className="text-[10px] font-bold text-gray-700 mb-1.5">🔌 Drivers:</p>
+                                        <p className="text-[10px] font-bold text-gray-700 mb-1.5">Drivers:</p>
                                         {getDriversForProduct(item.cartItemId).map((driver) => (
-                                          <div key={driver.cartItemId} className="flex items-center justify-between gap-1 mb-1.5 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
-                                            <div className="flex-1 min-w-0">
-                                              <p className="text-[10px] font-bold text-blue-900 truncate">{driver.name}</p>
-                                              <p className="text-[9px] text-blue-700">Qty: {driver.quantity}</p>
+                                          <div key={driver.cartItemId} className="flex flex-col gap-1.5 mb-1.5 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
+                                            <div className="flex items-start justify-between gap-1">
+                                              <div className="flex-1 min-w-0 pr-2">
+                                                <p className="text-[10px] font-bold text-blue-900 mb-1" title={driver.name}>
+                                                  {driver.name}
+                                                </p>
+                                                <div className="flex flex-wrap items-center gap-1 text-[9px] text-blue-800 font-medium">
+                                                  {driver.wattage && driver.wattage !== 'N/A' && (
+                                                    <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60">
+                                                      {driver.wattage}{String(driver.wattage).toUpperCase().endsWith('W') ? '' : 'W'}
+                                                    </span>
+                                                  )}
+                                                  <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60">
+                                                    Qty: {driver.quantity}
+                                                  </span>
+                                                  <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60">
+                                                    {formatPrice(driver.price ?? 0)}/unit
+                                                  </span>
+                                                  {driver.outputVoltage && (
+                                                    <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60">
+                                                      OV: {driver.outputVoltage}
+                                                    </span>
+                                                  )}
+                                                  {driver.outputCurrent && (
+                                                    <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60">
+                                                      OC: {driver.outputCurrent}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <button
+                                                onClick={() => removeFromCart(driver.cartItemId)}
+                                                className="p-1 rounded-md hover:bg-red-200/50 text-red-600 transition-all flex-shrink-0"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
                                             </div>
-                                            <button
-                                              onClick={() => removeFromCart(driver.cartItemId)}
-                                              className="p-1 rounded-md hover:bg-red-100 text-red-600 transition-all"
-                                            >
-                                              <X className="w-3 h-3" />
-                                            </button>
+                                            <div className="flex items-center justify-between mt-1 pt-1 border-t border-blue-200/50">
+                                              <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-md p-0.5">
+                                                <button onClick={() => decreaseQuantity(driver.cartItemId)} className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700"><Minus className="w-3 h-3" /></button>
+                                                <input type="number" min="1" value={driver.quantity} onChange={(e) => updateQuantity(driver.cartItemId, parseInt(e.target.value) || 1)} className="w-6 text-center text-[10px] font-bold outline-none bg-transparent" />
+                                                <button onClick={() => increaseQuantity(driver.cartItemId)} className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700"><Plus className="w-3 h-3" /></button>
+                                              </div>
+                                              <div className="text-right">
+                                                <p className="text-[10px] font-bold text-blue-900">Total: {formatPrice((driver.price ?? 0) * (driver.quantity ?? 1))}</p>
+                                              </div>
+                                            </div>
                                           </div>
                                         ))}
                                       </div>
