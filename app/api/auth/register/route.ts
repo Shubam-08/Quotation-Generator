@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        message: "User registered successfully",
+        message: "Registration successful. Please wait for admin approval.",
         user: {
           id: newUser._id,
           name: newUser.name,

@@ -2083,7 +2083,13 @@ export default function ProductsPage() {
                             )}
                           </td>
                           <td className="px-4 py-4 text-sm font-bold text-yellow-400">
-                            {formatPrice(currentPrice)}
+                            {session ? (
+                              formatPrice(currentPrice)
+                            ) : (
+                              <span className="text-xs text-gray-400 flex items-center gap-1 font-normal">
+                                🔒 Login to view
+                              </span>
+                            )}
                           </td>
                           {false && (
                           <td className="px-4 py-4">
@@ -2254,49 +2260,58 @@ export default function ProductsPage() {
                               </div>
                             ) : (
                               // Show Add to Cart button when item is not in cart
-                              <button 
-                                onClick={() => {
-                                  // Get selected beam angle if multiple exist
-                                  const beamAngles = p.beamAngle ? Array.from(new Set(p.beamAngle.split(/[\/,]/).map((angle: string) => angle.trim()).filter(Boolean))) : [];
-                                  const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
+                              session ? (
+                                <button 
+                                  onClick={() => {
+                                    // Get selected beam angle if multiple exist
+                                    const beamAngles = p.beamAngle ? Array.from(new Set(p.beamAngle.split(/[\/,]/).map((angle: string) => angle.trim()).filter(Boolean))) : [];
+                                    const selectedBeamAngle = beamAngles.length > 1 ? (selectedBeamAngles[p._id] || beamAngles[0]) : p.beamAngle;
 
-                                  const ccts = p.cct ? Array.from(new Set(p.cct.split(/[\/,]/).map((c: string) => c.trim()).filter(Boolean))) : [];
-                                  const selectedCct = ccts.length > 1 ? (selectedCcts[p._id] || ccts[0]) : p.cct;
+                                    const ccts = p.cct ? Array.from(new Set(p.cct.split(/[\/,]/).map((c: string) => c.trim()).filter(Boolean))) : [];
+                                    const selectedCct = ccts.length > 1 ? (selectedCcts[p._id] || ccts[0]) : p.cct;
 
-                                  const selectedIdx = selectedWattVariants[p._id] ?? 0;
-                                  const selectedVariant = p.wattageVariants?.[selectedIdx];
+                                    const selectedIdx = selectedWattVariants[p._id] ?? 0;
+                                    const selectedVariant = p.wattageVariants?.[selectedIdx];
 
-                                  setCustomizeProduct({ ...p, price: currentPrice });
-                                  setCustomSpecs({
-                                    category: p.category || '',
-                                    watt: selectedVariant?.watt || currentWatt || p.watt || '',
-                                    dimension: selectedVariant?.dimension || p.dimension || '',
-                                    beamAngle: selectedBeamAngle || p.beamAngle || '',
-                                    lumen: selectedVariant?.lumen || currentLumen || p.lumen || '',
-                                    ipRating: currentIpRating || '',
-                                    cct: selectedCct || p.cct || '',
-                                    price: currentPrice || p.price || '',
-                                    dimming: p.dimming || '',
-                                    accessories: p.accessories || '',
-                                    finish: p.finish || '',
-                                    reflectorFinish: p.reflectorFinish || '',
-                                    quantity: 1,
-                                  });
-                                  setDimmingCustom(p.dimming ? !DIMMING_OPTIONS.includes(p.dimming) : false);
-                                  setAccessoriesCustom(p.accessories ? !ACCESSORIES_OPTIONS.includes(p.accessories) : false);
-                                  setFinishCustom(p.finish ? !FINISH_OPTIONS.includes(p.finish) : false);
-                                  setReflectorFinishCustom(p.reflectorFinish ? !REFLECTOR_FINISH_OPTIONS.includes(p.reflectorFinish) : false);
-                                }}
-                                disabled={addingProductId === cartItemId}
-                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                                  addingProductId === cartItemId
-                                  ? 'bg-blue-500 text-white cursor-wait'
-                                  : 'bg-yellow-400 hover:bg-yellow-500 text-black hover:scale-105'
-                                }`}
-                              >
-                                <ShoppingCart className="w-4 h-4" />
-                                {addingProductId === cartItemId ? 'Adding...' : 'Add to Cart'}
-                              </button>
+                                    setCustomizeProduct({ ...p, price: currentPrice });
+                                    setCustomSpecs({
+                                      category: p.category || '',
+                                      watt: selectedVariant?.watt || currentWatt || p.watt || '',
+                                      dimension: selectedVariant?.dimension || p.dimension || '',
+                                      beamAngle: selectedBeamAngle || p.beamAngle || '',
+                                      lumen: selectedVariant?.lumen || currentLumen || p.lumen || '',
+                                      ipRating: currentIpRating || '',
+                                      cct: selectedCct || p.cct || '',
+                                      price: currentPrice || p.price || '',
+                                      dimming: p.dimming || '',
+                                      accessories: p.accessories || '',
+                                      finish: p.finish || '',
+                                      reflectorFinish: p.reflectorFinish || '',
+                                      quantity: 1,
+                                    });
+                                    setDimmingCustom(p.dimming ? !DIMMING_OPTIONS.includes(p.dimming) : false);
+                                    setAccessoriesCustom(p.accessories ? !ACCESSORIES_OPTIONS.includes(p.accessories) : false);
+                                    setFinishCustom(p.finish ? !FINISH_OPTIONS.includes(p.finish) : false);
+                                    setReflectorFinishCustom(p.reflectorFinish ? !REFLECTOR_FINISH_OPTIONS.includes(p.reflectorFinish) : false);
+                                  }}
+                                  disabled={addingProductId === cartItemId}
+                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                                    addingProductId === cartItemId
+                                    ? 'bg-blue-500 text-white cursor-wait'
+                                    : 'bg-yellow-400 hover:bg-yellow-500 text-black hover:scale-105'
+                                  }`}
+                                >
+                                  <ShoppingCart className="w-4 h-4" />
+                                  {addingProductId === cartItemId ? 'Adding...' : 'Add to Cart'}
+                                </button>
+                              ) : (
+                                <a 
+                                  href="/login"
+                                  className="flex items-center gap-1 px-3 py-2 bg-gray-600 hover:bg-gray-500 text-gray-300 rounded-md text-sm cursor-pointer transition-all whitespace-nowrap"
+                                >
+                                  🔒 Login
+                                </a>
+                              )
                             )}
                             <button
                               onClick={() => setSelectedProduct(p)}
