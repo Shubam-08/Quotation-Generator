@@ -318,10 +318,10 @@ export default function AdminDashboard() {
     if (existingIndex !== -1) {
       // Update existing IP rating price instead of blocking
       const priceMsg = newIpPrice && !isNaN(priceValue) && priceValue > 0 
-        ? `$${priceValue} USD` 
+        ? `₹${priceValue} INR` 
         : "TBD (no price)";
       if (confirm(`IP rating ${trimmed} already exists. Do you want to update the price to ${priceMsg}?`)) {
-        // Store price directly in USD (no conversion)
+        // Store price directly in INR (no conversion)
         const finalPrice = (newIpPrice && !isNaN(priceValue) && priceValue > 0) 
           ? Math.round(priceValue * 100) / 100 
           : 0;
@@ -335,7 +335,7 @@ export default function AdminDashboard() {
       return;
     }
     
-    // Store price directly in USD (no conversion) - rounded to 2 decimal places
+    // Store price directly in INR (no conversion) - rounded to 2 decimal places
     const finalPrice = (newIpPrice && !isNaN(priceValue) && priceValue > 0) 
       ? Math.round(priceValue * 100) / 100 
       : 0;
@@ -366,7 +366,7 @@ export default function AdminDashboard() {
       setBisApproval(product.bisApproval || []);
       setIsoCertificate(product.isoCertificate || []);
       
-      // Prices are stored in USD - no conversion needed
+      // Prices are stored in INR - no conversion needed
       if (product.ipRatings && product.ipRatings.length > 0) {
         setIpRatings(product.ipRatings);
       } else if (product.ipRating && product.ipRating.length > 0) {
@@ -521,16 +521,16 @@ export default function AdminDashboard() {
   }, [showToast]);
 
   // Inline price editing handlers
-  const handleStartInlineEdit = (productId: string, ipIndex: number, currentPriceInUSD: number) => {
-    // Prices are stored in USD - no conversion needed
+  const handleStartInlineEdit = (productId: string, ipIndex: number, currentPriceInINR: number) => {
+    // Prices are stored in INR - no conversion needed
     setEditingPrice({ productId, ipIndex });
-    setEditPriceValue(currentPriceInUSD.toString());
+    setEditPriceValue(currentPriceInINR.toString());
   };
 
   const handleSaveInlinePrice = async (productId: string, ipIndex: number, currentIpRatings: IpRatingPrice[]) => {
-    const newPriceUSD = parseFloat(editPriceValue);
+    const newPriceINR = parseFloat(editPriceValue);
     
-    if (isNaN(newPriceUSD) || newPriceUSD < 0) {
+    if (isNaN(newPriceINR) || newPriceINR < 0) {
       showToast("Please enter a valid price (0 or greater)", "error");
       return;
     }
@@ -538,8 +538,8 @@ export default function AdminDashboard() {
     setSavingPrice(true);
 
     try {
-      // Store price directly in USD (no conversion) - rounded to 2 decimal places
-      const finalPrice = Math.round(newPriceUSD * 100) / 100;
+      // Store price directly in INR (no conversion) - rounded to 2 decimal places
+      const finalPrice = Math.round(newPriceINR * 100) / 100;
 
       // Update the IP rating price
       const updatedIpRatings = [...currentIpRatings];
@@ -833,7 +833,7 @@ export default function AdminDashboard() {
                               <span className="text-xs font-semibold text-blue-800">{ip.rating}</span>
                               {editingPrice?.productId === product._id && editingPrice?.ipIndex === idx ? (
                                 <div className="flex items-center gap-1">
-                                  <span className="text-xs text-blue-600">$</span>
+                                  <span className="text-xs text-blue-600">₹</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -875,9 +875,9 @@ export default function AdminDashboard() {
                                 <button
                                   onClick={() => handleStartInlineEdit(product._id, idx, ip.price)}
                                   className="text-xs text-blue-600 hover:text-blue-800 hover:underline text-left"
-                                  title="Click to edit price in USD"
+                                  title="Click to edit price in INR"
                                 >
-                                  {ip.price > 0 ? `$${ip.price.toFixed(2)}` : 'TBD'}
+                                  {ip.price > 0 ? `₹${ip.price.toFixed(2)}` : 'TBD'}
                                 </button>
                               )}
                             </div>
@@ -901,7 +901,7 @@ export default function AdminDashboard() {
                       {product.ipRatings && product.ipRatings.length > 0 ? (
                         <span className="text-gray-400" title="Price varies by IP rating">Varies</span>
                       ) : (
-                        <span>${product.price.toFixed(2)}</span>
+                        <span>₹{product.price.toFixed(2)}</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1440,7 +1440,7 @@ export default function AdminDashboard() {
 
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      IP Ratings with Prices (USD)
+                      IP Ratings with Prices (INR)
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -1491,7 +1491,7 @@ export default function AdminDashboard() {
                           >
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-blue-900">{ip.rating}</span>
-                              <span className="text-xs text-blue-700">{ip.price > 0 ? `$${ip.price.toFixed(2)}` : 'TBD'}</span>
+                              <span className="text-xs text-blue-700">{ip.price > 0 ? `₹${ip.price.toFixed(2)}` : 'TBD'}</span>
                             </div>
                             <button
                               type="button"
