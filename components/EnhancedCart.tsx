@@ -4047,7 +4047,7 @@ export default function EnhancedCart() {
                       <label className={`flex items-center gap-1.5 text-xs font-semibold mb-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'
                         }`}>
                         <FileText className="w-3.5 h-3.5" />
-                        Quotation No
+                        Project Code
                       </label>
                       <input
                         type="text"
