@@ -399,22 +399,13 @@ export default function EnhancedCart() {
     return `${companyCode}/${productCode}/${countryCode}/${yy}/${mm}/${dd}/${serial}`;
   };
 
-  // Auto-fill & update quotation number when cart type or address change,
-  // using the CURRENT serial without incrementing it.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const currentSerial = getCurrentSerial();
-    const newQuote = generateQuotationNumber(currentSerial);
-    setAutoInvoiceNo(newQuote);
-    setUserInfo(prev => ({ ...prev, invoiceNo: newQuote }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddress, cart.length]);
+  // Auto-fill quotation removed for manual Project Code entry
   const canDownload =
     !!userInfo.email &&
     !!userInfo.mobile &&
     !!userInfo.project &&
-    !!userInfo.company;
+    !!userInfo.company &&
+    !!userInfo.invoiceNo;
   const totalItems = cart.reduce((sum, item) => sum + (item.quantity ?? 1), 0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -607,10 +598,12 @@ export default function EnhancedCart() {
 
       if (!canDownload) { setShowError(true); return; }
 
-      // Allocate next serial ONLY when exporting and update quotation number
-      const nextSerial = allocateNextSerial();
-      const exportQuoteNo = generateQuotationNumber(nextSerial);
-      setUserInfo(prev => ({ ...prev, invoiceNo: exportQuoteNo }));
+      if (!userInfo.invoiceNo || userInfo.invoiceNo.trim() === '') {
+        showToast('Please enter a Project Code before downloading', 'error');
+        clearInterval(progressInterval);
+        setDownloadingType(null);
+        return;
+      }
 
       // Persist quotation + user snapshot in backend
       try {
@@ -618,7 +611,7 @@ export default function EnhancedCart() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            quotationNumber: exportQuoteNo,
+            quotationNumber: userInfo.invoiceNo,
             clientName: userInfo.project || userInfo.company || 'Client',
             clientEmail: userInfo.email || session?.user?.email || '',
             products: cart
@@ -1230,10 +1223,12 @@ export default function EnhancedCart() {
 
       if (!canDownload) { setShowError(true); return; }
 
-      // Allocate next serial ONLY when exporting and update quotation number
-      const nextSerial = allocateNextSerial();
-      const exportQuoteNo = generateQuotationNumber(nextSerial);
-      setUserInfo(prev => ({ ...prev, invoiceNo: exportQuoteNo }));
+      if (!userInfo.invoiceNo || userInfo.invoiceNo.trim() === '') {
+        showToast('Please enter a Project Code before downloading', 'error');
+        clearInterval(progressInterval);
+        setDownloadingType(null);
+        return;
+      }
 
       // Persist quotation + user snapshot in backend
       try {
@@ -1241,7 +1236,7 @@ export default function EnhancedCart() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            quotationNumber: exportQuoteNo,
+            quotationNumber: userInfo.invoiceNo,
             clientName: userInfo.project || userInfo.company || 'Client',
             clientEmail: userInfo.email || session?.user?.email || '',
             products: cart
@@ -4082,6 +4077,7 @@ export default function EnhancedCart() {
                         }`}>
                         <FileText className="w-3.5 h-3.5" />
                         Project Code
+                        <span className="text-red-400 ml-0.5">*</span>
                       </label>
                       <input
                         type="text"
@@ -4089,9 +4085,12 @@ export default function EnhancedCart() {
                         value={userInfo.invoiceNo}
                         onChange={handleChange}
                         placeholder="e.g., QT-12345678"
-                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${isDarkMode
-                          ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                          : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
+                          (!userInfo.invoiceNo || userInfo.invoiceNo.trim() === '') && showError 
+                            ? 'border-red-500 bg-red-50' 
+                            : isDarkMode
+                              ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                              : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                           }`}
                       />
                     </div>

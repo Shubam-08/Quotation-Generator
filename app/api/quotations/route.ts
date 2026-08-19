@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     } = body;
 
     console.log('Received status from frontend:', status);
-    console.log('Full body received:', body);
+    // Removed full body log for privacy/security
 
     if (!quotationNumber || !clientName) {
       return NextResponse.json(
