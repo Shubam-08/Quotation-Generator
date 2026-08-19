@@ -285,7 +285,7 @@ export default function LedDisplaysAdmin() {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Pixel Pitch</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Application</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Price (USD)</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Price (INR)</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Materials</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
               </tr>
@@ -297,7 +297,7 @@ export default function LedDisplaysAdmin() {
                   <td className="px-4 py-3 text-gray-700">{display.category}</td>
                   <td className="px-4 py-3 text-gray-700">{display.pixelPitch || '-'}</td>
                   <td className="px-4 py-3 text-gray-700">{display.application || '-'}</td>
-                  <td className="px-4 py-3 text-gray-900">${(Math.round(display.price * 100) / 100).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-gray-900">₹{(Math.round(display.price * 100) / 100).toFixed(2)}</td>
                   <td className="px-4 py-3 text-sm">
                     {display.cabinetMaterialVariants && display.cabinetMaterialVariants.length > 0 ? (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">

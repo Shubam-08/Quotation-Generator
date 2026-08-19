@@ -207,7 +207,7 @@ export default function LightingControlsAdmin() {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Ok</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Ok</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Price (USD)</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Price (INR)</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
@@ -218,7 +218,7 @@ export default function LightingControlsAdmin() {
                   <td className="px-4 py-3 text-gray-700">{control.category}</td>
                   <td className="px-4 py-3 text-gray-700">{control.controlType || '-'}</td>
                   <td className="px-4 py-3 text-gray-700">{control.protocol || '-'}</td>
-                  <td className="px-4 py-3 text-gray-900">${control.price.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-gray-900">₹{control.price.toFixed(2)}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       <button
@@ -347,7 +347,7 @@ export default function LightingControlsAdmin() {
 
                   <div>
                     <label className="block text-sm font-semibold mb-2 text-gray-700">
-                      Base Price (USD) {formData.priceVariants && formData.priceVariants.length > 0 ? "(Optional)" : "*"}
+                      Base Price (INR) {formData.priceVariants && formData.priceVariants.length > 0 ? "(Optional)" : "*"}
                     </label>
                     <input
                       type="number"
@@ -407,7 +407,7 @@ export default function LightingControlsAdmin() {
                               <input
                                 type="number"
                                 step="0.01"
-                                placeholder="Price (USD)"
+                                placeholder="Price (INR)"
                                 value={variant.price || ""}
                                 onChange={(e) => {
                                   const newVariants = [...(formData.priceVariants || [])];

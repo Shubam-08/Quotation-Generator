@@ -139,7 +139,7 @@ export const renderFormFields = (
         {/* Square Feet field hidden as requested */}
         {formData.__context !== 'cart' && (
           <div>
-            <label className={labelClass}>Price (USD)</label>
+            <label className={labelClass}>Price (INR)</label>
             <input
               type="number"
               step="0.01"
@@ -178,7 +178,7 @@ export const renderFormFields = (
               </select>
             </div>
             <div className="flex-1">
-              <label className={labelSmallClass}>Price (USD per sq.m)</label>
+              <label className={labelSmallClass}>Price (INR per sq.m)</label>
               <input
                 type="number"
                 step="0.01"
