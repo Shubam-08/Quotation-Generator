@@ -129,6 +129,7 @@ export default function EnhancedCart() {
   const [autoInvoiceNo, setAutoInvoiceNo] = useState('');
   const [showError, setShowError] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [productCodes, setProductCodes] = useState<Record<string, string>>({});
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [editingQuantity, setEditingQuantity] = useState<string | null>(null);
@@ -938,8 +939,9 @@ export default function EnhancedCart() {
           // 1. S.No.
           row1.getCell(1).value = serialNumber;
 
-          // 2. Code (Blank)
-          row1.getCell(2).value = '';
+          // 2. Code
+          const itemCode = productCodes[item.cartItemId] || '';
+          row1.getCell(2).value = itemCode;
 
           // 3. Description
           const specLines: any[] = [];
@@ -3676,6 +3678,21 @@ export default function EnhancedCart() {
                                         <p className="text-[10px] text-gray-600">
                                           {item.category}
                                         </p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span className="text-black text-xs font-bold">
+                                            Code:
+                                          </span>
+                                          <input
+                                            type="text"
+                                            value={productCodes[item.cartItemId] || ''}
+                                            onChange={(e) => setProductCodes(prev => ({
+                                              ...prev,
+                                              [item.cartItemId]: e.target.value
+                                            }))}
+                                            placeholder="e.g. L1, CL2"
+                                            className="bg-white border border-gray-300 text-gray-900 font-bold text-xs rounded px-2 py-1 w-28 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none placeholder-gray-400 shadow-sm"
+                                          />
+                                        </div>
                                       </div>
                                       <div className="flex items-center gap-1">
                                         <button
