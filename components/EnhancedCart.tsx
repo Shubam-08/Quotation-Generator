@@ -108,6 +108,7 @@ const isDisplayItem = (item: CartItem) => {
 };
 
 export default function EnhancedCart() {
+  const [mounted, setMounted] = useState(false);
   const { cart, removeFromCart, clearCart, increaseQuantity, decreaseQuantity, updateQuantity, addDriverToCart, updateCartItem } = useCart() as {
     cart: CartItem[];
     removeFromCart: (id: string) => void;
@@ -5440,20 +5441,27 @@ export default function EnhancedCart() {
             {/* Content */}
             <div className="p-6">
               <div className="space-y-4">
-                <div>
+                <div className="flex flex-col gap-1 mb-3">
                   <label className={`block text-sm font-semibold mb-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                     Driver Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
+                    list="driver-options"
                     value={customDriverName}
                     onChange={(e) => setCustomDriverName(e.target.value)}
-                    placeholder="e.g. Meanwell LPF-60-24"
+                    placeholder="Select or type driver name..."
                     className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all outline-none ${isDarkMode
                       ? 'bg-gray-800 border border-white/20 text-white placeholder-gray-500 focus:border-blue-500'
                       : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                       }`}
                   />
+                  <datalist id="driver-options">
+                    <option value="Meanwell/Fullham/BAG INDIA Driver" />
+                    <option value="Non Dimmable Driver" />
+                    <option value="Dimmable Driver" />
+                    <option value="DALI Driver" />
+                  </datalist>
                 </div>
 
                 <div>
