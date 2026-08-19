@@ -123,6 +123,13 @@ export default function EnhancedCart() {
   const { data: session } = useSession();
   const { showToast } = useToast();
 
+  const formatINR = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
   // Check if user is admin
   const isAdmin = session?.user?.role === 'admin';
 
@@ -140,6 +147,11 @@ export default function EnhancedCart() {
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [selectedProductForDriver, setSelectedProductForDriver] = useState<CartItem | null>(null);
   const [customDriverName, setCustomDriverName] = useState('');
+  const [editingDriver, setEditingDriver] = useState<any>(null);
+  const [editDriverName, setEditDriverName] = useState('');
+  const [editDriverWattage, setEditDriverWattage] = useState('');
+  const [editDriverPrice, setEditDriverPrice] = useState('');
+  const [editDriverQuantity, setEditDriverQuantity] = useState(1);
   const [customDriverWattage, setCustomDriverWattage] = useState('');
   const [customDriverPrice, setCustomDriverPrice] = useState('');
   const [customDriverQuantity, setCustomDriverQuantity] = useState(1);
@@ -3817,12 +3829,12 @@ export default function EnhancedCart() {
                                           <Plus className="w-3 h-3" />
                                         </button>
                                       </div>
-                                      <div className="text-right">
-                                        <p className="text-[10px] text-gray-500 whitespace-nowrap">
-                                          {formatPrice(item.price ?? 0)} × {item.quantity}
+                                      <div className="text-right min-w-0 flex-1">
+                                        <p className="text-[10px] text-gray-500 break-words">
+                                          {currencyInfo.symbol}{formatINR(convertPrice(item.price ?? 0))} × {item.quantity}
                                         </p>
-                                        <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent whitespace-nowrap">
-                                          {formatPrice((item.price ?? 0) * (item.quantity ?? 1))}
+                                        <p className="text-sm font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent break-words">
+                                          {currencyInfo.symbol}{formatINR(convertPrice((item.price ?? 0) * (item.quantity ?? 1)))}
                                         </p>
                                       </div>
                                     </div>
@@ -3854,8 +3866,8 @@ export default function EnhancedCart() {
                                                   <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60">
                                                     Qty: {driver.quantity}
                                                   </span>
-                                                  <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60">
-                                                    {formatPrice(driver.price ?? 0)}/unit
+                                                  <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60 break-words max-w-full inline-block">
+                                                    {currencyInfo.symbol}{formatINR(convertPrice(driver.price ?? 0))}/unit
                                                   </span>
                                                   {driver.outputVoltage && (
                                                     <span className="bg-white/60 px-1.5 py-0.5 rounded border border-blue-200/60">
@@ -3869,21 +3881,38 @@ export default function EnhancedCart() {
                                                   )}
                                                 </div>
                                               </div>
-                                              <button
-                                                onClick={() => removeFromCart(driver.cartItemId)}
-                                                className="p-1 rounded-md hover:bg-red-200/50 text-red-600 transition-all flex-shrink-0"
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                              </button>
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setEditingDriver(driver);
+                                                    setEditDriverName(driver.name || '');
+                                                    setEditDriverWattage(String(driver.wattage || ''));
+                                                    setEditDriverPrice(String(driver.price || ''));
+                                                    setEditDriverQuantity(driver.quantity || 1);
+                                                  }}
+                                                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-md cursor-pointer transition-all text-[10px] font-bold shadow-sm"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  onClick={() => removeFromCart(driver.cartItemId)}
+                                                  className="p-1 rounded-md hover:bg-red-200/50 text-red-600 transition-all flex-shrink-0"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                              </div>
                                             </div>
-                                            <div className="flex items-center justify-between mt-1 pt-1 border-t border-blue-200/50">
-                                              <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-md p-0.5">
+                                            <div className="flex items-start justify-between mt-1 pt-1 border-t border-blue-200/50 gap-2">
+                                              <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-md p-0.5 shrink-0">
                                                 <button onClick={() => decreaseQuantity(driver.cartItemId)} className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700"><Minus className="w-3 h-3" /></button>
-                                                <input type="number" min="1" value={driver.quantity} onChange={(e) => updateQuantity(driver.cartItemId, parseInt(e.target.value) || 1)} className="w-6 text-center text-[10px] font-bold outline-none bg-transparent" />
+                                                <span className="text-gray-900 font-bold text-xs min-w-[20px] text-center">
+                                                  {driver.quantity || 1}
+                                                </span>
                                                 <button onClick={() => increaseQuantity(driver.cartItemId)} className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-100 text-gray-700"><Plus className="w-3 h-3" /></button>
                                               </div>
-                                              <div className="text-right">
-                                                <p className="text-[10px] font-bold text-blue-900">Total: {formatPrice((driver.price ?? 0) * (driver.quantity ?? 1))}</p>
+                                              <div className="text-right flex-1 min-w-0">
+                                                <p className="text-[10px] font-bold text-blue-900 break-words">Total: {currencyInfo.symbol}{formatINR(convertPrice((driver.price ?? 0) * (driver.quantity ?? 1)))}</p>
                                               </div>
                                             </div>
                                           </div>
@@ -4119,12 +4148,12 @@ export default function EnhancedCart() {
                 {/* Final Total */}
                 <div className={`p-4 rounded-xl mb-6 ${isDarkMode ? 'bg-gradient-to-br from-yellow-400/10 to-orange-400/10 border border-yellow-400/30 shadow-lg' : 'bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-300 shadow-md'
                   }`}>
-                  <div className="flex justify-between items-center">
-                    <span className={`text-sm font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                  <div className="flex justify-between items-start gap-4">
+                    <span className={`text-sm font-bold whitespace-nowrap shrink-0 mt-1 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
                       Final Total
                     </span>
-                    <span className={`text-2xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
-                      {currencyInfo.symbol} {total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span className="text-amber-600 font-bold text-lg leading-tight break-words text-right flex-1 min-w-0">
+                      {currencyInfo.symbol}{formatINR(total)}
                     </span>
                   </div>
                 </div>
@@ -5408,7 +5437,104 @@ export default function EnhancedCart() {
         </div>
       )}
 
-      {/* Driver Selection Modal */}
+      {/* Modals */}
+      {editingDriver && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-xl p-6 max-w-sm w-full border border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold">Edit Driver</h3>
+              <button
+                type="button"
+                onClick={() => setEditingDriver(null)}
+                className="text-gray-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">
+                  Driver Name *
+                </label>
+                <input
+                  type="text"
+                  list="driver-options-edit"
+                  value={editDriverName}
+                  onChange={(e) => setEditDriverName(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <datalist id="driver-options-edit">
+                  <option value="Meanwell/Fullham/BAG INDIA Driver" />
+                  <option value="Non Dimmable Driver" />
+                  <option value="Dimmable Driver" />
+                  <option value="DALI Driver" />
+                </datalist>
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">Wattage</label>
+                <input
+                  type="text"
+                  value={editDriverWattage}
+                  onChange={(e) => setEditDriverWattage(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">
+                  Price (INR)
+                </label>
+                <input
+                  type="text"
+                  value={editDriverPrice}
+                  onChange={(e) => setEditDriverPrice(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-600 text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
+                <span className="text-gray-400 text-sm">Quantity</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditDriverQuantity(prev => Math.max(1, prev - 1))}
+                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white cursor-pointer"
+                  >−</button>
+                  <span className="text-white font-bold w-8 text-center">
+                    {editDriverQuantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setEditDriverQuantity(prev => prev + 1)}
+                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white cursor-pointer"
+                  >+</button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!editDriverName) return;
+                  updateCartItem(editingDriver.cartItemId, {
+                    ...editingDriver,
+                    name: editDriverName,
+                    wattage: editDriverWattage,
+                    price: Number(editDriverPrice) || 0,
+                    quantity: editDriverQuantity,
+                  });
+                  setEditingDriver(null);
+                }}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer"
+              >
+                Update Driver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDriverModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`max-w-md w-full rounded-xl overflow-hidden ${isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200 shadow-lg'
