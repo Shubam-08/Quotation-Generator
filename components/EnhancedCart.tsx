@@ -629,8 +629,8 @@ export default function EnhancedCart() {
             clientName: userInfo.project || userInfo.company || 'Client',
             clientEmail: userInfo.email || session?.user?.email || '',
             products: cart.map(item => ({
-              productId: !String((item as any)._id || '').startsWith('custom-') 
-                ? ((item as any)._id || undefined) 
+              productId: !String((item as any)._id || '').startsWith('custom-')
+                ? ((item as any)._id || undefined)
                 : undefined,
               sku: item.sku || '',
               category: item.category || '',
@@ -640,8 +640,8 @@ export default function EnhancedCart() {
               watt: item.watt,
               lumen: (item as any).lumen || '',
               beamAngle: (item as any).beamAngle || '',
-              ipRating: Array.isArray(item.ipRating) 
-                ? item.ipRating.join(', ') 
+              ipRating: Array.isArray(item.ipRating)
+                ? item.ipRating.join(', ')
                 : item.ipRating || '',
               cct: (item as any).cct || '',
               dimming: (item as any).dimming || '',
@@ -1272,8 +1272,8 @@ export default function EnhancedCart() {
             clientName: userInfo.project || userInfo.company || 'Client',
             clientEmail: userInfo.email || session?.user?.email || '',
             products: cart.map(item => ({
-              productId: !String((item as any)._id || '').startsWith('custom-') 
-                ? ((item as any)._id || undefined) 
+              productId: !String((item as any)._id || '').startsWith('custom-')
+                ? ((item as any)._id || undefined)
                 : undefined,
               sku: item.sku || '',
               category: item.category || '',
@@ -1283,8 +1283,8 @@ export default function EnhancedCart() {
               watt: item.watt,
               lumen: (item as any).lumen || '',
               beamAngle: (item as any).beamAngle || '',
-              ipRating: Array.isArray(item.ipRating) 
-                ? item.ipRating.join(', ') 
+              ipRating: Array.isArray(item.ipRating)
+                ? item.ipRating.join(', ')
                 : item.ipRating || '',
               cct: (item as any).cct || '',
               dimming: (item as any).dimming || '',
@@ -1316,7 +1316,7 @@ export default function EnhancedCart() {
       // - If there are any LED display items, keep portrait (existing layout)
       // - If there are only LED lights (no displays), use landscape for a wider table
       const hasDisplayInCart = cart.some(item => !item.isDriver && isDisplayItem(item));
-      const orientation: 'portrait' | 'landscape' = hasDisplayInCart ? 'portrait' : 'portrait';
+      const orientation: 'portrait' | 'landscape' = hasDisplayInCart ? 'portrait' : 'landscape';
 
       const doc = new jsPDF({ orientation, unit: 'pt', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -1530,7 +1530,7 @@ export default function EnhancedCart() {
       const columns = hasOnlyLightingControls ? [
         'SI No', 'Image', 'Product Name', 'Description', `Price (${pdfCurrency})`, 'Quantity', `Total (${pdfCurrency})`
       ] : [
-        'S.No.', 'Description', 'Model No.', 'Image',
+        'S.No.', 'Code', 'Description', 'Model No.', 'Image',
         'Unit', 'Quantity', 'Unit Price', 'Total Amount'
       ];
 
@@ -2661,6 +2661,7 @@ export default function EnhancedCart() {
             } else {
               return [
                 index + 1, // SI No
+                '', // Code (blank for driver)
                 `${driverLabel}`, // No indentation or icon
                 { content: allSpecs, colSpan: 3, styles: { halign: 'left' as const } }, // Merged cell with all specs
                 item.quantity ?? 1,
@@ -2688,11 +2689,12 @@ export default function EnhancedCart() {
             // LED Product row - normal format
             return [
               index + 1,
-              getSpecText(item),
-              item.sku ?? 'N/A',
-              '',
-              'Nos',
-              item.quantity ?? 1,
+              productCodes[item.cartItemId] || '',  // Code column
+              getSpecText(item),                     // Description
+              item.sku ?? 'N/A',                    // Model No.
+              '',                                    // Image
+              'Nos',                                 // Unit
+              item.quantity ?? 1,                    // Quantity
               convertPrice(item.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
               (convertPrice(item.price ?? 0) * (item.quantity ?? 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             ];
@@ -2730,19 +2732,20 @@ export default function EnhancedCart() {
             2: { cellWidth: 'auto', minCellWidth: 70 },
             3: { cellWidth: 'auto', minCellWidth: 50 }
           } : {
-            0: { cellWidth: 45, halign: 'center' },      // S.No.
-            1: {
-              cellWidth: 150,
+            0: { cellWidth: 54, halign: 'center' },   // S.No.
+            1: { cellWidth: 80, halign: 'center' },   // Code
+            2: {
+              cellWidth: 180,
               halign: 'left',
               overflow: 'linebreak',
               cellPadding: { top: 4, right: 4, bottom: 4, left: 4 }
-            },       // Description
-            2: { cellWidth: 80, halign: 'center' },      // Model No.
-            3: { cellWidth: 70, halign: 'center' },      // Image
-            4: { cellWidth: 45, halign: 'center' },      // Unit
-            5: { cellWidth: 45, halign: 'center' },      // Quantity
-            6: { cellWidth: 65, halign: 'center' },      // Unit Price
-            7: { cellWidth: 67, halign: 'center' },      // Total Amount
+            },    // Description
+            3: { cellWidth: 80, halign: 'center' },   // Model No.
+            4: { cellWidth: 80, halign: 'center' },   // Image
+            5: { cellWidth: 80, halign: 'center' },   // Unit
+            6: { cellWidth: 80, halign: 'center' },   // Quantity
+            7: { cellWidth: 80, halign: 'center' },   // Unit Price
+            8: { cellWidth: 100, halign: 'center' },   // Total Amount
           },
           theme: 'grid', // Use grid theme to show all borders
           didParseCell: (data: CellHookData) => {
@@ -2751,10 +2754,10 @@ export default function EnhancedCart() {
               const idx = data.row.index;
               const item = organizedCart[idx];
 
-              if (data.column.index === 1 && !item?.isDriver) {
+              if (data.column.index === 2 && !item?.isDriver) {
                 data.cell.styles.fontStyle = 'normal';
                 data.cell.styles.overflow = 'linebreak';
-                data.cell.styles.cellWidth = 150;
+                data.cell.styles.cellWidth = 180;
               }
 
               // For driver rows, use lighter background and smaller height
@@ -2765,7 +2768,7 @@ export default function EnhancedCart() {
                 data.cell.styles.minCellHeight = 20; // Smaller height for drivers
 
                 // Only make the Driver Label bold, keep everything else normal
-                const driverLabelColIndex = hasOnlyLightingControls ? 2 : 1;
+                const driverLabelColIndex = hasOnlyLightingControls ? 2 : 2;
                 if (data.column.index === driverLabelColIndex) {
                   data.cell.styles.fontStyle = 'bold';
                 } else {
@@ -2784,7 +2787,7 @@ export default function EnhancedCart() {
               const item = organizedCart[idx];
               if (!item) return;
 
-              if (data.column.index === 1 && !item?.isDriver) {
+              if (data.column.index === 2 && !item?.isDriver) {
                 const specLines = getSpecText(item).split('\n');
 
                 // Clear the auto-rendered text by drawing white rect
@@ -2824,7 +2827,7 @@ export default function EnhancedCart() {
                 });
               }
 
-              const imgColIndex = hasOnlyLightingControls ? 1 : 3;
+              const imgColIndex = hasOnlyLightingControls ? 1 : 4;
 
               // Render images for product rows
               if (data.column.index === imgColIndex) {
@@ -4166,12 +4169,11 @@ export default function EnhancedCart() {
                         value={userInfo.invoiceNo}
                         onChange={handleChange}
                         placeholder="e.g., QT-12345678"
-                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${
-                          (!userInfo.invoiceNo || userInfo.invoiceNo.trim() === '') && showError 
-                            ? 'border-red-500 bg-red-50' 
-                            : isDarkMode
-                              ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
-                              : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                        className={`w-full px-3 py-2.5 rounded-lg text-xs transition-all outline-none ${(!userInfo.invoiceNo || userInfo.invoiceNo.trim() === '') && showError
+                          ? 'border-red-500 bg-red-50'
+                          : isDarkMode
+                            ? 'bg-black border border-white/20 text-white placeholder-gray-500 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
+                            : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20'
                           }`}
                       />
                     </div>

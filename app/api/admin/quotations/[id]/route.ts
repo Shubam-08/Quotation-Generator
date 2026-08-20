@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth-helpers";
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authCheck = await requireAdmin(req);
   if ("error" in authCheck) {
@@ -13,7 +13,8 @@ export async function GET(
   }
   try {
     await dbConnect();
-    const quotation = await Quotation.findById(params.id).lean();
+    const { id } = await params;
+    const quotation = await Quotation.findById(id).lean();
     if (!quotation) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
