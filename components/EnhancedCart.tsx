@@ -628,15 +628,32 @@ export default function EnhancedCart() {
             quotationNumber: userInfo.invoiceNo,
             clientName: userInfo.project || userInfo.company || 'Client',
             clientEmail: userInfo.email || session?.user?.email || '',
-            products: cart
-              .filter(item => {
-                const id = (item as any).productId || (item as any)._id || '';
-                return !String(id).startsWith('custom-');
-              })
-              .map(item => ({
-                productId: (item as any).productId || (item as any)._id || undefined,
-                quantity: item.quantity ?? 1,
-              })),
+            products: cart.map(item => ({
+              productId: !String((item as any)._id || '').startsWith('custom-') 
+                ? ((item as any)._id || undefined) 
+                : undefined,
+              sku: item.sku || '',
+              category: item.category || '',
+              quantity: item.quantity ?? 1,
+              unitPrice: item.price ?? 0,
+              totalPrice: (item.price ?? 0) * (item.quantity ?? 1),
+              watt: item.watt,
+              lumen: (item as any).lumen || '',
+              beamAngle: (item as any).beamAngle || '',
+              ipRating: Array.isArray(item.ipRating) 
+                ? item.ipRating.join(', ') 
+                : item.ipRating || '',
+              cct: (item as any).cct || '',
+              dimming: (item as any).dimming || '',
+              accessories: (item as any).accessories || '',
+              finish: (item as any).finish || '',
+              reflectorFinish: (item as any).reflectorFinish || '',
+              dimension: (item as any).dimension || '',
+              isDriver: item.isDriver || false,
+              driverName: item.isDriver ? (item as any).name || '' : '',
+              driverWattage: item.isDriver ? (item as any).wattage || '' : '',
+              itemCode: '',
+            })),
             totalPrice: total,
             userDepartment: session?.user?.department || '',
             userCountry: session?.user?.country || '',
@@ -1254,15 +1271,32 @@ export default function EnhancedCart() {
             quotationNumber: userInfo.invoiceNo,
             clientName: userInfo.project || userInfo.company || 'Client',
             clientEmail: userInfo.email || session?.user?.email || '',
-            products: cart
-              .filter(item => {
-                const id = (item as any).productId || (item as any)._id || '';
-                return !String(id).startsWith('custom-');
-              })
-              .map(item => ({
-                productId: (item as any).productId || (item as any)._id || undefined,
-                quantity: item.quantity ?? 1,
-              })),
+            products: cart.map(item => ({
+              productId: !String((item as any)._id || '').startsWith('custom-') 
+                ? ((item as any)._id || undefined) 
+                : undefined,
+              sku: item.sku || '',
+              category: item.category || '',
+              quantity: item.quantity ?? 1,
+              unitPrice: item.price ?? 0,
+              totalPrice: (item.price ?? 0) * (item.quantity ?? 1),
+              watt: item.watt,
+              lumen: (item as any).lumen || '',
+              beamAngle: (item as any).beamAngle || '',
+              ipRating: Array.isArray(item.ipRating) 
+                ? item.ipRating.join(', ') 
+                : item.ipRating || '',
+              cct: (item as any).cct || '',
+              dimming: (item as any).dimming || '',
+              accessories: (item as any).accessories || '',
+              finish: (item as any).finish || '',
+              reflectorFinish: (item as any).reflectorFinish || '',
+              dimension: (item as any).dimension || '',
+              isDriver: item.isDriver || false,
+              driverName: item.isDriver ? (item as any).name || '' : '',
+              driverWattage: item.isDriver ? (item as any).wattage || '' : '',
+              itemCode: '',
+            })),
             totalPrice: total,
             userDepartment: session?.user?.department || '',
             userCountry: session?.user?.country || '',

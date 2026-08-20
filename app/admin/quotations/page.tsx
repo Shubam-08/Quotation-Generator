@@ -18,6 +18,21 @@ export default function AdminQuotationsPage() {
   const [quotations, setQuotations] = useState<AdminQuotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedQuotation, setSelectedQuotation] = useState<any>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const handleRowClick = async (id: string) => {
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/admin/quotations/${id}`);
+      const data = await res.json();
+      setSelectedQuotation(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
 
   useEffect(() => {
     if (status === "loading") return;
@@ -82,7 +97,11 @@ export default function AdminQuotationsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {quotations.map((q) => (
-                <tr key={q._id}>
+                <tr 
+                  key={q._id} 
+                  onClick={() => handleRowClick(q._id)}
+                  className="cursor-pointer hover:bg-blue-50 transition-colors"
+                >
                   <td className="px-4 py-2 font-mono text-xs text-blue-700 break-all">
                     {q.quotationNumber}
                   </td>
@@ -93,12 +112,122 @@ export default function AdminQuotationsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-gray-500 text-xs">
-                    {q.createdAt ? new Date(q.createdAt).toLocaleString() : "-"}
+                    {q.createdAt ? new Date(q.createdAt).toLocaleString('en-GB') : "-"}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {selectedQuotation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 
+          z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl p-6 max-w-2xl 
+            w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                Quotation Details
+              </h2>
+              <button
+                onClick={() => setSelectedQuotation(null)}
+                className="text-gray-400 hover:text-gray-600 
+                  text-2xl cursor-pointer"
+              >×</button>
+            </div>
+
+            {/* Info Grid */}
+            <div className="grid grid-cols-2 gap-4 mb-6 
+              p-4 bg-gray-50 rounded-lg">
+              <div>
+                <p className="text-xs text-gray-500">Project Code</p>
+                <p className="font-semibold text-gray-900">
+                  {selectedQuotation.quotationNumber}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Date</p>
+                <p className="font-semibold text-gray-900">
+                  {new Date(selectedQuotation.createdAt).toLocaleString('en-GB')}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">User</p>
+                <p className="font-semibold text-gray-900">
+                  {selectedQuotation.userName}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Role</p>
+                <p className="font-semibold text-gray-900">
+                  {selectedQuotation.userRole}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Company</p>
+                <p className="font-semibold text-gray-900">
+                  {selectedQuotation.userCompanyName || '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Total Amount</p>
+                <p className="font-bold text-green-600 text-lg">
+                  ₹{selectedQuotation.totalPrice?.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2
+                  }) || '0.00'}
+                </p>
+              </div>
+            </div>
+
+            {/* Products Table */}
+            <h3 className="font-semibold text-gray-700 mb-2">Products</h3>
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">SKU</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Category</th>
+                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600">Qty</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Unit Price</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {selectedQuotation.products?.map((p: any, idx: number) => {
+                    const unitPrice = p.unitPrice || 0;
+                    const qty = p.quantity || 1;
+                    return (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-mono text-xs text-blue-700">
+                          {p.sku || p.productId?.sku || 'N/A'}
+                          {p.isDriver && (
+                            <span className="text-xs text-purple-600 ml-1">
+                              (Driver)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {p.category || p.productId?.category || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-center text-gray-700">
+                          {qty}
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-700">
+                          ₹{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-gray-900">
+                          ₹{(unitPrice * qty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>
